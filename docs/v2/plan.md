@@ -224,10 +224,14 @@ data**.
 
 ### 4.7 Multiplayer — *a first-class constraint (committed for v1.1, before v2)*
 
-Multiplayer is a **committed v1.1 feature** delivered on the v1 codebase; the **extended design
-conversation happens immediately after 1.0**, so specifics (link-style trade/battle vs. modern online,
-authoritative vs. peer, matchmaking scope) are deliberately open here. But two things are already fixed
-and constrain v2:
+Multiplayer is a **committed v1.1 feature** delivered on the v1 codebase. **The design conversation was
+held 2026-07-17 — see ADR-014**, which resolves the specifics this section left open: the faithful Cable
+Club only (trade + link battle), trusted peers over direct connect (no servers/matchmaking),
+deterministic lockstep, a versioned stable-ID mon-record wire schema, and a version+content-hash link
+identity handshake. The three requirements below are therefore now **pinned artifacts, not open
+questions** — the mon record is v2's serialized state model, the lockstep contract is §4.2's
+reproducible battle stream, and the link identity prototypes the project manifest. Two things were
+already fixed and constrain v2:
 
 - **v2 rebuilds a v1 that already has multiplayer**, so the v2 engine cannot treat it as a bolt-on. The
   pieces that networking touches must be designed network-ready from the start:

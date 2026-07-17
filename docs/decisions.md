@@ -2,6 +2,48 @@
 
 Newest first. Each entry: context → decision → consequences.
 
+## ADR-014 — v1.1 multiplayer is the faithful Cable Club over deterministic lockstep (2026-07-17)
+
+**Context:** ADR-013 committed multiplayer as a v1.1 feature whose extended design conversation happens
+immediately after 1.0 — it gates v2 because it pins the requirements v2's Core would otherwise guess at
+(deterministic/serializable battle state, a portable mon/state model, project identity). 1.0 shipped
+2026-07-17; the conversation was held the same day. The personal-use constraint frames everything: builds
+and extracted assets are never distributed, so the other player has always built pokeredpc themselves
+from their own `pokered/` clone.
+**Decision:** (1) **Audience: trusted peers, direct connect** — you plus friends running their own
+builds, over LAN or direct IP (Godot high-level multiplayer / ENet); no servers, accounts, matchmaking,
+or anti-cheat. (2) **Scope: the faithful Cable Club only** — link trades and link battles through the
+Pokémon Center upstairs, asm-faithful semantics including trade evolutions; no overworld presence in 1.1
+(a candidate for later). (3) **Authority: deterministic lockstep**, the cartridge's own model — a shared
+RNG seed at link-up, only the players' chosen actions cross the wire, both engines simulate and must
+agree; a desync is by definition a determinism bug. This ships v2 §4.7's "seed + action log → reproducible
+battle" contract as tested reality. (4) **Wire format: a versioned mon-record schema** with stable string
+IDs (`species:…`, `move:…`) and explicit fields, translated at the link boundary — v1 internals stay
+index-based; the schema is the mon record v2's Core inherits, formalized once. (5) **Handshake: strict
+identity** — exact `VERSION` match plus a content hash over link-relevant extracted data (written at
+extraction time); any mismatch refuses the session naming the differing part. Lockstep turns silent data
+drift into an undebuggable mid-battle desync, so refusal is the only sane failure mode; this prototypes
+v2's project-identity manifest. (6) **Connect UX: the Cable Club attendant is the seam** — she offers
+HOST / JOIN (IP entered on the Gen-1 naming-screen keyboard); everything after link-up follows the asm.
+`--host` / `--join <ip>` debug flags exist for automation. (7) **Disconnects: atomic trades with the dupe
+glitch as a mutual opt-in easter egg** — a trade commits two-phase (a drop completes on both sides or
+neither; a battle drop is stakeless, as on cartridge), but the classic cable-pull duplication glitch is
+deliberately preserved behind an opt-in flag that is **symmetric**: advertised in the handshake and active
+only when *both* peers enabled it, refused otherwise, so the two saves can never disagree about what a
+trade did. (8) **The 1.1 gate is a two-stage hybrid**, rhyming with ADR-011 — Stage 1: headless bot-vs-bot
+over localhost (a seeded desync soak asserting byte-identical battle event streams every turn; a scripted
+trade round-trip including a trade evolution with both saves verified; drop-injection proving no dupe and
+no loss, and that the easter egg fires only under mutual opt-in). Stage 2: a real remote human session —
+trades, battles both directions, at least one genuine disconnect — under ADR-011's log-and-continue policy.
+**Consequences:** The battle engine must be strictly deterministic on every code path (no
+frame-rate-dependent RNG draws, no float drift) — an audit v2 needed anyway, now forced early with the
+soak as its permanent oracle. The no-dupe default is a **documented divergence** from cartridge behavior
+(like the credits table-read clamp): the dupe is a hardware save-timing accident, not authored asm, and an
+accidental Wi-Fi blip forking a friend's mon is the worst outcome 1.1 could produce — hence safe by
+default, glitch by mutual consent. Three v2 Core requirements are now pinned artifacts instead of open
+questions: the reproducible-battle contract, the mon-record schema, and the content-hash identity. v2 work
+remains gated on 1.1 shipping, not merely on this design existing.
+
 ## ADR-013 — v2 is a generic monster-RPG creation toolkit, not just a moddable port (2026-07-12)
 
 **Context:** Beyond 1.0, the project's direction is to become **a toolkit others use to build and ship

@@ -2,10 +2,15 @@
 
 **Living document** — update the table when a milestone lands; add sub-tasks as discovered.
 
-**After 1.0 (direction):** **v1.1 = multiplayer** — the extended design conversation happens *immediately
-after 1.0*; it ships on v1 and also sets requirements for v2. **v2** is the fan-game creation toolkit
-(standalone Studio editor + generic engine + shareable projects) — see [v2/plan.md](v2/plan.md) and
-ADR-013. Sequence: **1.0 → v1.1 multiplayer → v2**. No v2 work begins until multiplayer's shape is known.
+**After 1.0 (direction):** **v1.1 = multiplayer** — the extended design conversation was **held
+2026-07-17** and its eight decisions are pinned in **ADR-014**: the faithful **Cable Club only**
+(link trades + link battles, trade evolutions included), trusted peers over direct connect,
+**deterministic lockstep**, a versioned **mon record** wire schema, a strict version+content-hash
+**link identity** handshake, the attendant as the HOST/JOIN seam, atomic trades (the dupe glitch as
+a mutual opt-in easter egg), and an ADR-011-style **two-stage 1.1 gate** (bot-vs-bot desync soak →
+real remote human session). **v2** is the fan-game creation toolkit (standalone Studio editor +
+generic engine + shareable projects) — see [v2/plan.md](v2/plan.md) and ADR-013. Sequence:
+**1.0 → v1.1 multiplayer → v2**. v2 work stays gated on 1.1 *shipping*, not just on the design.
 
 **Versioning:** SemVer where **`0.9.x` = full audited parity** (every system verified against the
 disassembly) and **`1.0.0` additionally requires a complete playthrough sign-off** — audits prove
@@ -17,8 +22,9 @@ PATCH = fixes/polish). The version lives in `VERSION` + `project.godot`
 Stage 1 (the seeded legit-play bot, NEW GAME → HALL OF FAME, seeds 1+2 GREEN) and Stage 2 (the
 complete human playthrough, signed off after ~60 fixed playtest issues and the full audit
 campaigns gh #19–#22/#176/#185). Every engine system maps to a completed audit; the tracker is
-at zero open bugs. **The next milestone is the v1.1 multiplayer design conversation** (to be
-held with the user — no multiplayer work before its shape is agreed), then v2 (ADR-013).
+at zero open bugs. **The v1.1 multiplayer design conversation is held (2026-07-17, ADR-014) — the next
+milestone is building v1.1**: the Cable Club (trades + link battles) over deterministic lockstep,
+gated by a bot-vs-bot desync soak then a real remote session; then v2 (ADR-013).
 Earlier: the playthrough bug waves (gh #23–#52, 27 issues) are fully fixed across 0.9.1–0.9.12:
 and the playthrough bug waves (gh #23–#52, 27 issues) are fully fixed across 0.9.1–0.9.12:
 options/start/yes-no boxes, party + summary + battle-item screens, Pokédex (with working

@@ -48,3 +48,38 @@ failure condition, alongside softlocks and crashes.
 The set of optional systems the human playthrough must exercise at least once in real context
 (legendaries, all three rods, Safari Zone, Game Corner, in-game trades, Day Care, fossils, gift
 Pokémon, PC storage, vending, bike, every HM field move, marts). Touch-once, not 100% completion.
+
+### Multiplayer (v1.1)
+
+**Cable Club**:
+The only multiplayer surface — the Pokémon Center upstairs, exactly as on cartridge: the Trade
+Center (link trades) and the Colosseum (link battles). If a feature isn't reachable through the
+Cable Club, it isn't v1.1 multiplayer.
+_Avoid_: online mode, netplay (both suggest more than is in scope)
+
+**Link session**:
+An established connection between two peers, from a successful [[link identity]] handshake to
+disconnect. Both players are trusted peers running self-built copies; there is no server between
+them.
+
+**Lockstep**:
+The link-battle authority model — no authority at all. Both engines simulate the same battle from a
+shared seed, exchanging only the players' chosen actions. A desync is never tolerated or
+reconciled: it is, by definition, a determinism bug in the engine.
+_Avoid_: host-authoritative, state sync
+
+**Mon record**:
+The versioned wire schema for one exchanged Pokémon — stable string IDs and explicit fields,
+independent of the engine's internal representation. The contract a trade speaks, and the state
+model v2 inherits.
+_Avoid_: save blob, party struct
+
+**Link identity**:
+What the handshake compares before a [[link session]] is allowed: the exact game version plus a
+content hash over link-relevant extracted data. Any mismatch refuses the session outright — under
+[[lockstep]], silent data drift becomes an undebuggable mid-battle desync.
+
+**Dupe easter egg**:
+The deliberately preserved cable-pull duplication glitch, off by default (trades commit atomically)
+and active only when *both* peers opt in during the handshake — never asymmetrically, so the two
+saves cannot disagree about what a trade did.
