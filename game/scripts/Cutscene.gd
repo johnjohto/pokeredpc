@@ -1232,20 +1232,41 @@ func _club_wait_link(hosting: bool, addr: String) -> void:
 	main.link.timeout_s = main.link_wait_s
 	var port: int = main.link_port if main.link_port > 0 else main.link.DEFAULT_PORT
 	if hosting:
+		# gh #5 follow-up: show the host their own address while they wait. The LAN IPv4
+		# comes from the OS; the external one is asked of the ROUTER via UPnP (no
+		# third-party service), which also maps the UDP port through so an internet
+		# friend can actually reach us.
+		main.link.lan_addr = main.link.lan_address()
+		if OS.get_cmdline_user_args().is_empty():   # real play only: tests skip router chatter
+			main.link.start_wan_query(port)
 		main.link.host(port)
 	else:
 		main.link.join(addr, port)
 	main.modal = main.textbox
-	main.textbox.show_ask("Waiting for a\npartner..." if hosting else "Calling %s ..." % addr)
+	var wait_txt := _club_host_wait_text() if hosting else "Calling %s ..." % addr
+	main.textbox.show_ask(wait_txt)
 	while main.link.state in ["waiting", "connecting", "handshake"]:
 		if Input.is_action_just_pressed("ui_cancel"):
 			main.link.close("player-canceled")
 			break
+		if hosting and _club_host_wait_text() != wait_txt:   # the router answered: show it
+			wait_txt = _club_host_wait_text()
+			main.textbox.show_ask(wait_txt)
 		await main.get_tree().process_frame
 	main.textbox.visible = false
 	main.textbox.active = false
 	main.textbox.held = false
 	main.modal = null
+
+
+## The hosting wait box: the partner types one of these at their attendant — the top line
+## for a friend on the same network, the bottom (once UPnP answers) for a remote one.
+func _club_host_wait_text() -> String:
+	if main.link.lan_addr == "" and main.link.wan_addr == "":
+		return "Waiting for a\npartner..."
+	var l1: String = main.link.lan_addr if main.link.lan_addr != "" else "waiting..."
+	var l2: String = main.link.wan_addr if main.link.wan_addr != "" else "waiting..."
+	return "Your address:\f%s\n%s" % [l1, l2]
 
 
 ## The "Please wait." beat: both sides confirm the save and sync (the asm's

@@ -69,6 +69,13 @@ talked to — faithful to `engine/link/cable_club_npc.asm` (`CableClubNPC`) +
 `engine/menus/main_menu.asm` (`LinkMenu`):
 
 - **Welcome** → no Pokédex: the "We're making preparations." brush-off, as on cartridge.
+- **HOST shows your address while you wait**: the waiting box lists the machine's LAN IPv4
+  (for a friend on the same network) and — once the router answers — the external address,
+  discovered via **UPnP** (`Link.start_wan_query`: the only thing consulted is your own
+  router, true to the no-servers design), which also **maps the UDP port through** so an
+  internet friend can reach you without manual port forwarding. The mapping is removed on
+  close. No gateway/UPnP → the plain "Waiting for a partner..." box; tests skip the router
+  chatter entirely.
 - **HOST / JOIN / CANCEL** — the modern stand-in for the asm's serial-connection attempt.
   JOIN opens the naming screen's **address mode** (digits + `.`; ED confirms; the
   **last-used address** is the ED default, saved additively as `link_addr`). A wait or a

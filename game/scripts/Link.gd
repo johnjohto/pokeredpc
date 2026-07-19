@@ -40,6 +40,10 @@ var _elapsed := 0.0
 var inbox: Array = []                # session messages that arrived with no `message` listener
                                      # connected (e.g. the partner sat at the table before we
                                      # loaded the room) — drained via take_inbox() on connect
+var lan_addr := ""                   # this machine's private IPv4 (shown while hosting)
+var wan_addr := ""                   # the router's external address, via UPnP ("" until found)
+var _wan_thread: Thread              # the blocking UPnP discover runs off the main thread
+var _upnp_mapped_port := 0           # the UDP port we asked the router to forward
 var _remote: Dictionary = {}         # the peer's hello identity
 var _remote_ok := false              # we validated their identity
 var _accepted := false               # they validated ours
@@ -110,6 +114,68 @@ func close(reason := "closed") -> void:
 		_finish(reason)
 
 
+## This machine's private IPv4 — the address a friend on the SAME network joins.
+func lan_address() -> String:
+	for a in IP.get_local_addresses():
+		var s := str(a)
+		if s.begins_with("192.168.") or s.begins_with("10."):
+			return s
+		if s.begins_with("172."):
+			var oct := int(s.get_slice(".", 1))
+			if oct >= 16 and oct <= 31:
+				return s
+	return ""
+
+
+## Ask the ROUTER (UPnP — no third-party service, true to the no-servers design) for the
+## external address a remote friend joins, and map the UDP port through while we're at it,
+## so internet hosting works without manual port forwarding. Runs on a thread: discover
+## blocks for up to ~1.5 s and must never hitch a frame. Results land in `wan_addr`.
+func start_wan_query(port: int) -> void:
+	if _wan_thread != null or wan_addr != "":
+		return
+	_wan_thread = Thread.new()
+	_wan_thread.start(_wan_worker.bind(port))
+
+
+func _wan_worker(port: int) -> void:
+	var upnp := UPNP.new()
+	if upnp.discover(1500, 2) == UPNP.UPNP_RESULT_SUCCESS:
+		var gw := upnp.get_gateway()
+		if gw != null and gw.is_valid_gateway():
+			upnp.add_port_mapping(port, port, "pokeredpc link", "UDP")
+			var ext := str(upnp.query_external_address())
+			call_deferred("_wan_found", ext, port)
+	call_deferred("_wan_thread_done")
+
+
+func _wan_found(ext: String, port: int) -> void:
+	if ext != "":
+		wan_addr = ext
+		_upnp_mapped_port = port
+		print("[link] reachable at %s (UPnP: UDP %d mapped)" % [ext, port])
+
+
+func _wan_thread_done() -> void:
+	if _wan_thread != null:
+		_wan_thread.wait_to_finish()
+		_wan_thread = null
+
+
+## Best-effort removal of the UPnP mapping (fire-and-forget thread; leases also expire).
+func _upnp_unmap() -> void:
+	if _upnp_mapped_port == 0:
+		return
+	var port := _upnp_mapped_port
+	_upnp_mapped_port = 0
+	var t := Thread.new()
+	t.start(func() -> void:
+		var upnp := UPNP.new()
+		if upnp.discover(1000, 2) == UPNP.UPNP_RESULT_SUCCESS:
+			upnp.delete_port_mapping(port, "UDP")
+		t.wait_to_finish.call_deferred())
+
+
 ## Hand over (and clear) the messages that arrived before a listener connected.
 func take_inbox() -> Array:
 	var held := inbox
@@ -122,6 +188,7 @@ func _finish(reason: String) -> void:
 		return
 	state = "closed"
 	inbox = []
+	_upnp_unmap()
 	if _enet != null:
 		_enet.destroy()
 		_enet = null

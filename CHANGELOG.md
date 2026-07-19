@@ -101,6 +101,11 @@ design ADR-014).
   the same ack-window pull deliberately reproduces the cartridge's duplication — the
   survivor keeps the copy, the puller's relaunch keeps the original.
 
+- **The host sees their own address** (gh #5 follow-up): while waiting at the attendant,
+  the box shows the machine's LAN IPv4 and — via UPnP, asking only your own router — the
+  external address, with the UDP port auto-mapped through (and unmapped on close) so an
+  internet friend can join without manual port forwarding.
+
 ### Fixed
 - **Healing-machine ball alignment** (gh #11): the right (x-flipped) ball of each pair drew
   one cell right of the machine's slot panel. A negative-width rect flips the texture but
