@@ -119,6 +119,7 @@ var martscreen                               # Poké Mart shop modal (MartScreen
 var title
 var battle
 var link                                     # v1.1 link layer (Link.gd, gh #3): the one networking seam
+var monrecord                                # v1.1 mon record codec (MonRecord.gd, gh #4): the link-boundary mapper
 var transition                              # screen transitions: battle wipes + warp fade (Transition.gd)
 var dungeon_maps: Array = []                # map labels using the dungeon battle transitions
 var slots                                   # Game Corner slot machine modal
@@ -371,6 +372,8 @@ func _ready() -> void:
 	link = preload("res://scripts/Link.gd").new()
 	add_child(link)
 	link.main = self
+	monrecord = preload("res://scripts/MonRecord.gd").new()
+	monrecord.main = self
 	slots = preload("res://scripts/SlotMachine.gd").new()
 	ui.add_child(slots)
 	slots.setup(ft, fcols, cmap, self)
@@ -531,6 +534,8 @@ func _ready() -> void:
 		_movefxtest()
 	elif "--battledettest" in args:
 		_battledettest()
+	elif "--monrecordtest" in args:
+		_monrecordtest()
 	elif "--host" in args:
 		_linktest(true)
 	elif _has_join_arg(args):
@@ -4921,6 +4926,106 @@ func _wraptest() -> void:
 	battle._say(["Enemy RATTATA used\nSUPER FANG!", "RATTATA was caught by RED!"], "menu")
 	await get_tree().create_timer(0.9).timeout
 	get_viewport().get_texture().get_image().save_png("res://wrap1.png")
+	get_tree().quit()
+
+
+## gh #4 (ADR-014): the mon record codec, tested single-process on fixture messages — a
+## fixture dict IS a valid peer message by construction of the versioned schema, so no
+## second instance is needed. Round-trips varied mons (nicknamed, statused, outsider OT,
+## every move-slot shape), refuses an unknown schema version, and rejects malformed and
+## field-invalid records without crashing. Run: `pwsh tools/run.ps1 -- --monrecordtest`.
+func _monrecordtest() -> void:
+	await get_tree().process_frame
+	player_name = "RED"
+	player_id = 31337
+	var ok := true
+
+	# --- round-trips: encode -> JSON wire string -> decode -> field compare + re-encode ---
+	var a: Dictionary = make_mon("kadabra", 40, [])                       # plain, own OT
+	var b: Dictionary = make_mon("dragonair", 35, ["WRAP", "THRASH", "AGILITY", "SLAM"])
+	b["name"] = "NOODLE"                                                  # nicknamed
+	b["status"] = "slp"; b["sleep"] = 3                                   # statused
+	b["ot"] = "TRADER"; b["otid"] = 555                                   # outsider mon
+	b["sexp"] = {"hp": 1200, "atk": 65535, "def": 40, "spd": 0, "spc": 7}
+	recompute_stats(b)
+	b["hp"] = 11                                                          # partial HP
+	b["moves"][0]["pp"] = 0; b["moves"][2]["pp"] = 5                      # spent PP
+	var c: Dictionary = make_mon("magikarp", 5, ["SPLASH"])               # one move slot
+	var d: Dictionary = make_mon("mrmime", 99, ["MIMIC", "METRONOME", "SUBSTITUTE", "CONFUSION"])
+	d["status"] = "psn"
+	for pair in [["plain", a], ["traded+status", b], ["one-move", c], ["four-move", d]]:
+		var mon: Dictionary = pair[1]
+		var wire := JSON.stringify(monrecord.encode(mon))                 # the peer-message form
+		var back: Dictionary = monrecord.decode_json(wire)
+		var good: bool = bool(back["ok"])
+		if good:
+			var m2: Dictionary = back["mon"]
+			for k in ["species", "name", "level", "exp", "hp", "maxhp", "status", "sleep",
+					"atk", "def", "spd", "spc", "ot", "otid"]:
+				good = good and str(m2.get(k)) == str(mon.get(k, m2.get(k)))
+			for k2 in ["hp", "atk", "def", "spd", "spc"]:   # per-key: dict ORDER may differ
+				good = good and int(m2["dvs"][k2]) == int(mon["dvs"][k2]) \
+					and int(m2["sexp"][k2]) == int(mon["sexp"][k2])
+			good = good and JSON.stringify(monrecord.encode(m2)) == wire  # canonical re-encode
+		print("[monrecord] round-trip %s: %s" % [pair[0], "ok" if good else
+			"FAIL (%s)" % back.get("error", "field mismatch")])
+		ok = ok and good
+
+	# --- unknown format version: refused cleanly, naming the schema ---
+	var vrec: Dictionary = monrecord.encode(a)
+	vrec["schema"] = "mon/9"
+	var vres: Dictionary = monrecord.decode(vrec)
+	var vok: bool = not bool(vres["ok"]) and "mon/9" in str(vres["error"])
+	print("[monrecord] unknown version refused: %s (%s)" % [vok, vres.get("error", "?")])
+	ok = ok and vok
+
+	# --- malformed / field-invalid fixtures: rejected, never crashing ---
+	var base: Dictionary = monrecord.encode(a)
+	var bad_fixtures: Array = [
+		["not JSON", "{nope"],
+		["not a dict", "[1, 2, 3]"],
+		["empty dict", "{}"],
+	]
+	for f in bad_fixtures:
+		var r: Dictionary = monrecord.decode_json(str(f[1]))
+		var rj: bool = not bool(r["ok"]) and str(r["error"]) != ""
+		print("[monrecord] reject %s: %s (%s)" % [f[0], rj, r.get("error", "?")])
+		ok = ok and rj
+	var tweaks: Array = [
+		["missing species", func(r: Dictionary) -> void: r.erase("species")],
+		["bare species id", func(r: Dictionary) -> void: r["species"] = "kadabra"],
+		["unknown species", func(r: Dictionary) -> void: r["species"] = "species:missingno"],
+		["level 0", func(r: Dictionary) -> void: r["level"] = 0],
+		["level 101", func(r: Dictionary) -> void: r["level"] = 101],
+		["level as text", func(r: Dictionary) -> void: r["level"] = "forty"],
+		["negative exp", func(r: Dictionary) -> void: r["exp"] = -1],
+		["bad status", func(r: Dictionary) -> void: r["status"] = "pox"],
+		["sleep 9", func(r: Dictionary) -> void: r["sleep"] = 9],
+		["dv 16", func(r: Dictionary) -> void: (r["dvs"] as Dictionary)["atk"] = 16],
+		["dv -1", func(r: Dictionary) -> void: (r["dvs"] as Dictionary)["spd"] = -1],
+		["stat exp 70000", func(r: Dictionary) -> void: (r["stat_exp"] as Dictionary)["hp"] = 70000],
+		["no moves", func(r: Dictionary) -> void: r["moves"] = []],
+		["five moves", func(r: Dictionary) -> void: r["moves"] = [
+			{"id": "move:POUND", "pp": 1}, {"id": "move:TACKLE", "pp": 1},
+			{"id": "move:GROWL", "pp": 1}, {"id": "move:SCRATCH", "pp": 1},
+			{"id": "move:EMBER", "pp": 1}]],
+		["unknown move", func(r: Dictionary) -> void: r["moves"] = [{"id": "move:FISSURE_X", "pp": 1}]],
+		["duplicate move", func(r: Dictionary) -> void: r["moves"] = [
+			{"id": "move:POUND", "pp": 1}, {"id": "move:POUND", "pp": 1}]],
+		["pp over max", func(r: Dictionary) -> void: r["moves"] = [{"id": "move:POUND", "pp": 99}]],
+		["numeric nickname", func(r: Dictionary) -> void: r["nickname"] = 12345],
+		["11-char nickname", func(r: Dictionary) -> void: r["nickname"] = "ABCDEFGHIJK"],
+		["trainer_id 70000", func(r: Dictionary) -> void: r["trainer_id"] = 70000],
+	]
+	for t in tweaks:
+		var rec: Dictionary = JSON.parse_string(JSON.stringify(base))     # deep copy via the wire
+		(t[1] as Callable).call(rec)
+		var r: Dictionary = monrecord.decode(rec)
+		var rj: bool = not bool(r["ok"]) and str(r["error"]) != ""
+		print("[monrecord] reject %s: %s (%s)" % [t[0], rj, r.get("error", "?")])
+		ok = ok and rj
+
+	print("[monrecord] %s" % ("ALL GREEN" if ok else "FAIL"))
 	get_tree().quit()
 
 

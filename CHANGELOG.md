@@ -32,6 +32,15 @@ design ADR-014).
   drives two-instance scenarios (clean link + round-trip, tampered part, tampered version,
   no-host timeout). See `docs/engine/link.md`.
 
+- **The mon record codec** (gh #4): `MonRecord.gd` maps one exchanged Pokémon between the
+  engine's internal dict and the versioned **`mon/1`** wire schema — stable string IDs
+  (`species:…`, `move:…`), explicit fields (level, exp, DVs, stat exp, status, moves + PP,
+  OT, trainer ID, nickname), the hp DV re-derived Gen-1-style, and stats rebuilt on decode
+  rather than trusted off the wire. Unknown schema versions are refused; malformed or
+  field-invalid records reject cleanly with the field named. `--monrecordtest` covers four
+  round-trip shapes and ~24 bad fixtures single-process. Doc:
+  `docs/data-formats/mon-record.md` — the serialized state model v2's Core inherits.
+
 ### Fixed
 - **Healing-machine ball alignment** (gh #11): the right (x-flipped) ball of each pair drew
   one cell right of the machine's slot panel. A negative-width rect flips the texture but

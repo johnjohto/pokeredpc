@@ -40,7 +40,13 @@ validates version + per-part hashes, refusals NAME the differing part and are de
 before the graceful drop (`peer_disconnect_later`), and the session records the mutual-only
 dupe flag. `python tools/linktest.py` drives four two-instance scenarios (clean + round-trip,
 tampered part, tampered version, no-host timeout) — ALL GREEN. See
-[engine/link.md](engine/link.md). Next: gh #4 (the mon record codec).
+[engine/link.md](engine/link.md). **Landed: gh #4 — the mon record codec** (2026-07-19):
+`MonRecord.gd` maps one mon between the internal dict and the versioned **`mon/1`** wire
+schema (stable `species:`/`move:` ids, explicit fields, hp DV re-derived, stats rebuilt —
+never trusted off the wire), refusing unknown versions and malformed records with
+field-naming errors; `--monrecordtest` round-trips four mon shapes + rejects ~24 bad
+fixtures single-process. See [data-formats/mon-record.md](data-formats/mon-record.md).
+Next: gh #5 (the Cable Club attendant) or gh #7 (Colosseum lockstep).
 Earlier: the playthrough bug waves (gh #23–#52, 27 issues) are fully fixed across 0.9.1–0.9.12:
 and the playthrough bug waves (gh #23–#52, 27 issues) are fully fixed across 0.9.1–0.9.12:
 options/start/yes-no boxes, party + summary + battle-item screens, Pokédex (with working

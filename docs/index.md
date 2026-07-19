@@ -18,6 +18,7 @@ as development proceeds — when a format, rule, or decision is discovered, reco
 - **[data-formats/graphics.md](data-formats/graphics.md)** — tile/sprite PNGs, palettes, transparency.
 - **[data-formats/pokemon.md](data-formats/pokemon.md)** — base stats, moves, types, learnsets.
 - **[data-formats/battle-anims.md](data-formats/battle-anims.md)** — per-move battle animations (`move_anims.json`).
+- **[data-formats/mon-record.md](data-formats/mon-record.md)** — the `mon/1` link wire schema for one exchanged Pokémon.
 
 ### Engine (Godot side)
 - **[engine/rendering.md](engine/rendering.md)** — block→tile expansion, custom 2D draw.
