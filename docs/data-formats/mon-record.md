@@ -49,7 +49,7 @@ Design rules:
 | `sleep` | int 0–7 | Sleep counter; zeroed on decode unless `status == "slp"`. |
 | `dvs` | 4 × int 0–15 | `atk/def/spd/spc`. The **hp DV is not sent** — Gen 1 derives it from the low bit of each of the other four, and decode re-derives it, so an illegal combination can't travel. |
 | `stat_exp` | 5 × int 0–65535 | `hp/atk/def/spd/spc` (Gen-1 EVs); folded into stats by the decode-side recompute (`CalcStat`'s sqrt term). |
-| `moves` | array of 1–4 | Each `{"id": "move:<CONST>", "pp": int}`. Move must exist, no duplicates, `pp` in `0..` the move's base PP (`maxpp` is derived — PP Ups are not modelled). |
+| `moves` | array of 1–4 | Each `{"id": "move:<CONST>", "pp": int, "maxpp": int}`. Move must exist, no duplicates, `maxpp` in `1..64` (Gen 1's absolute ceiling: 40 base + 3 PP Ups), `pp` in `0..maxpp`. `maxpp` travels **explicitly**: a real save's max PP can legitimately differ from the current move table (a move taught under an older extraction; PP Ups if ever modelled) — deriving it refused real parties. |
 | `ot` | string, 1–10 chars | Original trainer name. Drives the outsider-mon checks (boosted EXP, the Name Rater's refusal). |
 | `trainer_id` | int 0–65535 | The OT's ID number (`player_id` internally, `otid` on the mon). |
 

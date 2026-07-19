@@ -1543,9 +1543,10 @@ func _tc_commit(idx: int) -> bool:
 	var peer_record: Dictionary = _tc_q_record.pop_front()
 	var decoded: Dictionary = main.monrecord.decode(peer_record)
 	if not bool(decoded["ok"]):
+		print("[tc] abort: partner record refused — %s" % decoded["error"])
 		main.link.close("bad-record")
 		_tc_result = "aborted"
-		await say("The trade data\nwas invalid!\fThe trade did not\nhappen.")
+		await say("The trade data\nwas invalid!\f(%s)\fThe trade did not\nhappen." % decoded["error"])
 		return true
 	var received: Dictionary = decoded["mon"]
 	var dupe := bool(main.link.session.get("dupe", false))

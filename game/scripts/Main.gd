@@ -5054,7 +5054,11 @@ func _monrecordtest() -> void:
 		["unknown move", func(r: Dictionary) -> void: r["moves"] = [{"id": "move:FISSURE_X", "pp": 1}]],
 		["duplicate move", func(r: Dictionary) -> void: r["moves"] = [
 			{"id": "move:POUND", "pp": 1}, {"id": "move:POUND", "pp": 1}]],
-		["pp over max", func(r: Dictionary) -> void: r["moves"] = [{"id": "move:POUND", "pp": 99}]],
+		["missing maxpp", func(r: Dictionary) -> void: r["moves"] = [{"id": "move:POUND", "pp": 5}]],
+		["pp over maxpp", func(r: Dictionary) -> void: r["moves"] = [
+			{"id": "move:POUND", "pp": 20, "maxpp": 10}]],
+		["maxpp over the Gen-1 ceiling", func(r: Dictionary) -> void: r["moves"] = [
+			{"id": "move:POUND", "pp": 5, "maxpp": 99}]],
 		["numeric nickname", func(r: Dictionary) -> void: r["nickname"] = 12345],
 		["11-char nickname", func(r: Dictionary) -> void: r["nickname"] = "ABCDEFGHIJK"],
 		["trainer_id 70000", func(r: Dictionary) -> void: r["trainer_id"] = 70000],
@@ -5350,6 +5354,16 @@ func _recovertest() -> void:
 		sp.append(str(m["species"]))
 	print("[recover] loaded=%s party=%s box=%d journal=%s" % [
 		okl, sp, pc_box.size(), FileAccess.file_exists(_tc_journal_path())])
+	# Codec probe: run every party mon through the wire round-trip and name any failure —
+	# the exact check the Trade Center runs on the partner's records.
+	for m in player_party:
+		var rec: Dictionary = monrecord.encode(m)
+		var back: Dictionary = monrecord.decode(JSON.parse_string(JSON.stringify(rec)))
+		if bool(back["ok"]):
+			print("[codec] %s: ok" % m["species"])
+		else:
+			print("[codec] %s: FAIL — %s" % [m["species"], back["error"]])
+			print("[codec]   record: %s" % JSON.stringify(rec))
 	get_tree().quit()
 
 

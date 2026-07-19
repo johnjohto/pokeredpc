@@ -18,7 +18,8 @@ var main                       # Main: mon_base / mon_moves / make_mon / recompu
 func encode(mon: Dictionary) -> Dictionary:
 	var moves: Array = []
 	for mv in mon["moves"]:
-		moves.append({"id": "move:" + str(mv["move"]), "pp": int(mv["pp"])})
+		moves.append({"id": "move:" + str(mv["move"]), "pp": int(mv["pp"]),
+			"maxpp": int(mv["maxpp"])})
 	var dvs: Dictionary = mon["dvs"]
 	var sexp: Dictionary = mon["sexp"]
 	return {
@@ -101,6 +102,7 @@ func decode(rec) -> Dictionary:
 		return _err("moves must hold 1-4 entries (got %d)" % mlist.size())
 	var move_ids: Array = []
 	var pps: Array = []
+	var maxpps: Array = []
 	for m in mlist:
 		if not m is Dictionary or not str(m.get("id", "")).begins_with("move:"):
 			return _err("move entry without a move:… id")
@@ -109,12 +111,19 @@ func decode(rec) -> Dictionary:
 			return _err("unknown move '%s'" % mc)
 		if move_ids.has(mc):
 			return _err("duplicate move '%s'" % mc)
-		var maxpp := int(main.mon_moves[mc]["pp"])
+		# maxpp travels EXPLICITLY: a real save's maxpp can legitimately differ from the
+		# current move table (a move taught under an older extraction; PP Ups, if ever
+		# modelled) — deriving it refused real parties (the VAPOREON/BLIZZARD playtest
+		# bug). Bounded by Gen 1's absolute ceiling: 40 base + 3 PP Ups = 64.
+		var maxpp = _int_in(m, "maxpp", 1, 64)
+		if maxpp is String:
+			return _err("move %s: %s" % [mc, maxpp])
 		var pp = _int_in(m, "pp", 0, maxpp)
 		if pp is String:
 			return _err("move %s: %s" % [mc, pp])
 		move_ids.append(mc)
 		pps.append(pp)
+		maxpps.append(maxpp)
 	# rebuild the internal mon: stats always recomputed from base+level+DVs+stat exp —
 	# never trusted off the wire (a tampered record can't carry impossible stats).
 	var mon: Dictionary = main.make_mon(species, level, move_ids, dvs)
@@ -127,6 +136,7 @@ func decode(rec) -> Dictionary:
 	mon["otid"] = tid
 	for i in pps.size():
 		mon["moves"][i]["pp"] = pps[i]
+		mon["moves"][i]["maxpp"] = maxpps[i]
 	main.recompute_stats(mon)          # folds the stat-exp sqrt term into the stats
 	mon["hp"] = clampi(hp, 0, int(mon["maxhp"]))
 	return {"ok": true, "mon": mon}

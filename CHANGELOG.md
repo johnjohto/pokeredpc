@@ -107,6 +107,13 @@ design ADR-014).
   internet friend can join without manual port forwarding.
 
 ### Fixed
+- **"The trade data was invalid!" on real parties** (second playtest): the mon record
+  derived each move's max PP from the current move table and refused any saved PP above it
+  — a real save's VAPOREON carried BLIZZARD at 30/30 from an older extraction (the table
+  says 5) and the whole trade refused. `maxpp` now travels explicitly in the record
+  (bounded by Gen 1's 64 ceiling, `pp ≤ maxpp`), the refusal dialogue and `[tc]` log now
+  NAME the failing field, and `--recovertest` doubles as a codec probe that round-trips
+  every party mon of a save slot and prints any failure.
 - **Link-session robustness** (from the first real playtest): a dead link while standing in
   a Cable Club room now walks the player back to the attendant (the closed signal usually
   fired mid-flow and the kick never re-checked — players were stuck in the room); every
