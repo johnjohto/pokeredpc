@@ -4166,6 +4166,14 @@ var _last_cam_block := Vector2i(-9999, -9999)   # the culled world redraws on bl
 
 func _process(delta: float) -> void:
 	_flush_pending_on_enter()                         # a load callback a cutscene swallowed (gh #96)
+	# A dead link in a Cable Club room walks the player back out — POLLED, not signal-driven:
+	# the closed signal usually fires mid-flow (cutscene_active), whose own abort message
+	# handles that moment but leaves the player standing in the room; this catches them the
+	# moment they're free and returns them to the attendant (the reported stuck-in-room bug).
+	if link != null and link.state != "linked" and link.state != "idle" \
+			and center_label in ["TradeCenter", "Colosseum"] \
+			and modal == null and not cutscene_active and not _club_leaving:
+		_club_room_kicked()
 	# Clock. When a --playthrough / --<flag>test driver owns it (pt_time_scale > 0, gh #98) it applies
 	# everywhere: the bot's nav budgets already scale by Engine.time_scale (_pt_frames, gh #99), battles
 	# survive it, and the bot drives input from state rather than human pacing, so the gh #111 race can't
@@ -5460,6 +5468,15 @@ func _clubtest() -> void:
 			print("[trade] %s: result=%s party=%s box=%d journal=%s" % [
 				"host" if hosting else "join", cutscene._tc_result, names, pc_box.size(),
 				FileAccess.file_exists(_tc_journal_path())])
+			if str(cutscene._tc_result) != "done":
+				# the dead-link kick must walk us back out (the stuck-in-room bug)
+				var t3 := Time.get_ticks_msec()
+				while center_label == "TradeCenter" and Time.get_ticks_msec() - t3 < 75000:
+					if modal == textbox and textbox.active:
+						await _press("ui_accept")
+					else:
+						await get_tree().process_frame
+				print("[trade] after-drop map=%s" % center_label)
 		get_tree().quit()
 		return
 

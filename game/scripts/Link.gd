@@ -64,7 +64,21 @@ func identity() -> Dictionary:
 	return {"version": ver, "parts": parts, "flags": {"dupe": dupe_opt_in}}
 
 
+## Fresh handshake state per attempt: the one Link node serves many sessions (and the
+## joiner's redial), and stale _remote_ok/_accepted from a past session could otherwise
+## establish before the new peer validated anything.
+func _reset_session() -> void:
+	_remote = {}
+	_remote_ok = false
+	_accepted = false
+	_peer = null
+	session = {}
+	inbox = []
+	_elapsed = 0.0
+
+
 func host(port := DEFAULT_PORT) -> void:
+	_reset_session()
 	is_host = true
 	_enet = ENetConnection.new()
 	var err := _enet.create_host_bound("*", port, 1, 2)
@@ -78,6 +92,7 @@ func host(port := DEFAULT_PORT) -> void:
 
 
 func join(ip: String, port := DEFAULT_PORT) -> void:
+	_reset_session()
 	is_host = false
 	_enet = ENetConnection.new()
 	var err := _enet.create_host(1, 2)
@@ -224,6 +239,11 @@ func _process(delta: float) -> void:
 			return
 		if kind == ENetConnection.EVENT_CONNECT:
 			_peer = ev[1]
+			# Real networks hiccup: ENet's default drop detection is tuned for LAN. Give the
+			# peer up to ~60 s of unacknowledged silence before declaring it gone — combined
+			# with the human-paced waits, a rough patch stalls the session instead of
+			# killing it (the reported frequent "drops").
+			_peer.set_timeout(10000, 20000, 60000)
 			state = "handshake"
 			_elapsed = 0.0
 			var me := identity()

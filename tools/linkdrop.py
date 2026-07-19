@@ -85,6 +85,8 @@ def main():
         rec = recover(js)
         hp, jp = party_of(hs), party_of(js)
         ok &= check(f"trade@{point}: killed at the point", "[kill]" in jout)
+        ok &= check(f"trade@{point}: survivor walked back to the Center",
+                    "after-drop map=CeruleanPokecenter" in hout)
         ok &= check(f"trade@{point}: both saves untraded",
                     "machamp" not in hp and "kadabra" in hp
                     and "alakazam" not in jp and "machoke" in jp, f"{hp} / {jp}")

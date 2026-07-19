@@ -107,6 +107,16 @@ design ADR-014).
   internet friend can join without manual port forwarding.
 
 ### Fixed
+- **Link-session robustness** (from the first real playtest): a dead link while standing in
+  a Cable Club room now walks the player back to the attendant (the closed signal usually
+  fired mid-flow and the kick never re-checked — players were stuck in the room); every
+  human-paced club wait (partner picking/reading/choosing, the save-beat sync) is bounded
+  by link liveness instead of a 30-second timer — the timer expiring while a friend was
+  still deciding was the "frequent drops"; ENet's dead-peer tolerance raised to ~60 s of
+  silence; the joiner's call auto-redials twice ("No answer — redialing (2/3)..."); a
+  machine-paced protocol timeout now actively closes the link; and `host()`/`join()` reset
+  stale handshake state so a reused/redialed session can't establish early. Session resume
+  into an interrupted trade/battle is filed as gh #13.
 - **Healing-machine ball alignment** (gh #11): the right (x-flipped) ball of each pair drew
   one cell right of the machine's slot panel. A negative-width rect flips the texture but
   stays anchored at `position.x` — it does not draw leftward — so the flipped half must

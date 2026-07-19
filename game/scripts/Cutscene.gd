@@ -1245,14 +1245,27 @@ func _club_wait_link(hosting: bool, addr: String) -> void:
 	main.modal = main.textbox
 	var wait_txt := _club_host_wait_text() if hosting else "Calling %s ..." % addr
 	main.textbox.show_ask(wait_txt)
-	while main.link.state in ["waiting", "connecting", "handshake"]:
-		if Input.is_action_just_pressed("ui_cancel"):
-			main.link.close("player-canceled")
+	var attempt := 1
+	while true:
+		var canceled := false
+		while main.link.state in ["waiting", "connecting", "handshake"]:
+			if Input.is_action_just_pressed("ui_cancel"):
+				main.link.close("player-canceled")
+				canceled = true
+				break
+			if hosting and _club_host_wait_text() != wait_txt:   # the router answered
+				wait_txt = _club_host_wait_text()
+				main.textbox.show_ask(wait_txt)
+			await main.get_tree().process_frame
+		# A joiner's timed-out call auto-redials twice before giving up — the host may
+		# still be walking to their attendant (the requested connect retry).
+		if hosting or canceled or main.link.state == "linked" or _club_refusal != "" \
+				or attempt >= 3:
 			break
-		if hosting and _club_host_wait_text() != wait_txt:   # the router answered: show it
-			wait_txt = _club_host_wait_text()
-			main.textbox.show_ask(wait_txt)
-		await main.get_tree().process_frame
+		attempt += 1
+		main.textbox.show_ask("No answer —\nredialing (%d/3)..." % attempt)
+		main.link.timeout_s = main.link_wait_s
+		main.link.join(addr, port)
 	main.textbox.visible = false
 	main.textbox.active = false
 	main.textbox.held = false
@@ -1276,7 +1289,8 @@ func _club_sync_ready() -> bool:
 	main.modal = main.textbox
 	main.textbox.show_ask("Please wait.")
 	var waited := 0.0
-	while not _club_peer_ready and main.link.state == "linked" and waited < main.link_wait_s:
+	# Human-paced: the partner may still be reading the save prompt — liveness-bound.
+	while not _club_peer_ready and main.link.state == "linked":
 		await main.get_tree().process_frame
 		waited += main.get_process_delta_time()
 	main.textbox.visible = false
@@ -1305,8 +1319,8 @@ func _club_link_menu() -> int:
 	if idx == -9:
 		return _club_go
 	main.link.send_message({"t": "club_pick", "sel": 2 if idx < 0 else idx})
-	var waited := 0.0                          # the host always answers with club_go
-	while _club_go < 0 and main.link.state == "linked" and waited < main.link_wait_s:
+	var waited := 0.0                          # the host always answers with club_go —
+	while _club_go < 0 and main.link.state == "linked":   # but a human host may be deciding
 		await main.get_tree().process_frame
 		waited += main.get_process_delta_time()
 	return _club_go if _club_go >= 0 else 2
@@ -1359,15 +1373,24 @@ func _tc_on_message(msg: Dictionary) -> void:
 				main.battle.link_swaps.append(int(msg.get("idx", 0)))
 
 
-## Wait for `cond` while the link lives; false on link death or timeout (no soft-lock).
-func _tc_wait(cond: Callable) -> bool:
+## Wait for `cond` while the link lives. Machine-paced protocol replies (records, acks)
+## keep the link_wait_s timer; HUMAN-paced steps (the partner is choosing/reading) pass
+## `patient = true` and are bounded by link liveness alone — a friend who thinks for a
+## minute is the game working, not a dead link (the "frequent drops" were this timer).
+## Returns 1 ok, 0 link dead/timed out, -1 the player pressed B to give up (patient only).
+func _tc_wait(cond: Callable, patient := false) -> int:
 	var waited := 0.0
 	while not cond.call():
-		if main.link.state != "linked" or waited > main.link_wait_s:
-			return false
+		if main.link.state != "linked":
+			return 0
+		if patient:
+			if Input.is_action_just_pressed("ui_cancel"):
+				return -1
+		elif waited > main.link_wait_s:
+			return 0
 		await main.get_tree().process_frame
 		waited += main.get_process_delta_time()
-	return true
+	return 1
 
 
 ## Armed on ROOM ENTRY (not at the table): the partner may sit down and send `tc_party`
@@ -1456,15 +1479,20 @@ func _tc_flow() -> void:
 			return
 		main.link.send_message({"t": "tc_pick", "idx": idx})
 		main._maybe_kill("pick")
-		# --- the partner's pick ---
+		# --- the partner's pick (HUMAN-paced: they may browse; B stands up) ---
 		main.modal = main.textbox
 		main.textbox.show_ask("Waiting for your\nfriend to choose...")
-		var got := await _tc_wait(func() -> bool: return not _tc_q_pick.is_empty())
+		var got := await _tc_wait(func() -> bool: return not _tc_q_pick.is_empty(), true)
 		main.textbox.visible = false
 		main.textbox.active = false
 		main.textbox.held = false
 		main.modal = null
-		if not got:
+		if got == -1:
+			main.link.send_message({"t": "tc_cancel"})
+			_tc_result = "canceled"
+			await say("The trade was\ncanceled.")
+			return
+		if got == 0:
 			_tc_result = "aborted"
 			print("[tc] abort: no partner pick (link=%s)" % main.link.state)
 			await say("The link has been\nclosed.")
@@ -1480,8 +1508,11 @@ func _tc_flow() -> void:
 			str(main.player_party[idx]["name"]), _tc_rec_name(theirs)])
 		main.link.send_message({"t": "tc_confirm", "yes": yes})
 		main._maybe_kill("confirm")
-		got = await _tc_wait(func() -> bool: return not _tc_q_confirm.is_empty())
-		if not got:
+		while true:                                        # human-paced: they're reading the offer
+			got = await _tc_wait(func() -> bool: return not _tc_q_confirm.is_empty(), true)
+			if got != -1:                                  # (B does nothing here — answers are quick,
+				break                                      #  and a second cancel would desync rounds)
+		if got == 0:
 			_tc_result = "aborted"
 			print("[tc] abort: no partner confirm (link=%s)" % main.link.state)
 			await say("The link has been\nclosed.")
@@ -1502,10 +1533,12 @@ func _tc_commit(idx: int) -> bool:
 	main.link.send_message({"t": "tc_commit", "record": main.monrecord.encode(give)})
 	main._maybe_kill("commit")
 	var got := await _tc_wait(func() -> bool: return not _tc_q_record.is_empty())
-	if not got:
+	if got != 1:
 		_tc_result = "aborted"
 		print("[tc] abort: no partner record (link=%s)" % main.link.state)
-		await say("The link has been\nclosed.\fThe trade did not\nhappen.")
+		if main.link.state == "linked":
+			main.link.close("unresponsive")   # a protocol timeout IS a dead partner: close,
+		await say("The link has been\nclosed.\fThe trade did not\nhappen.")   # so the room kick fires now
 		return true
 	var peer_record: Dictionary = _tc_q_record.pop_front()
 	var decoded: Dictionary = main.monrecord.decode(peer_record)
@@ -1523,10 +1556,12 @@ func _tc_commit(idx: int) -> bool:
 	main.link.send_message({"t": "tc_ack"})
 	main._maybe_kill("ack")
 	got = await _tc_wait(func() -> bool: return _tc_q_ack > 0)
-	if not got:
+	if got != 1:
 		main._tc_journal_clear()                           # never acknowledged: nothing applied
 		_tc_result = "aborted"
 		print("[tc] abort: no partner ack (link=%s)" % main.link.state)
+		if main.link.state == "linked":
+			main.link.close("unresponsive")
 		await say("The link has been\nclosed.\fThe trade did not\nhappen.")
 		return true
 	_tc_q_ack -= 1

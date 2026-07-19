@@ -150,7 +150,17 @@ special cases):
   the `linktest.py` colosseum scenario across two real networked instances.
 - Waiting on the partner (`linkwait`) has no artificial clock — a friend may think; ENet's
   own dead-peer detection ends a vanished session, stakeless ("Waiting..." reads as the
-  game working, spec story 16).
+  game working, spec story 16). The same rule holds across the club: every **human-paced**
+  wait (the partner picking a mon, reading the trade offer, choosing the LinkMenu
+  destination, the save-beat sync) is bounded by link liveness, not a timer — only the
+  **machine-paced** protocol replies (records, acks) keep `link_wait_s`, and a machine
+  timeout actively closes the link (an unresponsive partner IS a dead one). ENet's
+  dead-peer tolerance is raised to ~60 s of unacknowledged silence (`set_timeout` at
+  connect) so a rough network patch stalls a session instead of killing it; the joiner's
+  call auto-redials twice before giving up; and a dead link while standing in a club room
+  **walks the player back to the attendant** (polled in `Main._process` — the closed
+  signal usually lands mid-flow, where only the message shows). Session **resume** into an
+  interrupted trade/battle is gh #13.
 
 **Documented v1.1 divergences** (each refused/handled identically on both sims, so no
 desync surface): items can't be used in a link battle (the cartridge allows them; the
