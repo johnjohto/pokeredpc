@@ -64,7 +64,11 @@ func _draw() -> void:
 		var ht: Texture2D = _heal_tex_c8 if _heal_flash else _heal_tex_e0
 		draw_texture_rect_region(ht, Rect2(44, 20, 8, 8), Rect2(0, 0, 8, 8))
 		for i in _heal_balls:                         # ball pairs; the right half is x-flipped
-			var bx := 40.0 if i % 2 == 0 else 56.0    # flipped draw: x + width
+			# gh #11: a negative-width rect FLIPS the texture but stays anchored at position.x —
+			# it does not draw leftward. Anchoring the flipped half at 56 put the right balls one
+			# cell right of the machine's slot panel; pokered's OAM has the pair at x 48/56 raw,
+			# screen 40/48 (dbsprite 6,y / 7,y | OAM_XFLIP in PokeCenterOAMData).
+			var bx := 40.0 if i % 2 == 0 else 48.0
 			var bw := 8.0 if i % 2 == 0 else -8.0
 			# heal_machine.png stacks its two tiles VERTICALLY: the ball is at (0,8), not
 			# (8,0) — the old region read off the texture's right edge and drew nothing (gh #69)
@@ -79,7 +83,11 @@ func _draw() -> void:
 				draw_texture(_anne["smoke"], Vector2(p) + Vector2((q % 2) * 8.0, (q / 2) * 8.0))
 	if _fly_bird_tex:                                 # the FLY bird (player_animations.asm, gh #144)
 		var bf := 5 if _fly_bird_flap else 2          # the flap alternates walk-left/stand-left
-		var brect := Rect2(_fly_bird + Vector2(16, 0), Vector2(-16, 16)) if _fly_bird_right \
+		# gh #11: a negative-width rect flips the texture but stays anchored at position.x, so
+		# the mirrored (right-facing) frame anchors at the SAME spot as the left-facing one —
+		# the old `+ Vector2(16, 0)` anchor drew every right-facing frame 16 px right of its
+		# asm screen coord.
+		var brect := Rect2(_fly_bird, Vector2(-16, 16)) if _fly_bird_right \
 			else Rect2(_fly_bird, Vector2(16, 16))    # right-facing = the left frame mirrored
 		draw_texture_rect_region(_fly_bird_tex, brect, Rect2(0, bf * 16, 16, 16))
 	if _in_credits:                                   # the end-credits roll (engine/movie/credits.asm)

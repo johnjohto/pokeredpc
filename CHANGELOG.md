@@ -33,6 +33,12 @@ design ADR-014).
   no-host timeout). See `docs/engine/link.md`.
 
 ### Fixed
+- **Healing-machine ball alignment** (gh #11): the right (x-flipped) ball of each pair drew
+  one cell right of the machine's slot panel. A negative-width rect flips the texture but
+  stays anchored at `position.x` — it does not draw leftward — so the flipped half must
+  anchor at its own screen x (48, per `PokeCenterOAMData`), not at `x + width`. The same
+  idiom offset every right-facing FLY-bird frame 16 px right of its asm screen coord; fixed
+  together. Verified by `--healtest` / `--flytest` shots.
 - `--dblkotest` no longer depends on a lucky TAKE DOWN accuracy roll: the double-KO setup
   re-arms and retries until the hit lands.
 
