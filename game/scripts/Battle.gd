@@ -174,6 +174,97 @@ var _level_stats := {}         # new stats shown in the level-up box (PrintStats
 var queue: Array = []
 var after := ""
 
+# ---- determinism oracle (gh #2, ADR-014) -----------------------------------
+# Link battles run deterministic lockstep: both peers simulate the identical battle from a
+# shared seed and exchange only chosen actions, so every battle-LOGIC random draw must come
+# from this battle-local generator — never the global RNG, which the overworld (NPC wander,
+# encounter rolls) advances at frame rate. Each turn appends a canonical event line (turn,
+# both actions, the RNG cursor, a state digest) to `det_stream`; byte-equality of two peers'
+# streams is the DEFINITION of "in sync" (ADR-014). Verified by --battledettest.
+var rng := RandomNumberGenerator.new()
+var rng_cursor := 0            # logic draws since battle start (the lockstep "RNG cursor")
+var battle_seed := 0           # this battle's seed (a link session fixes it at establishment)
+var next_seed := -1            # set before start*() to force the seed (tests/link); -1 = derive
+var det_stream: Array = []     # canonical event lines (docs/engine/battle.md "Determinism")
+var det_log := false           # echo events to stdout as [battledet] lines (the link soak reads logs)
+var turn_no := 0
+var _det_paction := "-"        # the player action driving the current turn, canonical form
+var _det_eaction := "-"        # the enemy action (in a link battle: the peer's choice)
+
+
+## Battle-logic random draws (the ONLY randomness battle rules may use): each advances the
+## cursor, so two lockstep peers can compare how much randomness every turn consumed.
+func _ri(n: int) -> int:
+	rng_cursor += 1
+	return rng.randi() % n
+
+
+func _rr(lo: int, hi: int) -> int:
+	rng_cursor += 1
+	return rng.randi_range(lo, hi)
+
+
+func _rf() -> float:
+	rng_cursor += 1
+	return rng.randf()
+
+
+## One canonical event line: kind ("S" start / "T<n>" turn / "X" mid-turn decision / "END"),
+## the action info, the RNG cursor, and the state digest.
+func _det_event(kind: String, info: String) -> void:
+	var line := "%s|%s|c=%d|%s" % [kind, info, rng_cursor, _det_digest()]
+	det_stream.append(line)
+	if det_log:
+		print("[battledet] " + line)
+
+
+## Canonical digest of everything the battle rules can read or write. Field order is fixed
+## throughout — the digest must not depend on dictionary construction history.
+func _det_digest() -> String:
+	var s := "a%d/e%d;" % [active, enemy_active]
+	for m in party:
+		s += _det_mon(m)
+	s += "~"
+	for m in enemy_party:
+		s += _det_mon(m)
+	s += "~" + _det_kv(p_stages) + _det_kv(e_stages) + _det_kv(p_mod) + _det_kv(e_mod)
+	s += "~" + _det_kv(p_vol) + _det_kv(e_vol)
+	s += "~r%d;u%d;t%d;p%s;%s%s%s" % [run_attempts, _ai_uses, _ai_turn,
+		str(participants), str(won), str(caught), str(blacked_out)]
+	return s.md5_text()
+
+
+func _det_mon(mon: Dictionary) -> String:
+	var s := "%s,L%d,x%d,%d/%d,%s%d," % [str(mon["species"]), int(mon["level"]),
+		int(mon["exp"]), int(mon["hp"]), int(mon["maxhp"]), str(mon["status"]), int(mon["sleep"])]
+	s += "%d.%d.%d.%d," % [int(mon["atk"]), int(mon["def"]), int(mon["spd"]), int(mon["spc"])]
+	s += str(mon["types"][0]) + "." + str(mon["types"][1]) + ","
+	for mv in mon["moves"]:
+		s += "%s/%d." % [str(mv["move"]), int(mv["pp"])]
+	return s + ";"
+
+
+## Sorted key=value dump of a stages/mod/vol dict. Nested values (the Transform/Mimic
+## backups) count by presence only — their contents are mon state already in the digest.
+func _det_kv(d: Dictionary) -> String:
+	var ks := d.keys()
+	ks.sort()
+	var s := ""
+	for k in ks:
+		var v = d[k]
+		s += "%s=%s," % [str(k), "#" if (v is Dictionary or v is Array) else str(v)]
+	return s + ";"
+
+
+## The canonical form of a player action for the event stream.
+func _det_action(action: Dictionary) -> String:
+	var kind := str(action["kind"])
+	if kind == "switch":
+		return "w:%d" % int(action["idx"])
+	if kind == "forced":
+		return "f:" + str(action["move"])
+	return "m:" + str(player_mon["moves"][int(action["idx"])]["move"])
+
 
 func setup(ftex: Texture2D, cols: int, cmap: Dictionary, base: Dictionary, mdb: Dictionary, tchart: Dictionary) -> void:
 	font_tex = ftex
@@ -292,6 +383,7 @@ func start(p_party: Array, e_species: String, e_level: int) -> void:
 	if not demo:                # BATTLE_TYPE_OLD_MAN sends no mon out: the back pic stays put
 		q.append_array([{"intro": "slide_off"},
 			{"auto": "Go! %s!" % player_mon["name"]}, {"intro": "throw"}])
+	_det_event("S", "wild seed=%d" % battle_seed)
 	_say(q, "menu")
 
 
@@ -318,6 +410,7 @@ func start_trainer(p_party: Array, enemy_data: Array, tname: String, money_base:
 	q.append_array([{"auto": "%s sent\nout %s!" % [tname, enemy_mon["name"]]},
 		{"intro": "enemy_grow"}, {"intro": "enemy_hud"}, {"intro": "pause"},
 		{"intro": "slide_off"}, {"auto": "Go! %s!" % player_mon["name"]}, {"intro": "throw"}])
+	_det_event("S", "trainer seed=%d" % battle_seed)
 	_say(q, "menu")
 
 
@@ -332,12 +425,24 @@ func start_safari(p_party: Array, e_species: String, e_level: int) -> void:
 	safari_catch = int(base_stats[enemy_mon["species"]]["catch"])
 	# The same wild intro, but no send-out — the player's own pic stays on screen (StartBattle
 	# jumps straight to the safari menu).
+	_det_event("S", "safari seed=%d" % battle_seed)
 	_say([{"intro": "silhouette"}, {"intro": "reveal"}, {"intro": "pokeballs"},
 		{"auto": "Wild %s\nappeared!" % enemy_mon["name"]}, {"intro": "enemy_hud"},
 		{"intro": "pause"}, {"intro": "end"}], "menu")
 
 
 func _begin(p_party: Array) -> void:
+	# Determinism oracle (gh #2): seed the battle-local RNG. Outside a link/test, the seed
+	# itself comes off the global RNG — the battle stays as unpredictable as before, but
+	# every draw AFTER this line is battle-local and replayable from the seed alone.
+	battle_seed = next_seed if next_seed >= 0 else (randi() & 0x7fffffff)
+	next_seed = -1
+	rng.seed = battle_seed
+	rng_cursor = 0
+	turn_no = 0
+	det_stream = []
+	_det_paction = "-"
+	_det_eaction = "-"
 	party = p_party
 	is_trainer = false
 	is_safari = false
@@ -704,6 +809,7 @@ func _resolve_after() -> void:
 		"party_forced":
 			state = "party_forced"; cursor = _first_usable(); queue_redraw()
 		_:
+			_det_event("END", "won=%s caught=%s blackout=%s" % [won, caught, blacked_out])
 			if not caught:
 				visible = false        # a catch keeps the scene up for the dex/nickname beats
 			_revert_battle_copy(player_mon, p_vol)
@@ -915,6 +1021,7 @@ func _nav_grid() -> void:
 ## you're at least as fast, else odds are playerSpeed*32 / ((enemySpeed/4) % 256) + 30 per
 ## prior attempt against a byte roll — and failing costs the turn (the wild mon attacks).
 func _try_run() -> void:
+	_det_paction = "r"
 	run_attempts += 1
 	if not (ghost or is_safari or demo):
 		var ps := _eff_speed(true)
@@ -923,7 +1030,7 @@ func _try_run() -> void:
 			var b := (es >> 2) % 256
 			if b > 0:
 				var q := (ps * 32) / b + 30 * (run_attempts - 1)
-				if q <= 255 and randi() % 256 >= q:
+				if q <= 255 and _ri(256) >= q:
 					_enemy_turn_after_item(["Can't escape!"])
 					return
 	_say([{"sfx": "run"}, "Got away\nsafely!"], "run")
@@ -954,14 +1061,16 @@ func _choose_action() -> void:
 		"BALL":
 			_safari_ball()
 		"BAIT":
+			_det_paction = "bait"
 			safari_catch = safari_catch >> 1                 # bait halves the catch rate
 			safari_escape = 0
-			safari_bait = min(255, safari_bait + (randi() % 5 + 1))
+			safari_bait = min(255, safari_bait + (_ri(5) + 1))
 			_safari_turn(["%s threw\nsome BAIT." % main.player_name])
 		"ROCK":
+			_det_paction = "rock"
 			safari_catch = min(255, safari_catch * 2)         # a rock doubles the catch rate
 			safari_bait = 0
-			safari_escape = min(255, safari_escape + (randi() % 5 + 1))
+			safari_escape = min(255, safari_escape + (_ri(5) + 1))
 			_safari_turn(["%s threw\na ROCK." % main.player_name])
 
 
@@ -972,6 +1081,7 @@ func _mimic_choose() -> void:
 	var mslot: Dictionary = player_mon["moves"][_mimic_slot]
 	mslot["move"] = m
 	mslot["maxpp"] = int(moves_db[m]["pp"])
+	_det_event("X", "mimic:" + m)          # MIMIC's mid-turn pick: a player decision (gh #2)
 	queue.push_front("%s learned\n%s!" % [player_mon["name"], str(moves_db[m]["name"])])
 	_next_msg()
 
@@ -998,6 +1108,7 @@ func _learn_choose(idx: int) -> void:
 	var pre: Array = []
 	for m in out:
 		pre.append_array(_wrap(m))
+	_det_event("X", "learn:%d" % idx)         # the "delete a move?" pick: a player decision (gh #2)
 	queue = pre + queue                       # show result, then resume the queued messages
 	_next_msg()
 
@@ -1037,6 +1148,7 @@ func _choose_party() -> void:
 		_sub_shown["player"] = false
 		if not participants.has(active):
 			participants.append(active)
+		_det_event("X", "w:%d" % active)   # faint replacement: a player decision mid-flow (gh #2)
 		_say([{"auto": "Go! %s!" % player_mon["name"]}, {"send_player": true}], "menu")
 	elif state == "party_shift":
 		# SHIFT style: a free switch before the trainer's next mon comes out; the queued
@@ -1051,6 +1163,7 @@ func _choose_party() -> void:
 		_sub_shown["player"] = false
 		if not participants.has(active):
 			participants.append(active)
+		_det_event("X", "w:%d" % active)   # SHIFT free switch: a player decision mid-flow (gh #2)
 		queue.push_front({"send_player": true})
 		queue.push_front({"auto": "Go! %s!" % player_mon["name"]})
 		queue.push_front({"recall": true})
@@ -1076,6 +1189,7 @@ func _consume(item: String) -> void:
 func _use_item(item: String) -> void:
 	if not demo and int(main.player_bag.get(item, 0)) <= 0:
 		return                                    # (the old man throws his own ball)
+	_det_paction = "i:" + item
 	# --- Poké Balls (all four kinds roll ItemUseBall's algorithm) ---
 	if item in ["POKé BALL", "GREAT BALL", "ULTRA BALL", "MASTER BALL"]:
 		if is_trainer:
@@ -1237,6 +1351,7 @@ func _safari_ball() -> void:
 		return
 	# No 0-ball guard, faithfully: ItemUseBall just decrements wNumSafariBalls — the menu can
 	# never reappear at 0, because the battle ends the moment the count hits it (gh #180).
+	_det_paction = "i:SAFARI BALL"
 	main.safari_balls -= 1
 	# The same ItemUseBall roll with the bait/rock-modified rate, and the same toss/wobble
 	# presentation as any other ball.
@@ -1282,12 +1397,15 @@ func _safari_turn(msgs: Array) -> void:
 			b = b >> 2                                # eating -> a quarter as likely to flee
 		elif safari_escape > 0:
 			b = min(255, b << 1)                      # angry -> twice as likely to flee
-		ran = (randi() % 256) < b
+		ran = _ri(256) < b
 	if ran:
 		msgs.append("%s fled!" % enemy_mon["name"])
 		_say(msgs, "run")
 	else:
 		_say(msgs, "menu")
+	turn_no += 1
+	_det_event("T%d" % turn_no, "p[%s]e[safari]" % _det_paction)
+	_det_paction = "-"
 
 
 ## Party AND box full refuses a ball throw before it is spent (BoxFullCannotThrowBall ->
@@ -1333,7 +1451,7 @@ func _attempt_catch(ball := "POKé BALL", rate_override := -1) -> Dictionary:
 	elif ball in ["ULTRA BALL", "SAFARI BALL"]:
 		span = 151; bf2 = 150
 	var st := str(enemy_mon["status"])
-	var r1 := randi() % span
+	var r1 := _ri(span)
 	r1 -= 25 if st in ["slp", "frz"] else (12 if st != "" else 0)
 	if r1 < 0:
 		return {"caught": true, "shakes": 3}
@@ -1341,7 +1459,7 @@ func _attempt_catch(ball := "POKé BALL", rate_override := -1) -> Dictionary:
 		else int(base_stats[enemy_mon["species"]]["catch"])
 	var x := int(int(enemy_mon["maxhp"]) * 255 / bf) / maxi(1, int(int(enemy_mon["hp"]) / 4))
 	if r1 <= rate:
-		if x > 255 or (randi() % 256) <= x:
+		if x > 255 or _ri(256) <= x:
 			return {"caught": true, "shakes": 3}
 	var y := rate * 100 / bf2
 	if y > 255:
@@ -1354,18 +1472,20 @@ func _enemy_turn_after_item(msgs: Array) -> void:
 	# The item was the player's action; the enemy still moves — and speed order still decides
 	# whether the player's own residual ticks before or after the enemy's move (the item turn
 	# runs the same MainInBattleLoop with ExecutePlayerMove a no-op).
+	var emove := _enemy_choose()
+	_det_eaction = "m:" + emove
 	var pf: bool = _eff_speed(true) > _eff_speed(false) \
-		or (_eff_speed(true) == _eff_speed(false) and randf() < 0.5)
+		or (_eff_speed(true) == _eff_speed(false) and _rf() < 0.5)
 	if pf:
 		if enemy_mon["hp"] > 0 and player_mon["hp"] > 0:
 			_residual(player_mon, p_vol, enemy_mon, msgs)
 		if enemy_mon["hp"] > 0 and player_mon["hp"] > 0:
-			_enemy_act(_enemy_choose(), msgs)
+			_enemy_act(emove, msgs)
 			if enemy_mon["hp"] > 0 and player_mon["hp"] > 0:
 				_residual(enemy_mon, e_vol, player_mon, msgs)
 	else:
 		if enemy_mon["hp"] > 0 and player_mon["hp"] > 0:
-			_enemy_act(_enemy_choose(), msgs)
+			_enemy_act(emove, msgs)
 			if enemy_mon["hp"] > 0 and player_mon["hp"] > 0:
 				_residual(enemy_mon, e_vol, player_mon, msgs)
 		if enemy_mon["hp"] > 0 and player_mon["hp"] > 0:
@@ -1382,8 +1502,10 @@ func _resolve(action: Dictionary) -> void:
 		_say(["%s is too\nscared to move!" % player_mon["name"],
 			"GHOST: Get out...\nGet out..."], "menu")
 		return
+	_det_paction = _det_action(action)
 	var msgs: Array = []
 	var emove := _enemy_choose()
+	_det_eaction = "m:" + emove
 	# Each side's own psn/brn/LEECH SEED tick lands right after ITS action, in act order —
 	# MainInBattleLoop calls HandlePoisonBurnLeechSeed per side, not at end of turn — and is
 	# skipped when that action ended in a faint (a KO'd opponent, or your own recoil/EXPLODE):
@@ -1393,7 +1515,7 @@ func _resolve(action: Dictionary) -> void:
 	if action["kind"] != "switch":
 		var ps := _eff_speed(true)
 		var es := _eff_speed(false)
-		pf = ps > es or (ps == es and randf() < 0.5)
+		pf = ps > es or (ps == es and _rf() < 0.5)
 	if pf:
 		_player_act(action, msgs)
 		if enemy_mon["hp"] > 0 and player_mon["hp"] > 0:
@@ -1485,7 +1607,7 @@ func _enemy_choose() -> String:
 			if int(pri[m]) == best:
 				picks.append(m)
 		usable = picks
-	return str(usable[randi() % usable.size()])
+	return str(usable[_ri(usable.size())])
 
 
 ## AIGetTypeEffectiveness: the FIRST TypeEffects entry matching the move's type against either
@@ -1524,7 +1646,7 @@ func _ai_better_move(usable: Array, than: String) -> bool:
 func _ai_item_turn(msgs: Array) -> bool:
 	if _ai_uses <= 0:
 		return false
-	var r := randi() % 256
+	var r := _ri(256)
 	match ai_kind:
 		"Juggler":
 			if r < 65: return _ai_switch(msgs)
@@ -1751,6 +1873,11 @@ func _end_of_turn(msgs: Array) -> void:
 			won = false                   # a mutual KO that empties your party is a blackout, not a win
 			nxt = "end"
 	_say(msgs, nxt)
+	# Determinism oracle (gh #2): every turn kind funnels through here — emit its event.
+	turn_no += 1
+	_det_event("T%d" % turn_no, "p[%s]e[%s]" % [_det_paction, _det_eaction])
+	_det_paction = "-"
+	_det_eaction = "-"
 
 
 ## GainExperience (engine/battle/experience.asm), driven by HandleExpGain (core.asm). Each
@@ -1949,7 +2076,7 @@ func _do_move(att: Dictionary, defn: Dictionary, move: String, msgs: Array,
 		acc = int(acc * float(STAGE_MULT[clampi(int(att_st["acc"]), -6, 6)]))
 		acc = int(acc * float(STAGE_MULT[clampi(-int(def_st["eva"]), -6, 6)]))
 		acc = mini(acc, 255)
-		if randi() % 256 >= acc:
+		if _ri(256) >= acc:
 			msgs.append("%s's\nattack missed!" % att["label"])
 			_on_miss(att, md, msgs)
 			return
@@ -2009,7 +2136,7 @@ func _do_damage_move(att: Dictionary, defn: Dictionary, move: String, md: Dictio
 	else:
 		var hits := 1
 		if eff_name == "TWO_TO_FIVE_ATTACKS_EFFECT":
-			hits = int([2, 2, 3, 3, 4, 5][randi() % 6])
+			hits = int([2, 2, 3, 3, 4, 5][_ri(6)])
 		elif eff_name in ["ATTACK_TWICE_EFFECT", "TWINEEDLE_EFFECT"]:
 			hits = 2
 		var n := 0
@@ -2062,21 +2189,21 @@ func _do_damage_move(att: Dictionary, defn: Dictionary, move: String, md: Dictio
 		att_vol["recharge"] = true
 	elif eff_name == "TRAPPING_EFFECT" and int(defn["hp"]) > 0:
 		if int(att_vol["bind"]) <= 0:                 # first hit: lock both sides
-			var n := randi_range(1, 3)
+			var n := _rr(1, 3)
 			att_vol["bind"] = n
 			att_vol["bind_move"] = move
 			def_vol["bound"] = n
 		else:                                         # a forced repeat
 			att_vol["bind"] = int(att_vol["bind"]) - 1
 	elif eff_name == "THRASH_PETAL_DANCE_EFFECT" and int(att_vol["thrash"]) <= 0:
-		att_vol["thrash"] = randi_range(1, 2)        # 2-3 turns total (this one + 1-2 more)
+		att_vol["thrash"] = _rr(1, 2)                # 2-3 turns total (this one + 1-2 more)
 		att_vol["thrash_move"] = move
 	elif eff_name == "RAGE_EFFECT":
 		att_vol["raging"] = true                     # locked into RAGE until the battle ends
 	if int(att_vol["thrash"]) > 0 and eff_name == "THRASH_PETAL_DANCE_EFFECT":
 		att_vol["thrash"] = int(att_vol["thrash"]) - 1
 		if int(att_vol["thrash"]) <= 0:
-			att_vol["confuse"] = randi_range(2, 5)    # thrash ends confused 2-5 turns ((rand&3)+2)
+			att_vol["confuse"] = _rr(2, 5)            # thrash ends confused 2-5 turns ((rand&3)+2)
 
 	if int(defn["hp"]) > 0:
 		_side_effect(md, defn, def_st, def_vol, msgs)
@@ -2099,7 +2226,7 @@ func _calc_hit(att: Dictionary, defn: Dictionary, md: Dictionary, att_st: Dictio
 		b = mini(255, mini(255, b * 2) * 2)
 	else:
 		b = int(b / 2)
-	var crit := randf() < (b / 256.0)
+	var crit := _rf() < (b / 256.0)
 	var lvl: int = int(att["level"]) * 2 if crit else int(att["level"])
 	var special: bool = str(md["type"]) in SPECIAL_TYPES
 	var akey := "spc" if special else "atk"
@@ -2149,7 +2276,7 @@ func _calc_hit(att: Dictionary, defn: Dictionary, md: Dictionary, att_st: Dictio
 				return {"dmg": 0, "crit": crit, "eff": eff, "floored_miss": true}
 	# RandomizeDamage: damage below 2 is not randomized
 	if dmg > 1:
-		dmg = maxi(1, int(dmg * randi_range(217, 255) / 255.0))
+		dmg = maxi(1, int(dmg * _rr(217, 255) / 255.0))
 	return {"dmg": dmg, "crit": crit, "eff": eff}
 
 
@@ -2210,7 +2337,7 @@ func _special_damage(att: Dictionary, move: String) -> int:
 		"SEISMIC_TOSS", "NIGHT_SHADE": return int(att["level"])
 		"DRAGON_RAGE": return 40
 		"SONICBOOM": return 20
-		"PSYWAVE": return max(1, randi_range(1, int(1.5 * int(att["level"]))))
+		"PSYWAVE": return max(1, _rr(1, int(1.5 * int(att["level"]))))
 	return int(att["level"])
 
 
@@ -2243,7 +2370,7 @@ func _side_effect(md: Dictionary, defn: Dictionary, def_st: Dictionary, def_vol:
 		                    # (AttackSubstitute zeroes the move effect when the sub pops)
 	var eff_name := str(md["effect"])
 	var st := _status_from_effect(eff_name)
-	var roll := randi() % 256
+	var roll := _ri(256)
 	if st[0] != "" and "SIDE_EFFECT" in eff_name:
 		if str(st[0]) != "psn" and str(md["type"]) in defn["types"]:
 			return          # FreezeBurnParalyzeEffect: immune when sharing the move's type
@@ -2385,7 +2512,7 @@ func _do_status_move(att: Dictionary, defn: Dictionary, move: String, md: Dictio
 				msgs.append({"mimic_pick": names, "slot": slot})
 			else:
 				# the enemy copies a random non-empty move (.getRandomMove — no PP check)
-				var m := str(defn["moves"][randi() % (defn["moves"] as Array).size()]["move"])
+				var m := str(defn["moves"][_ri((defn["moves"] as Array).size())]["move"])
 				var mslot: Dictionary = att["moves"][slot]
 				mslot["move"] = m
 				mslot["maxpp"] = int(moves_db[m]["pp"])
@@ -2433,7 +2560,7 @@ func _do_bide(att: Dictionary, defn: Dictionary, msgs: Array, att_vol: Dictionar
 func _confuse(mon: Dictionary, vol: Dictionary, msgs: Array) -> void:
 	if int(vol["confuse"]) > 0:
 		return
-	vol["confuse"] = randi_range(2, 5)
+	vol["confuse"] = _rr(2, 5)
 	msgs.append("%s became\nconfused!" % mon["name"])
 
 
@@ -2442,13 +2569,13 @@ func _random_move_with_pp(mon: Dictionary) -> String:
 	for mv in mon["moves"]:
 		if int(mv["pp"]) > 0:
 			opts.append(str(mv["move"]))
-	return "" if opts.is_empty() else str(opts[randi() % opts.size()])
+	return "" if opts.is_empty() else str(opts[_ri(opts.size())])
 
 
 func _metronome_pick() -> String:
 	var keys: Array = moves_db.keys()
 	for i in range(20):
-		var m := str(keys[randi() % keys.size()])
+		var m := str(keys[_ri(keys.size())])
 		if m != "METRONOME" and m != "MIRROR_MOVE" and m != "STRUGGLE" and m != "TRANSFORM":
 			return m
 	return "POUND"
@@ -2498,12 +2625,12 @@ func _can_act(att: Dictionary, vol: Dictionary, other_vol: Dictionary, msgs: Arr
 			msgs.append("%s snapped out\nof confusion!" % att["label"])
 		else:
 			msgs.append("%s is\nconfused!" % att["label"])
-			if randi() % 256 >= 129:                   # cp 50 percent + 1: 127/256 to hurt itself
+			if _ri(256) >= 129:                        # cp 50 percent + 1: 127/256 to hurt itself
 				msgs.append("It hurt itself in\nits confusion!")
 				_set_hp(att, int(att["hp"]) - _confusion_self_damage(att, vol), msgs)
 				_break_locks(vol, other_vol, msgs)
 				return false
-	if str(att["status"]) == "par" and randi() % 256 < 64:   # 25 percent
+	if str(att["status"]) == "par" and _ri(256) < 64:   # 25 percent
 		msgs.append("%s is fully\nparalyzed!" % att["label"])
 		_break_locks(vol, other_vol, msgs)
 		return false
@@ -2575,7 +2702,7 @@ func _apply_status(mon: Dictionary, st: String, msgs: Array) -> void:
 	mon["status"] = st
 	var mod: Dictionary = p_mod if is_same(mon, player_mon) else e_mod
 	if st == "slp":
-		mon["sleep"] = randi_range(1, 7)        # SleepEffect: (rand & 7) rerolled while 0
+		mon["sleep"] = _rr(1, 7)                # SleepEffect: (rand & 7) rerolled while 0
 	elif st == "par":
 		mod["spd"] = maxi(1, int(mod["spd"] / 4))   # QuarterSpeedDueToParalysis, destructive —
 	elif st == "brn":                               # a later cure does NOT restore the stat
@@ -2634,7 +2761,7 @@ func _apply_stat_move(att: Dictionary, defn: Dictionary, md: Dictionary, msgs: A
 		# stat-down moves carry a hidden 65/256 miss in a non-link battle (the player's
 		# don't); a substitute blocks; MIST protects; a mid-FLY/DIG target can't be hit
 		# (the INVULNERABLE check).
-		if is_same(defn, player_mon) and randi() % 256 < 65:
+		if is_same(defn, player_mon) and _ri(256) < 65:
 			msgs.append("%s's\nattack missed!" % att["label"])
 			return
 		if bool(def_vol["sub_up"]):

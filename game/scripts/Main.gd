@@ -525,6 +525,8 @@ func _ready() -> void:
 		_flymovetest()
 	elif "--movefxtest" in args:
 		_movefxtest()
+	elif "--battledettest" in args:
+		_battledettest()
 	elif "--moveanimtest" in args:
 		_moveanimtest()
 	elif "--wipetest" in args:
@@ -4793,11 +4795,19 @@ func _dblkotest() -> void:
 	var g := 0
 	while battle.state != "menu" and modal == battle and g < 800:  # skip the trainer intro
 		await _press("ui_accept"); g += 1
-	await _press("ui_accept")                       # FIGHT -> moves
-	await _press("ui_accept")                       # TAKE DOWN: KOs the rattata, recoil KOs JOLTEON
-	g = 0
-	while modal == battle and battle.state != "menu" and battle.state != "party_forced" and g < 400:
-		await _press("ui_accept"); g += 1
+	# TAKE DOWN KOs the rattata and its recoil KOs JOLTEON — but it can MISS (85%), which
+	# burns the turn without recoil. Re-arm the setup and retry until the hit lands, so the
+	# test asserts the double-KO handling, not one lucky accuracy roll (gh #2 RNG hygiene).
+	var tries := 0
+	while modal == battle and battle.state == "menu" and int(player_party[0]["hp"]) > 0 and tries < 10:
+		tries += 1
+		player_party[0]["hp"] = 5
+		battle.enemy_mon["hp"] = int(battle.enemy_mon["maxhp"])
+		await _press("ui_accept")                   # FIGHT -> moves
+		await _press("ui_accept")                   # TAKE DOWN
+		g = 0
+		while modal == battle and battle.state != "menu" and battle.state != "party_forced" and g < 400:
+			await _press("ui_accept"); g += 1
 	var player_fainted: bool = int(player_party[0]["hp"]) <= 0
 	var enemy_sent_next: bool = battle.enemy_active == 1        # trainer sent its second mon
 	var forced_switch: bool = battle.state == "party_forced"   # player must replace the fainted lead (not "menu")
@@ -4904,6 +4914,182 @@ func _wraptest() -> void:
 	await get_tree().create_timer(0.9).timeout
 	get_viewport().get_texture().get_image().save_png("res://wrap1.png")
 	get_tree().quit()
+
+
+## gh #2 (ADR-014): the battle determinism oracle. Each scenario drives a REAL battle — the
+## input state machine, not direct _do_move calls — twice from the same battle seed with the
+## same scripted decisions, and asserts the two canonical per-turn event streams (turn, both
+## actions, RNG cursor, state digest) are BYTE-IDENTICAL; a third run on a different seed
+## must produce a different stream, so the oracle can't pass vacuously (the gh #84 lesson).
+## Scenarios cover status moves, trainer-AI items/switches, player switching, bag items,
+## multi-turn locks (WRAP/THRASH/HYPER BEAM), confusion, multi-hit, Transform/Mimic/
+## Metronome/Disable/Substitute, and the wild catch/run rolls.
+## Run: `pwsh tools/run.ps1 -- --battledettest [--verbose]` (verbose echoes every event).
+func _battledettest() -> void:
+	await get_tree().process_frame
+	var scns: Array = [
+		{"name": "core", "enemy_trainer": true,
+			"party": [["nidoking", 40, ["THUNDER_WAVE", "BODY_SLAM", "TOXIC", "BLIZZARD"]],
+				["snorlax", 38, ["REST", "HYPER_BEAM", "EARTHQUAKE", "AMNESIA"]]],
+			"bag": {"POTION": 3, "X ATTACK": 1},
+			"enemy": [["dewgong", 36], ["cloyster", 36], ["slowbro", 36]],
+			"ai": "Lorelei", "ai_mods": [1, 3],
+			"script": [["m", 0], ["m", 2], ["s", 1], ["m", 1], ["i", "POTION"], ["m", 2]]},
+		{"name": "multiturn", "enemy_trainer": true,
+			"party": [["dragonair", 35, ["WRAP", "THRASH", "AGILITY", "SLAM"]],
+				["primeape", 35, ["KARATE_CHOP", "FURY_SWIPES", "FOCUS_ENERGY", "THRASH"]]],
+			"bag": {},
+			"enemy": [["gengar", 35], ["golbat", 33], ["arbok", 33]],
+			"ai": "Agatha", "ai_mods": [1, 3],
+			"enemy_moves": {0: ["CONFUSE_RAY", "HYPNOSIS", "NIGHT_SHADE", "LICK"],
+				2: ["GLARE", "ACID", "WRAP", "SCREECH"]},
+			"script": [["m", 1], ["m", 0], ["s", 1], ["m", 2], ["m", 1], ["m", 0]]},
+		{"name": "copycat", "enemy_trainer": true,
+			"party": [["mrmime", 35, ["MIMIC", "METRONOME", "SUBSTITUTE", "CONFUSION"]],
+				["kadabra", 35, ["PSYWAVE", "DISABLE", "REFLECT", "PSYCHIC_M"]]],
+			"bag": {},
+			"enemy": [["ditto", 35], ["porygon", 30]],
+			"ai": "Generic", "ai_mods": [],
+			"script": [["m", 0], ["m", 1], ["m", 2], ["s", 1], ["m", 1], ["m", 0], ["m", 3]]},
+		{"name": "wild", "wild": ["fearow", 30],
+			"party": [["slowbro", 30, []]],       # slower than the wild mon: escapes must ROLL
+			"bag": {"POKé BALL": 3, "GREAT BALL": 2},
+			"script": [["i", "POKé BALL"], ["r"], ["i", "GREAT BALL"], ["r"], ["m", 0], ["r"]]},
+	]
+	var all_ok := true
+	for scn in scns:
+		var s1: Array = await _det_scn_run(scn, 12345)
+		var s2: Array = await _det_scn_run(scn, 12345)
+		var s3: Array = await _det_scn_run(scn, 54321)
+		var j1 := "\n".join(PackedStringArray(s1))
+		var same: bool = j1 == "\n".join(PackedStringArray(s2))
+		var differs: bool = j1 != "\n".join(PackedStringArray(s3))
+		# The stream md5 is printed so two INVOCATIONS can be compared too — lockstep peers
+		# are separate processes, so the stream must be stable across processes, not just
+		# across replays inside one.
+		print("[battledet] %s: events=%d/%d replay_identical=%s other_seed_differs=%s stream_md5=%s" % [
+			scn["name"], s1.size(), s2.size(), same, differs, j1.md5_text()])
+		if not same:
+			for i in mini(s1.size(), s2.size()):
+				if str(s1[i]) != str(s2[i]):
+					print("[battledet]   first divergence at event %d:" % i)
+					print("[battledet]     run1: %s" % s1[i])
+					print("[battledet]     run2: %s" % s2[i])
+					break
+			if s1.size() != s2.size():
+				print("[battledet]   stream lengths differ: %d vs %d" % [s1.size(), s2.size()])
+		all_ok = all_ok and same and differs
+	print("[battledet] %s" % ("ALL GREEN" if all_ok else "FAIL"))
+	get_tree().quit()
+
+
+## One oracle run: rebuild the parties from the scenario spec (fixed DVs; the global RNG is
+## re-seeded so make_mon's auto-move path is identical across runs), start the battle on the
+## given battle seed, drive the scripted decisions through the real input machine, and return
+## the battle's canonical event stream.
+func _det_scn_run(scn: Dictionary, seed_v: int) -> Array:
+	seed(4242)                                # make_mon (DVs / auto moves) off the global RNG
+	player_party = []
+	for spec in scn["party"]:
+		player_party.append(make_mon(str(spec[0]), int(spec[1]), spec[2],
+			{"hp": 8, "atk": 8, "def": 9, "spd": 10, "spc": 11}))
+	player_bag = (scn.get("bag", {}) as Dictionary).duplicate()
+	_bag_saved_idx = 0
+	_bag_saved_scroll = 0
+	pokedex_seen = {}
+	pokedex_owned = {}
+	battle.det_log = "--verbose" in OS.get_cmdline_user_args()
+	battle.next_seed = seed_v
+	modal = battle
+	if scn.has("wild"):
+		pokedex_owned[str(scn["wild"][0])] = true   # skip the new-species dex ceremony
+		battle.start(player_party, str(scn["wild"][0]), int(scn["wild"][1]))
+	else:
+		var edata: Array = []
+		for spec in scn["enemy"]:
+			edata.append({"species": str(spec[0]), "level": int(spec[1])})
+		battle.start_trainer(player_party, edata, "ORACLE", 30)
+		battle.ai_kind = str(scn.get("ai", "Generic"))
+		battle.ai_mods = scn.get("ai_mods", [])
+		battle.ai_count_max = int(scn.get("ai_count", 3))
+		battle._ai_uses = battle.ai_count_max
+		var eover: Dictionary = scn.get("enemy_moves", {})
+		for i in eover:
+			var mvs: Array = []
+			for mv in eover[i]:
+				var pp := int(mon_moves[mv]["pp"])
+				mvs.append({"move": mv, "pp": pp, "maxpp": pp})
+			battle.enemy_party[int(i)]["moves"] = mvs
+	var script: Array = scn["script"]
+	var si := 0
+	var presses := 0
+	while modal == battle and presses < 20000:
+		presses += 1
+		if battle.state == "menu":
+			var tok: Array
+			if si < script.size():
+				tok = script[si]
+			else:                                  # script exhausted: first damaging move with PP
+				var mi := 0
+				for i in (battle.player_mon["moves"] as Array).size():
+					var mv: Dictionary = battle.player_mon["moves"][i]
+					if int(mv["pp"]) > 0 and int(mon_moves.get(str(mv["move"]), {}).get("power", 0)) > 0:
+						mi = i
+						break
+				tok = ["m", mi]
+			si += 1
+			match str(tok[0]):
+				"m":
+					battle.cursor = 0
+					await _press("ui_accept")          # FIGHT
+					if battle.state == "moves":
+						battle.cursor = clampi(int(tok[1]), 0, (battle.player_mon["moves"] as Array).size() - 1)
+						await _press("ui_accept")
+						if battle.state == "moves":    # picked a 0-PP move: recover to the menu
+							await _press("ui_cancel")
+				"s":
+					battle.cursor = 1
+					await _press("ui_accept")          # PKMN
+					if battle.state == "party":
+						battle.cursor = clampi(int(tok[1]), 0, player_party.size() - 1)
+						await _press("ui_accept")
+						if battle.state == "party":    # refused (fainted/active): recover
+							await _press("ui_cancel")
+				"i":
+					battle.cursor = 2
+					await _press("ui_accept")          # ITEM
+					if battle.state == "item":
+						var idx: int = (battle.bag_keys as Array).find(str(tok[1]))
+						if idx < 0:
+							await _press("ui_cancel")
+						else:
+							battle.cursor = idx
+							await _press("ui_accept")
+				"r":
+					battle.cursor = 3
+					await _press("ui_accept")          # RUN
+		elif battle.state == "party_forced":
+			battle.cursor = battle._first_usable()
+			await _press("ui_accept")
+		elif battle.state in ["moves", "party", "item"]:
+			await _press("ui_cancel")                  # stray sub-menu: back out
+		else:
+			await _press("ui_accept")                  # messages / prompts (mimic + learn pick row 0)
+	if presses >= 20000:
+		print("[battledet]   WARNING: %s press budget hit (battle did not end)" % scn["name"])
+	# The catch ceremony (dex + nickname offer) runs after the battle: answer NO and close out.
+	var g := 0
+	while modal != null and g < 300:
+		g += 1
+		if modal == menu:
+			menu.chosen.emit(1)                        # nickname offer -> NO
+			await get_tree().process_frame
+		elif modal == naming:
+			naming.done.emit("")
+			await get_tree().process_frame
+		else:
+			await _press("ui_accept")
+	return (battle.det_stream as Array).duplicate()
 
 
 func _trainertest() -> void:

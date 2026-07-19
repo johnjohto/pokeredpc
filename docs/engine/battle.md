@@ -340,6 +340,49 @@ Verified by `--movefxtest` (fixed/super-fang/drain/recoil/leech/heal/confuse + e
 - Learning a **5th move** opens an interactive "delete a move?" panel (`learn` state).
 - **Transform** copies the target's stats, types, moves, stat stages, and on-screen sprite.
 
+## Determinism — the lockstep oracle (gh #2, ADR-014)
+
+v1.1 link battles run **deterministic lockstep**: both peers simulate the identical battle
+from a shared seed and exchange only the players' chosen actions, so the battle engine is
+under a hard determinism requirement — same seed + same action sequence ⇒ the identical
+battle, always, across processes.
+
+- **Battle-local RNG.** Every battle-*logic* random draw goes through `Battle._ri(n)` /
+  `_rr(lo,hi)` / `_rf()` — a battle-local `RandomNumberGenerator` seeded in `_begin`
+  (`battle_seed`; set `next_seed` before `start*()` to force it — a link session will fix it
+  at establishment, tests pin it). The **global** RNG (which the overworld advances at frame
+  rate: NPC wander, encounter rolls) is never consulted after battle start, so frame timing
+  cannot shift battle outcomes. Each draw advances `rng_cursor` — the lockstep "RNG cursor".
+  Presentation (animations, tweens) draws nothing from the battle RNG, so animations
+  on/off/skipped cannot desync peers.
+- **The event stream.** Every battle appends canonical lines to `det_stream` (echoed as
+  `[battledet]` stdout lines when `det_log` is set — the v1.1 soak reads logs):
+  - `S|<kind> seed=N|c=0|<digest>` at battle start;
+  - `T<n>|p[<action>]e[<action>]|c=<cursor>|<digest>` per turn (from `_end_of_turn`, the
+    funnel every turn kind passes through — fight/switch/item/run alike). Actions are
+    canonical: `m:MOVE`, `w:idx` (switch), `i:ITEM`, `r` (run), `f:MOVE` (forced locks);
+  - `X|…` for mid-flow player decisions (faint replacement, SHIFT free switch, MIMIC's
+    pick, the learn-move pick) — every choice that must cross the wire under lockstep;
+  - `END|won=… caught=… blackout=…` at battle end.
+  The digest is an md5 over a fixed-field-order dump of everything battle rules touch: both
+  parties' full mon state (species/level/exp/HP/status/stats/types/moves+PP), stat stages,
+  the stored battle stats (`p_mod`/`e_mod`), volatiles, and the AI/run counters. **Equality
+  of two peers' streams is the definition of "in sync"** (ADR-014); a divergence names the
+  turn it happened on.
+- **The replay check** (`--battledettest [--verbose]`): scenario battles driven through the
+  real input state machine — trainer AI classes with items/switches, status moves, player
+  switching, bag items, multi-turn locks (WRAP/THRASH/HYPER BEAM), confusion, multi-hit,
+  Transform/Mimic/Metronome/Disable/Substitute, and the wild catch/run rolls — each run
+  **twice from the same seed** (streams must be byte-identical) and **once from another**
+  (streams must differ, so the oracle can't pass vacuously — the gh #84 lesson). Each
+  scenario prints its `stream_md5`, so separate *invocations* are comparable too: lockstep
+  peers are separate processes, and the md5s are stable across processes.
+- Float ops in the damage/crit path (`_rf() < b/256.0`, the ×217..255/255 roll) are IEEE-754
+  double arithmetic — bit-stable across runs and across x86-64 builds of the same version;
+  the v1.1 link-identity handshake (exact version + content hash) is what guarantees both
+  peers run the same code and data. The two-machine guarantee is re-proven by the gh #8
+  desync soak.
+
 ## In-game trades (`Main`)
 
 The 10 `TradeMons` (give→get→nickname) are extracted to `assets/trades.json`, along with a

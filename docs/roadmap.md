@@ -24,7 +24,15 @@ complete human playthrough, signed off after ~60 fixed playtest issues and the f
 campaigns gh #19–#22/#176/#185). Every engine system maps to a completed audit; the tracker is
 at zero open bugs. **The v1.1 multiplayer design conversation is held (2026-07-17, ADR-014) — the next
 milestone is building v1.1**: the Cable Club (trades + link battles) over deterministic lockstep,
-gated by a bot-vs-bot desync soak then a real remote session; then v2 (ADR-013).
+gated by a bot-vs-bot desync soak then a real remote session; then v2 (ADR-013). The work is
+broken down as gh #1 (spec) with sub-issues #2–#10. **Landed: gh #2 — the battle determinism
+oracle** (2026-07-19): every battle-logic random draw now comes from a battle-local seeded RNG
+(never the frame-paced global RNG), each battle emits a canonical per-turn event stream (turn,
+both actions, RNG cursor, state digest — `det_stream`/`[battledet]`), and `--battledettest`
+replays scenario battles twice per seed asserting byte-identical streams (plus a
+different-seed divergence check and cross-process-stable per-scenario md5s). See
+[engine/battle.md](engine/battle.md) "Determinism". Next: gh #3 (the localhost link tracer
+bullet) or gh #4 (the mon record codec).
 Earlier: the playthrough bug waves (gh #23–#52, 27 issues) are fully fixed across 0.9.1–0.9.12:
 and the playthrough bug waves (gh #23–#52, 27 issues) are fully fixed across 0.9.1–0.9.12:
 options/start/yes-no boxes, party + summary + battle-item screens, Pokédex (with working

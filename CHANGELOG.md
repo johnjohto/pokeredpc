@@ -8,6 +8,23 @@ milestones, `PATCH` bumps are fixes/polish. See `docs/roadmap.md` for the live p
 
 ## [Unreleased]
 
+Toward **v1.1 multiplayer** (the faithful Cable Club over deterministic lockstep — spec gh #1,
+design ADR-014).
+
+### Added
+- **The battle determinism oracle** (gh #2): every battle-logic random draw now comes from a
+  battle-local seeded RNG with a draw cursor (`Battle._ri/_rr/_rf`), isolating battle outcomes
+  from the frame-paced global RNG; every battle emits a canonical per-turn event stream (turn,
+  both actions, RNG cursor, md5 state digest) — under ADR-014, byte-equality of two peers'
+  streams is the definition of "in sync". `--battledettest` replays scenario battles (trainer
+  AI, status, switching, items, multi-turn locks, Transform/Mimic/Metronome, catch/run) twice
+  per seed and asserts byte-identical streams, with a different-seed divergence check and
+  cross-process-stable per-scenario stream md5s. See `docs/engine/battle.md` "Determinism".
+
+### Fixed
+- `--dblkotest` no longer depends on a lucky TAKE DOWN accuracy roll: the double-KO setup
+  re-arms and retries until the hit lands.
+
 ## [1.0.0] - 2026-07-17
 
 **The 1:1 recreation is complete.** The ADR-011 two-stage gate closed today: **Stage 1**, the

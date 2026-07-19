@@ -142,6 +142,7 @@ where noted (git-ignored), prints results, and quits — used to verify features
 | `--trainertest` | Trainer battle (Bug Catcher, 2 mons): RUN blocked, fight the team, win → prize money. |
 | `--statustest` | Status conditions: poison tick, sleep skip+countdown, paralysis Speed ÷4 → `status1.png`. |
 | `--movefxtest` | Move effects: fixed/super-fang/drain/recoil/leech/heal/confuse + level-up evolution. |
+| `--battledettest` | The battle determinism oracle (gh #2, ADR-014): scenario battles replayed twice per seed — canonical per-turn event streams must be byte-identical, a different seed must diverge; prints per-scenario `stream_md5` (stable across invocations). `--verbose` echoes every event line. |
 | `--moveanimtest` | Move animations (gh #19): step building + enemy-turn transform + timed `{"moveanim"}` markers + a real fight turn → `moveanim_thunder.png`, `moveanim_gust_enemy.png`. |
 | `--wipetest` | Battle transitions: the 8-wipe pick (level/trainer/dungeon bits) + each wipe over the overworld + the warp fade → `wipe_*.png`. |
 | `--introshot` | Poses the boot intro at key beats (splash star, fight, logo bounce, version) → `intro_*.png`, `title_*.png`. |
