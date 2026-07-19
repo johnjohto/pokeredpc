@@ -73,7 +73,15 @@ canonically ("heads = host first"), and the event stream is role-canonical — t
 real networked instances** (ADR-014's definition of "in sync"), agreeing winners, and
 restored parties. Non-link battles untouched (`--battledettest` md5s unchanged).
 Documented divergences: no items in link battles, link MIMIC picks deterministically.
-Next: gh #8 (the desync soak) then gh #9 (drop-injection + the dupe easter egg).
+**Landed: gh #8 — the desync soak** (2026-07-19): `python tools/linksoak.py` runs a
+configurable battery of seeded two-instance link battles over the `--colsoak` fast path —
+six varied parties (status/locks/multi-hit/crit/confusion/Transform/Mimic/Metronome/REST,
+legal fixed DVs, a mirror match that speed-ties every turn), deterministic varied move
+policies — and gates green only on byte-identical streams in every battle, naming the
+battle/turn/first-diff on failure. The first battery caught three real lockstep bugs
+(illegal fixture DVs; forced-continuation PP spent on one sim only; the one-sided
+Transform/Mimic backup+revert) — all fixed; **8/8 in sync, repeatedly**. Next: gh #9
+(drop-injection + the dupe easter egg), then gh #10 (the 1.1 gate).
 Earlier: the playthrough bug waves (gh #23–#52, 27 issues) are fully fixed across 0.9.1–0.9.12:
 and the playthrough bug waves (gh #23–#52, 27 issues) are fully fixed across 0.9.1–0.9.12:
 options/start/yes-no boxes, party + summary + battle-item screens, Pokédex (with working

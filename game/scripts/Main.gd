@@ -558,6 +558,8 @@ func _ready() -> void:
 		_monrecordtest()
 	elif "--clubtest" in args:
 		_clubtest()
+	elif "--colsoak" in args:
+		_colsoaktest()
 	elif "--host" in args:
 		_linktest(true)
 	elif _has_join_arg(args):
@@ -5144,6 +5146,122 @@ func _tc_journal_write(give: Dictionary, peer_record: Dictionary) -> void:
 func _tc_journal_clear() -> void:
 	if FileAccess.file_exists(_tc_journal_path()):
 		DirAccess.open("user://").remove(_tc_journal_path().get_file())
+
+
+# gh #8: the desync-soak party roster. Fixed DVs so mirror matches produce REAL speed ties
+# (the shared-coin path), and the sets span the RNG-heavy surface: status, multi-turn locks,
+# multi-hit, crit-heavy, confusion, trapping, Transform/Mimic/Metronome, REST/recovery.
+const _SOAK_PARTIES := [
+	[["tauros", 50, ["BODY_SLAM", "EARTHQUAKE", "BLIZZARD", "TACKLE"]],
+		["lapras", 50, ["SURF", "ICE_BEAM", "BODY_SLAM", "GROWL"]]],
+	[["arcanine", 50, ["BODY_SLAM", "QUICK_ATTACK", "AGILITY", "BITE"]],
+		["slowbro", 50, ["SURF", "PSYCHIC_M", "AMNESIA", "POUND"]]],
+	[["gengar", 50, ["CONFUSE_RAY", "HYPNOSIS", "NIGHT_SHADE", "LICK"]],
+		["arbok", 50, ["GLARE", "ACID", "WRAP", "SCREECH"]]],
+	[["dragonair", 50, ["WRAP", "THRASH", "AGILITY", "SLAM"]],
+		["primeape", 50, ["KARATE_CHOP", "FURY_SWIPES", "FOCUS_ENERGY", "THRASH"]]],
+	[["ditto", 50, ["TRANSFORM"]],
+		["mrmime", 50, ["MIMIC", "METRONOME", "SUBSTITUTE", "CONFUSION"]]],
+	[["tauros", 50, ["BODY_SLAM", "EARTHQUAKE", "BLIZZARD", "TACKLE"]],
+		["snorlax", 50, ["REST", "HYPER_BEAM", "EARTHQUAKE", "AMNESIA"]]],
+]
+
+
+## gh #8: one soak battle — the fast path to a link battle, no club walk. The instances
+## link (--clubhost/--clubjoin), exchange col_party + the host's seed, and fight with a
+## deterministic varied move policy (each side cycles its moves by turn + party index, so
+## the battery reaches moves the always-m0 script never would). Driven in pairs by
+## tools/linksoak.py; any stream divergence is the battery's failure.
+func _colsoaktest() -> void:
+	await get_tree().process_frame
+	var args := OS.get_cmdline_user_args()
+	var hosting := "--clubhost" in args
+	var pidx := 0
+	var seed_v := 1
+	link_wait_s = 60.0
+	for a in args:
+		if str(a).begins_with("--port="):
+			link_port = int(str(a).substr(7))
+		elif str(a).begins_with("--colparty="):
+			pidx = int(str(a).substr(11)) % _SOAK_PARTIES.size()
+		elif str(a).begins_with("--colseed="):
+			seed_v = int(str(a).substr(10))
+	player_name = "HOSTA" if hosting else "JOINB"
+	player_id = 111 if hosting else 222
+	# Fixed DVs so mirror matches really tie — and LEGAL ones: Gen 1 derives the hp DV from
+	# the low bits of the other four ((8,9,10,11) -> 5), and the mon record re-derives it,
+	# so an illegal hp DV would make the peer's decoded copy differ from the local mon.
+	var dvs := {"hp": 5, "atk": 8, "def": 9, "spd": 10, "spc": 11}
+	player_party = []
+	for spec in _SOAK_PARTIES[pidx]:
+		player_party.append(make_mon(str(spec[0]), int(spec[1]), spec[2], dvs))
+	var port: int = link_port if link_port > 0 else link.DEFAULT_PORT
+	link.timeout_s = 45.0
+	if hosting:
+		link.host(port)
+	else:
+		link.join("127.0.0.1", port)
+	var g := 0
+	while link.state != "linked" and link.state != "closed" and g < 60 * 90:
+		await get_tree().process_frame
+		g += 1
+	if link.state != "linked":
+		print("[soak] FAIL: no link (%s)" % link.state)
+		get_tree().quit()
+		return
+	# the Colosseum exchange, headless: parties + the host's seed
+	cutscene.tc_room_arm()
+	var mine: Array = []
+	for m in player_party:
+		mine.append(monrecord.encode(m))
+	link.send_message({"t": "col_party", "mons": mine, "name": player_name, "seed": seed_v})
+	g = 0
+	while cutscene._col_peer.is_empty() and link.state == "linked" and g < 60 * 90:
+		await get_tree().process_frame
+		g += 1
+	if cutscene._col_peer.is_empty():
+		print("[soak] FAIL: no peer party (%s)" % link.state)
+		get_tree().quit()
+		return
+	var peer: Dictionary = cutscene._col_peer
+	cutscene._col_peer = {}
+	if not start_colosseum_battle(peer.get("mons", []), seed_v, str(peer.get("name", "?"))):
+		print("[soak] FAIL: bad peer party")
+		get_tree().quit()
+		return
+	g = 0
+	while modal == battle and g < 60000:
+		if battle.state == "menu":
+			battle.cursor = 0
+			await _press("ui_accept")                  # FIGHT
+			if battle.state == "moves":
+				# varied but deterministic: cycle the moveset by turn + party index,
+				# falling forward to the next slot with PP
+				var mvs: Array = battle.player_mon["moves"]
+				var want := (int(battle.turn_no) + pidx) % mvs.size()
+				for off in mvs.size():
+					var i2 := (want + off) % mvs.size()
+					if int(mvs[i2]["pp"]) > 0:
+						want = i2
+						break
+				battle.cursor = want
+				await _press("ui_accept")
+				if battle.state == "moves":            # all PP gone: back out, STRUGGLE path
+					await _press("ui_cancel")
+		elif battle.state == "party_forced":
+			battle.cursor = battle._first_usable()
+			await _press("ui_accept")
+		elif battle.state == "msg":
+			await _press("ui_accept")
+		else:
+			await get_tree().process_frame
+		g += 1
+	var stream: Array = battle.det_stream
+	print("[soak] %s: party=%d seed=%d end=%s events=%d stream_md5=%s" % [
+		"host" if hosting else "join", pidx, seed_v,
+		str(stream[-1]).split("|")[1] if stream.size() > 0 else "unfinished", stream.size(),
+		"\n".join(PackedStringArray(stream)).md5_text()])
+	get_tree().quit()
 
 
 ## gh #5: the Cable Club attendant. Single-instance (`--clubtest`) drives every refusal/

@@ -80,6 +80,16 @@ design ADR-014).
   (`--battledettest` stream md5s unchanged). Documented divergences: items refused in link
   battles; link MIMIC copies a deterministic random technique.
 
+- **The desync soak** (gh #8, Stage 1 of the 1.1 gate): `tools/linksoak.py` — one command
+  launches pairs of headless instances, runs a battery of seeded link battles across a
+  six-party roster (status, multi-turn locks, multi-hit, crits, confusion, Transform/
+  Mimic/Metronome, REST; legal fixed DVs; a mirror match that speed-ties every turn) with
+  deterministic varied move policies, and gates green only when both peers' event streams
+  are byte-identical in every battle — failures name the battle, seed/parties, and first
+  differing event. Its first run caught three real lockstep bugs, all fixed: illegal
+  fixture DVs, the forced-continuation PP asymmetry, and the one-sided Transform/Mimic
+  backup/revert.
+
 ### Fixed
 - **Healing-machine ball alignment** (gh #11): the right (x-flipped) ball of each pair drew
   one cell right of the machine's slot panel. A negative-width rect flips the texture but

@@ -283,13 +283,17 @@ func _det_mon(mon: Dictionary) -> String:
 	return s + ";"
 
 
-## Sorted key=value dump of a stages/mod/vol dict. Nested values (the Transform/Mimic
-## backups) count by presence only — their contents are mon state already in the digest.
+## Sorted key=value dump of a stages/mod/vol dict. The Transform/Mimic backups are NOT
+## digested: they are restore bookkeeping derivative of state already digested (moves/types/
+## stats), and they exist only on the owning side — in mirrored link sims the same mon is
+## "player" on one peer and "enemy" on the other, so their presence would falsely diverge.
 func _det_kv(d: Dictionary) -> String:
 	var ks := d.keys()
 	ks.sort()
 	var s := ""
 	for k in ks:
+		if str(k) in ["transform_backup", "mimic_backup"]:
+			continue
 		var v = d[k]
 		s += "%s=%s," % [str(k), "#" if (v is Dictionary or v is Array) else str(v)]
 	return s + ";"
@@ -1633,13 +1637,17 @@ func _submit_action(action: Dictionary) -> void:
 	queue_redraw()
 
 
-## The peer's canonical action string back into an enemy action.
+## The peer's canonical action string back into an enemy action. The forced tag matters:
+## a forced continuation (bind/thrash/charge/RAGE/Bide) spends no PP on the sender's sim,
+## so it must spend none here either — and the stream label must match byte for byte.
 func _parse_peer_action(s: String) -> Dictionary:
 	if s.begins_with("w:"):
 		return {"kind": "eswitch", "idx": int(s.substr(2))}
-	if s.begins_with("m:") or s.begins_with("f:"):
-		return {"kind": "emove", "move": s.substr(2)}
-	return {"kind": "emove", "move": "STRUGGLE"}
+	if s.begins_with("f:"):
+		return {"kind": "emove", "move": s.substr(2), "forced": true}
+	if s.begins_with("m:"):
+		return {"kind": "emove", "move": s.substr(2), "forced": false}
+	return {"kind": "emove", "move": "STRUGGLE", "forced": false}
 
 
 ## Both actions in hand: switches first (independent), then the moves in canonical speed
@@ -1649,7 +1657,7 @@ func _parse_peer_action(s: String) -> Dictionary:
 func _resolve_link(pact: Dictionary, eact: Dictionary) -> void:
 	_det_paction = _det_action(pact) if str(pact.get("kind", "")) != "" else "-"
 	_det_eaction = ("w:%d" % int(eact["idx"])) if str(eact["kind"]) == "eswitch" \
-		else "m:" + str(eact["move"])
+		else ("f:" if bool(eact.get("forced", false)) else "m:") + str(eact["move"])
 	var msgs: Array = []
 	if str(pact["kind"]) == "switch":
 		_player_act(pact, msgs)
@@ -1670,18 +1678,19 @@ func _resolve_link(pact: Dictionary, eact: Dictionary) -> void:
 		elif e_moves:
 			pf = false
 		var emove := str(eact.get("move", ""))
+		var eforced := bool(eact.get("forced", false))
 		if pf:
 			if p_moves:
 				_player_act(pact, msgs)
 				if enemy_mon["hp"] > 0 and player_mon["hp"] > 0:
 					_residual(player_mon, p_vol, enemy_mon, msgs)
 			if e_moves and enemy_mon["hp"] > 0 and player_mon["hp"] > 0:
-				_link_enemy_act(emove, msgs)
+				_link_enemy_act(emove, msgs, eforced)
 				if enemy_mon["hp"] > 0 and player_mon["hp"] > 0:
 					_residual(enemy_mon, e_vol, player_mon, msgs)
 		else:
 			if e_moves:
-				_link_enemy_act(emove, msgs)
+				_link_enemy_act(emove, msgs, eforced)
 				if enemy_mon["hp"] > 0 and player_mon["hp"] > 0:
 					_residual(enemy_mon, e_vol, player_mon, msgs)
 			if p_moves and enemy_mon["hp"] > 0 and player_mon["hp"] > 0:
@@ -1694,8 +1703,9 @@ func _resolve_link(pact: Dictionary, eact: Dictionary) -> void:
 
 
 ## The peer's move, no AI anywhere near it (the item/switch handler is theirs to choose).
-func _link_enemy_act(move: String, msgs: Array) -> void:
-	if str(e_vol["charging"]) == "" and not _is_two_turn(move):
+## A forced continuation spends no PP, exactly like the local forced branch.
+func _link_enemy_act(move: String, msgs: Array, forced := false) -> void:
+	if not forced and str(e_vol["charging"]) == "" and not _is_two_turn(move):
 		for mv in enemy_mon["moves"]:
 			if str(mv["move"]) == move:
 				mv["pp"] = max(0, int(mv["pp"]) - 1)
@@ -1703,12 +1713,16 @@ func _link_enemy_act(move: String, msgs: Array) -> void:
 	_do_move(enemy_mon, player_mon, move, msgs, e_stages, p_stages, false)
 
 
-## The peer switched: their pick lands on our enemy side (mirrors _ai_switch's markers).
+## The peer switched: their pick lands on our enemy side, applied SYNCHRONOUSLY (their sim
+## applied their own switch synchronously, and the turn digest compares end states) with
+## the revert their sim ran on switch-out; the markers replay it for presentation.
 func _link_enemy_switch(idx: int, msgs: Array) -> void:
 	if idx < 0 or idx >= enemy_party.size() or int(enemy_party[idx]["hp"]) <= 0:
 		return
 	msgs.append("%s withdrew\n%s!" % [peer_name, enemy_mon["name"]])
 	msgs.append({"hide_pic": "enemy"})
+	_revert_battle_copy(enemy_mon, e_vol)
+	_set_enemy(idx)
 	msgs.append({"auto": "%s sent\nout %s!" % [peer_name, enemy_party[idx]["name"]]})
 	msgs.append({"next_enemy": idx})
 
@@ -1726,7 +1740,8 @@ func _link_enemy_has_usable() -> bool:
 func _link_enemy_swap_in(idx: int) -> void:
 	if idx < 0 or idx >= enemy_party.size():
 		idx = 0
-	_set_enemy(idx)
+	_revert_battle_copy(enemy_mon, e_vol)   # the outgoing mon sheds Transform/Mimic, as the
+	_set_enemy(idx)                         # peer's own sim reverts it on switch-out
 	_det_event("X", "%s:w:%d" % ["j" if link_host else "h", idx])   # mirror of the peer's X
 	_say([{"auto": "%s sent\nout %s!" % [peer_name, enemy_party[idx]["name"]]},
 		{"next_enemy": idx}], "menu")
@@ -2749,7 +2764,10 @@ func _do_status_move(att: Dictionary, defn: Dictionary, move: String, md: Dictio
 			# MimicEffect writes wBattleMonMoves only — give the player's mon a battle-only
 			# copy so the party keeps its real moves (gh #62). PP drains still reach the
 			# party slot at the revert (DecrementPP skips the party only when TRANSFORMED).
-			if att_is_player and not att_vol.has("mimic_backup") \
+			# The battle-only copy is kept for the player's mon — and for BOTH sides in a
+			# link battle, where the same mon is "enemy" on the peer's sim and must revert
+			# identically on switch-out (gh #8: the soak caught the one-sided revert).
+			if (att_is_player or link_battle) and not att_vol.has("mimic_backup") \
 					and not att_vol.has("transform_backup"):
 				att_vol["mimic_backup"] = att["moves"]
 				var mcopy: Array = []
@@ -2781,7 +2799,7 @@ func _do_status_move(att: Dictionary, defn: Dictionary, move: String, md: Dictio
 		"TRANSFORM_EFFECT":
 			# TransformEffect_ writes the wBattleMon struct only; keep the party mon's real
 			# moves/types so they revert when it leaves the field (gh #62).
-			if att_is_player and not att_vol.has("transform_backup"):
+			if (att_is_player or link_battle) and not att_vol.has("transform_backup"):
 				att_vol["transform_backup"] = {"moves": att["moves"], "types": att["types"]}
 			att_vol["transformed"] = true     # a transformed catch becomes a DITTO (ItemUseBall)
 			att["types"] = (defn["types"] as Array).duplicate()

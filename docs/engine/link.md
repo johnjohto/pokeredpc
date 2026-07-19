@@ -151,6 +151,30 @@ enemy-side application of every bag item is a later faithfulness pass), and a li
 MIMIC copies a deterministic random technique on both sims instead of opening the mid-turn
 pick menu (a menu choice can't cross the wire mid-resolution).
 
+## The desync soak (gh #8) — Stage 1 of the 1.1 gate
+
+**`python tools/linksoak.py [--battles N]`** is the lockstep oracle at volume: it launches
+pairs of real headless instances (reusing `linktest.py`'s launch/collect driver), runs a
+battery of seeded link battles via the **`--colsoak`** fast path (link up → `col_party` +
+the pinned `--colseed` → battle, no club walk), and gates green only when both peers'
+`[battledet]` streams are **byte-identical in every battle**. A divergence fails the
+battery naming the battle, its parties/seed, and the first differing event (which names
+the turn).
+
+The battery varies real coverage: a six-party roster (`Main._SOAK_PARTIES`) spanning
+status moves, WRAP/THRASH/HYPER BEAM locks, multi-hit, crit-heavy, confusion,
+Transform/Mimic/Metronome, and REST — with **legal fixed DVs** so the mirror match
+(battle 6, same party both sides) produces genuine speed ties every turn (the shared-coin
+path); each side cycles its moveset deterministically by turn + party index, reaching
+moves an always-first-slot script never would.
+
+First battery caught three real lockstep bugs, each now fixed: illegal fixture DVs (the
+record re-derives the hp DV, so the peer's decoded copy differed — a test bug the oracle
+surfaced), the forced-continuation PP asymmetry (`f:` actions spend no PP on either sim),
+and the one-sided Transform/Mimic backup (link battles keep the copy-on-write backup on
+both sides so a switch-out reverts identically; backups are excluded from the digest as
+side-owned bookkeeping).
+
 ## Debug flags (the tracer bullet)
 
 | Flag | What it does |
