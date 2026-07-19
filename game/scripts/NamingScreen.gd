@@ -21,6 +21,13 @@ const KB := [
 	["×", "(", ")", ":", ";", "[", "]", "Pk", "Mn"],
 	["-", "?", "!", "♂", "♀", "/", ".", ",", "ED"],
 ]
+# Address mode (gh #5): the Cable Club joiner types a direct IP on the same keyboard frame —
+# digits + "." are all an IPv4 address needs (LAN/direct IP only, by spec). ED confirms.
+const ADDR_KB := [
+	["1", "2", "3", "4", "5", "6", "7", "8", "9"],
+	["0", ".", " ", " ", " ", " ", " ", " ", "ED"],
+]
+const ADDR_MAX := 15               # "255.255.255.255"
 
 var font_tex: Texture2D
 var font_cols: int
@@ -34,6 +41,7 @@ var name_buf := ""
 var lower := false
 var cur := Vector2i(0, 0)     # keyboard cursor (col, row); row 5 = the case toggle
 var sel := 0                  # preset-list cursor
+var addr_mode := false        # gh #5: the Cable Club address keyboard (digits, no case row)
 
 
 func setup(tex: Texture2D, cols: int, cmap: Dictionary) -> void:
@@ -56,8 +64,17 @@ func open(t: String, p: Array, q := "", skip_presets := false) -> void:
 	sel = 0
 	name_buf = ""
 	lower = false
+	addr_mode = false
 	cur = Vector2i(0, 0)
 	visible = true
+	queue_redraw()
+
+
+## gh #5: address entry for the Cable Club joiner. The default (last-used address, or
+## localhost) is confirmed by ED on an empty buffer, so reconnecting means two presses.
+func open_address(def_addr: String) -> void:
+	open("", [def_addr if def_addr != "" else "127.0.0.1"], "", true)
+	addr_mode = true
 	queue_redraw()
 
 
@@ -90,36 +107,38 @@ func _presets_input() -> void:
 
 
 func _keyboard_input() -> void:
+	var nrows := ADDR_KB.size() if addr_mode else 6      # address mode has no case-toggle row
+	var caserow := -1 if addr_mode else 5
 	if Input.is_action_just_pressed("ui_up"):
-		cur.y = (cur.y - 1 + 6) % 6
+		cur.y = (cur.y - 1 + nrows) % nrows
 		queue_redraw()
 	elif Input.is_action_just_pressed("ui_down"):
-		cur.y = (cur.y + 1) % 6
+		cur.y = (cur.y + 1) % nrows
 		queue_redraw()
-	elif Input.is_action_just_pressed("ui_left") and cur.y < 5:
+	elif Input.is_action_just_pressed("ui_left") and cur.y != caserow:
 		cur.x = (cur.x - 1 + 9) % 9
 		queue_redraw()
-	elif Input.is_action_just_pressed("ui_right") and cur.y < 5:
+	elif Input.is_action_just_pressed("ui_right") and cur.y != caserow:
 		cur.x = (cur.x + 1) % 9
 		queue_redraw()
 	elif Input.is_action_just_pressed("ui_cancel"):
 		name_buf = name_buf.substr(0, max(0, name_buf.length() - 1))
 		queue_redraw()
 	elif Input.is_action_just_pressed("ui_accept"):
-		if cur.y == 5:                               # the lower/UPPER case toggle
+		if cur.y == caserow:                         # the lower/UPPER case toggle
 			lower = not lower
 			queue_redraw()
 			return
 		var cell := _cell(cur.y, cur.x)
 		if cell == "ED":
 			_finish(name_buf if name_buf != "" else str(presets[0]))
-		elif name_buf.length() < NAME_MAX:
+		elif cell != " " and name_buf.length() < (ADDR_MAX if addr_mode else NAME_MAX):
 			name_buf += cell
 			queue_redraw()
 
 
 func _cell(r: int, c: int) -> String:
-	var s: String = KB[r][c]
+	var s: String = ADDR_KB[r][c] if addr_mode else KB[r][c]
 	return s.to_lower() if (lower and s.length() == 1 and s >= "A" and s <= "Z") else s
 
 
@@ -145,19 +164,22 @@ func _draw() -> void:
 		return
 	# keyboard mode (full screen)
 	draw_rect(Rect2(0, 0, 160, 144), LIGHT)
-	_str("%s NAME?" % title, 0, 8)                           # title flush-left (naming_screen.asm 0,1)
+	var slots := ADDR_MAX if addr_mode else NAME_MAX
+	var px0 := 24.0 if addr_mode else 80.0                   # 15 address slots need the left margin
+	_str("ADDRESS?" if addr_mode else "%s NAME?" % title, 0, 8)   # title flush-left (naming_screen.asm 0,1)
 	# Name preview at rows 2/3 (naming_screen.asm 10,2 / 10,3): typed letters on the upper row over a
 	# row of underscores, with the current slot's underscore raised to mark the cursor.
-	for i in NAME_MAX:
-		var px := 80.0 + i * GLYPH
+	for i in slots:
+		var px := px0 + i * GLYPH
 		if i == name_buf.length():                           # current slot: ONLY the raised underscore
 			draw_rect(Rect2(px, 22, 7, 2), DARK)
 		else:                                                # bold baseline underscore elsewhere
 			draw_rect(Rect2(px, 30, 7, 2), DARK)
 		if i < name_buf.length():
 			_str(name_buf[i], px, 16)                        # typed letter (row 2)
+	var rows := ADDR_KB.size() if addr_mode else 5
 	Frame.draw(self, frame_tex, 0, 32, 20, 11, LIGHT)
-	for r in 5:
+	for r in rows:
 		for c in 9:
 			var s := _cell(r, c)
 			var px := GX + c * COLW
@@ -170,6 +192,11 @@ func _draw() -> void:
 				_tile(128, px, py)
 			else:
 				_str(s, px, py)
+	if addr_mode:
+		if name_buf == "" and presets.size() > 0:            # the remembered default, one ED away
+			_str("ED: %s" % str(presets[0]), GX, 122)
+		_cursor(GX + cur.x * COLW - 8, GY + cur.y * ROWH)
+		return
 	_str("UPPER CASE" if lower else "lower case", GX, 122)
 	if cur.y < 5:
 		_cursor(GX + cur.x * COLW - 8, GY + cur.y * ROWH)

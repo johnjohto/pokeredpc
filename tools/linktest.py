@@ -91,6 +91,38 @@ def main():
     ok &= check("tamper-version: no session", "session established" not in hout
                 and "session established" not in jout)
 
+    # gh #5: the full in-game Cable Club flow — attendant -> HOST/JOIN -> save beat ->
+    # LinkMenu (the joiner never picks; the host's club_go closes its menu) -> both players
+    # standing on the Trade Center floor at their special-warp spots.
+    club_port = BASE_PORT + 4
+    h = launch(["--clubtest", "--clubhost", f"--port={club_port}"])
+    time.sleep(6)
+    j = launch(["--clubtest", "--clubjoin", f"--port={club_port}"])
+    hout = collect(h, 120)
+    jout = collect(j, 60)
+    ok &= check("club: host on the Trade Center floor",
+                "[club] host: map=TradeCenter cell=(3, 4) link=linked" in hout)
+    ok &= check("club: joiner beside them",
+                "[club] join: map=TradeCenter cell=(6, 4) link=linked" in jout)
+    ok &= check("club: joiner remembered the address", "addr='127.0.0.1'" in jout)
+    ok &= check("club: both clean", "modal_clear=true" in hout and "modal_clear=true" in jout)
+
+    # gh #5: an in-club handshake refusal — the tampered joiner is turned away at the desk
+    # on BOTH sides (the reason surfaces in-dialogue), and both flows end cleanly outside.
+    ref_port = BASE_PORT + 5
+    h = launch(["--clubtest", "--clubhost", f"--port={ref_port}"])
+    time.sleep(6)
+    j = launch(["--clubtest", "--clubjoin", f"--port={ref_port}", "--tamper=moves"])
+    hout = collect(h, 120)
+    jout = collect(j, 60)
+    ok &= check("club-refusal: host refuses naming 'moves'",
+                "[link] REFUSED" in hout and "'moves'" in hout)
+    ok &= check("club-refusal: joiner refused too",
+                "[link] REFUSED" in jout and "'moves'" in jout)
+    ok &= check("club-refusal: both back at the attendant cleanly",
+                "map=CeruleanPokecenter" in hout and "map=CeruleanPokecenter" in jout
+                and hout.count("modal_clear=true") == 1 and jout.count("modal_clear=true") == 1)
+
     lone = launch(["--join", "127.0.0.1", f"--port={BASE_PORT + 3}", "--linktimeout=5"])
     t0 = time.time()
     lout = collect(lone, 60)

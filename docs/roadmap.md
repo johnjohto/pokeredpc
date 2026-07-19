@@ -46,7 +46,15 @@ schema (stable `species:`/`move:` ids, explicit fields, hp DV re-derived, stats 
 never trusted off the wire), refusing unknown versions and malformed records with
 field-naming errors; `--monrecordtest` round-trips four mon shapes + rejects ~24 bad
 fixtures single-process. See [data-formats/mon-record.md](data-formats/mon-record.md).
-Next: gh #5 (the Cable Club attendant) or gh #7 (Colosseum lockstep).
+**Landed: gh #5 — the Cable Club attendant** (2026-07-19): talking to any Center's link
+receptionist runs `CableClubNPC` faithfully — HOST/JOIN/CANCEL as the modern cable, the
+naming screen's new **address mode** (digits + dot, last-used address saved as the ED
+default), refusals surfacing in-dialogue naming the differing part, the asm's save-warning →
+save → "Please wait." sync → LinkMenu (first press wins, host arbitrates), and the special
+warp onto the TradeCenter/Colosseum floor (host (3,4), partner (6,4)). Every wait/dead-end
+path returns to the attendant cleanly. Verified by `--clubtest` + two new `linktest.py`
+scenarios (full two-instance flow to the Trade Center floor; tampered joiner turned away on
+both sides). Next: gh #6 (Trade Center) or gh #7 (Colosseum lockstep).
 Earlier: the playthrough bug waves (gh #23–#52, 27 issues) are fully fixed across 0.9.1–0.9.12:
 and the playthrough bug waves (gh #23–#52, 27 issues) are fully fixed across 0.9.1–0.9.12:
 options/start/yes-no boxes, party + summary + battle-item screens, Pokédex (with working

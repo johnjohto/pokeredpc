@@ -41,6 +41,17 @@ design ADR-014).
   round-trip shapes and ~24 bad fixtures single-process. Doc:
   `docs/data-formats/mon-record.md` — the serialized state model v2's Core inherits.
 
+- **The Cable Club attendant** (gh #5): any Pokémon Center's link receptionist now runs the
+  full `CableClubNPC` flow — HOST/JOIN/CANCEL standing in for the cable, JOIN typing a
+  direct IP on the naming screen's new address mode (digits + dot; the last successfully
+  used address is saved and offered as the ED default), handshake refusals surfacing
+  in-dialogue naming the differing part, then the asm's script from establishment on:
+  the save warning, the save + jingle, the "Please wait." sync, and LinkMenu (first press
+  wins, the host arbitrating like the internally-clocked Game Boy) into the special warp
+  onto the TradeCenter/Colosseum floor (host (3,4), partner (6,4)). Every wait and dead
+  address times out politely back to the attendant. Verified by `--clubtest` and two new
+  two-instance `linktest.py` scenarios.
+
 ### Fixed
 - **Healing-machine ball alignment** (gh #11): the right (x-flipped) ball of each pair drew
   one cell right of the machine's slot panel. A negative-width rect flips the texture but

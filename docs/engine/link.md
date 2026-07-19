@@ -62,6 +62,33 @@ is a refusal that **names the differing part**: the refuser logs `[link] REFUSED
   nostalgia can't desync the other's save (spec stories 19–20). A flag difference is *not*
   a refusal.
 
+## The Cable Club attendant (gh #5)
+
+`Cutscene.cable_club_npc` runs when any Pokémon Center's `SPRITE_LINK_RECEPTIONIST` is
+talked to — faithful to `engine/link/cable_club_npc.asm` (`CableClubNPC`) +
+`engine/menus/main_menu.asm` (`LinkMenu`):
+
+- **Welcome** → no Pokédex: the "We're making preparations." brush-off, as on cartridge.
+- **HOST / JOIN / CANCEL** — the modern stand-in for the asm's serial-connection attempt.
+  JOIN opens the naming screen's **address mode** (digits + `.`; ED confirms; the
+  **last-used address** is the ED default, saved additively as `link_addr`). A wait or a
+  dead address times out (`link_wait_s`, B cancels) back to the asm's failure line —
+  "This area is reserved for 2 friends…". A handshake refusal surfaces **in-dialogue**
+  first, naming the differing part.
+- From establishment on, **the asm's script**: "Please apply here / we have to save" →
+  YES/NO (NO → "Please come again!") → save + save jingle → "Please wait." while both
+  sides sync the ready beat (inactivity → the asm's link-closed apology) → **LinkMenu**:
+  TRADE CENTER / COLOSSEUM / CANCEL, where the first player to press wins and the **host
+  arbitrates** (in Gen 1 the internally-clocked Game Boy wins) — the joiner sends
+  `club_pick`, the host answers with the authoritative `club_go`.
+- The chosen room loads via the **special warp** (`special_warps.asm`): host at (3,4),
+  partner at (6,4), in `TradeCenter` / `Colosseum`. (The rooms' interactions are gh #6/#7.)
+
+Verified by `--clubtest` (single instance: no-dex, cancel, host-timeout, dead-address —
+each back to the overworld with no modal, no cutscene, link closed) and two
+`tools/linktest.py` scenarios (the full two-instance flow onto the Trade Center floor;
+a tampered joiner turned away at the desk on both sides).
+
 ## Debug flags (the tracer bullet)
 
 | Flag | What it does |

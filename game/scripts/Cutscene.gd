@@ -1123,6 +1123,183 @@ const _PRIZES := [
 ]
 
 
+# ---- the Cable Club (gh #5, ADR-014) ---------------------------------------
+# engine/link/cable_club_npc.asm CableClubNPC + engine/menus/main_menu.asm LinkMenu.
+# HOST/JOIN is the modern stand-in for plugging in the cable (the asm's serial-connection
+# attempt); from link establishment onward the dialogue is the asm's, beat for beat:
+# apply-here + save warning -> YES/NO -> save + SFX -> "Please wait." sync -> the
+# TRADE CENTER / COLOSSEUM / CANCEL menu, where the FIRST player to press wins and the
+# host arbitrates a tie (the internally-clocked Game Boy wins in LinkMenu) -> the special
+# warp into the room (host at (3,4), partner at (6,4) — special_warps.asm).
+
+var _club_refusal := ""            # the handshake refusal reason (surfaced in-dialogue)
+var _club_peer_ready := false      # partner passed the save beat (Serial_SyncAndExchangeNybble)
+var _club_peer_pick := -1          # host: the partner's LinkMenu pick, if it arrived first
+var _club_go := -1                 # joiner: the host's authoritative destination
+
+
+func cable_club_npc(_npc) -> void:
+	main.cutscene_active = true
+	await say("Welcome to the\nCable Club!")
+	if not main.has_event("GOT_POKEDEX"):
+		await main.get_tree().create_timer(1.0).timeout      # ld c, 60 + DelayFrames
+		await say("We're making\npreparations.\nPlease wait.")
+		main.cutscene_active = false
+		return
+	_club_refusal = ""
+	_club_peer_ready = false
+	_club_peer_pick = -1
+	_club_go = -1
+	if not main.link.refused.is_connected(_club_on_refused):
+		main.link.refused.connect(_club_on_refused)
+	if not main.link.message.is_connected(_club_on_message):
+		main.link.message.connect(_club_on_message)
+	await _club_flow()
+	if main.link.message.is_connected(_club_on_message):
+		main.link.message.disconnect(_club_on_message)
+	if main.link.refused.is_connected(_club_on_refused):
+		main.link.refused.disconnect(_club_on_refused)
+	main.cutscene_active = false
+
+
+func _club_flow() -> void:
+	# --- the modern cable: HOST / JOIN (spec stories 2-4) ---
+	var sel := await pick(["HOST", "JOIN", "CANCEL"], Vector2(88, 40))
+	var joined_addr := ""
+	if sel == 0:
+		await _club_wait_link(true, "")
+	elif sel == 1:
+		joined_addr = await ask_address()
+		if joined_addr != "":
+			await _club_wait_link(false, joined_addr)
+	if main.link.state != "linked":
+		if _club_refusal != "":
+			# a mismatch names exactly what differed (spec story 5), then the asm's line
+			await say(_club_refusal.replace(" — ", "!\f"))
+			_club_refusal = ""
+		main.link.close("club")
+		await say("This area is\nreserved for 2\nfriends who are\nlinked by cable.")
+		return
+	if joined_addr != "":
+		main.link_last_addr = joined_addr        # remembered (saved) as the next default
+	# --- from establishment on, the asm's script ---
+	if not await ask("Please apply here.\fBefore opening\nthe link, we have\nto save the game."):
+		main.link.close("declined")
+		await say("Please come again!")
+		return
+	main.save_game()
+	if main.audio:
+		main.audio.play_sfx("save")
+	if not await _club_sync_ready():
+		main.link.close("inactive")
+		await say("The link has been\nclosed because of\ninactivity.\fPlease contact\nyour friend and\ncome again!")
+		return
+	var dest := await _club_link_menu()
+	if dest != 0 and dest != 1:
+		main.link.close("canceled")
+		await say("The link was\ncanceled.")
+		return
+	await say("OK, please wait\njust a moment.")
+	var room := "TradeCenter" if dest == 0 else "Colosseum"
+	var cell := Vector2i(3, 4) if main.link.is_host else Vector2i(6, 4)
+	main.load_world(room, -1, cell, false)
+
+
+func _club_on_refused(reason: String, _by_peer: bool) -> void:
+	_club_refusal = reason
+
+
+func _club_on_message(msg: Dictionary) -> void:
+	match str(msg.get("t", "")):
+		"club_ready":
+			_club_peer_ready = true
+		"club_pick":                              # joiner -> host: the partner pressed first
+			if _club_peer_pick < 0:
+				_club_peer_pick = int(msg.get("sel", 2))
+				if main.modal == main.menu and main.menu_mode == "cutscene":
+					main.menu.chosen.emit(-9)     # close our still-open menu: the partner won
+		"club_go":                                # host -> joiner: the authoritative destination
+			_club_go = int(msg.get("sel", 2))
+			if main.modal == main.menu and main.menu_mode == "cutscene":
+				main.menu.chosen.emit(-9)
+
+
+## Raise the link and hold a "waiting" box until it resolves; B cancels. No awaits on
+## signals that may never come — a frame-poll with Link's own timeout underneath (gh #103).
+func _club_wait_link(hosting: bool, addr: String) -> void:
+	main.link.timeout_s = main.link_wait_s
+	var port: int = main.link_port if main.link_port > 0 else main.link.DEFAULT_PORT
+	if hosting:
+		main.link.host(port)
+	else:
+		main.link.join(addr, port)
+	main.modal = main.textbox
+	main.textbox.show_ask("Waiting for a\npartner..." if hosting else "Calling %s ..." % addr)
+	while main.link.state in ["waiting", "connecting", "handshake"]:
+		if Input.is_action_just_pressed("ui_cancel"):
+			main.link.close("player-canceled")
+			break
+		await main.get_tree().process_frame
+	main.textbox.visible = false
+	main.textbox.active = false
+	main.textbox.held = false
+	main.modal = null
+
+
+## The "Please wait." beat: both sides confirm the save and sync (the asm's
+## Serial_SyncAndExchangeNybble with wLinkTimeoutCounter). False = inactivity.
+func _club_sync_ready() -> bool:
+	main.link.send_message({"t": "club_ready"})
+	main.modal = main.textbox
+	main.textbox.show_ask("Please wait.")
+	var waited := 0.0
+	while not _club_peer_ready and main.link.state == "linked" and waited < main.link_wait_s:
+		await main.get_tree().process_frame
+		waited += main.get_process_delta_time()
+	main.textbox.visible = false
+	main.textbox.active = false
+	main.textbox.held = false
+	main.modal = null
+	return _club_peer_ready and main.link.state == "linked"
+
+
+## LinkMenu: whoever presses first wins; the host arbitrates (the internally-clocked GB).
+## Returns 0 TRADE CENTER / 1 COLOSSEUM / 2 CANCEL (a dead link reads as CANCEL).
+func _club_link_menu() -> int:
+	await say("Where would you\nlike to go?")
+	# The partner may already have decided while our text was still up — don't open a menu
+	# whose closing message has already been consumed.
+	if not main.link.is_host and _club_go >= 0:
+		return _club_go
+	if main.link.is_host and _club_peer_pick >= 0:
+		main.link.send_message({"t": "club_go", "sel": _club_peer_pick})
+		return _club_peer_pick
+	var idx := await pick(["TRADE CENTER", "COLOSSEUM", "CANCEL"], Vector2(40, 40))
+	if main.link.is_host:
+		var sel := _club_peer_pick if idx == -9 else (2 if idx < 0 else idx)
+		main.link.send_message({"t": "club_go", "sel": sel})
+		return sel
+	if idx == -9:
+		return _club_go
+	main.link.send_message({"t": "club_pick", "sel": 2 if idx < 0 else idx})
+	var waited := 0.0                          # the host always answers with club_go
+	while _club_go < 0 and main.link.state == "linked" and waited < main.link_wait_s:
+		await main.get_tree().process_frame
+		waited += main.get_process_delta_time()
+	return _club_go if _club_go >= 0 else 2
+
+
+## gh #5: the joiner types a direct IP on the naming-screen keyboard (address mode); the
+## last-used address is the ED default. "" = backed out empty with no default.
+func ask_address() -> String:
+	main.modal = main.naming
+	main.naming.open_address(main.link_last_addr)
+	var a: String = await main.naming.done
+	main.modal = null
+	main.naming.visible = false
+	return a.strip_edges()
+
+
 ## Open a cursor menu and await the chosen index (-1 on cancel), like ask_yes_no.
 func pick(labels: Array, at: Vector2) -> int:
 	main.menu_mode = "cutscene"

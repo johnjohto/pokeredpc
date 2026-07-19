@@ -135,6 +135,9 @@ var player_bag := {"POKé BALL": 5, "POTION": 3, "MOON STONE": 1, "FIRE STONE": 
 	"WATER STONE": 1, "THUNDER STONE": 1, "LEAF STONE": 1}
 var player_money := 3000
 var player_id := 0               # trainer ID number (IDNo on the stats screen); set at new game
+var link_last_addr := ""         # gh #5: the last successfully joined address (saved; the ED default)
+var link_wait_s := 30.0          # Cable Club wait/connect/sync timeout (tests shrink it)
+var link_port := 0               # Cable Club port override (0 = Link.DEFAULT_PORT; tests set it)
 var play_seconds := 0.0          # total play time in seconds (shown on the save screen)
 var player_coins := 0                       # Game Corner coins (BCD 0..9999 in wPlayerCoins)
 var fossil_mon := ""                         # the species the Cinnabar lab is reviving (wFossilMon)
@@ -536,6 +539,8 @@ func _ready() -> void:
 		_battledettest()
 	elif "--monrecordtest" in args:
 		_monrecordtest()
+	elif "--clubtest" in args:
+		_clubtest()
 	elif "--host" in args:
 		_linktest(true)
 	elif _has_join_arg(args):
@@ -892,6 +897,7 @@ func save_game() -> bool:
 		"rival_starter": rival_starter,
 		"badges": badges,
 		"options": options,
+		"link_addr": link_last_addr,   # additive (gh #5): a 1.0 save loads unchanged
 	}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f == null:
@@ -911,6 +917,7 @@ func load_game() -> bool:
 		return false
 	player_money = int(data["money"])
 	player_coins = int(data.get("coins", 0))
+	link_last_addr = str(data.get("link_addr", ""))
 	fossil_mon = str(data.get("fossil_mon", ""))
 	player_bag = data["bag"]
 	for k in player_bag:                       # JSON makes ints floats; bag counts must be ints
@@ -1558,10 +1565,10 @@ func interact(p) -> bool:
 		if npc.file == "nurse":
 			cutscene.nurse_heal(npc)
 			return true
-		# Cable Club receptionist: script_cable_club_receptionist. Single-player, so just her welcome
-		# (linking needs a second game) instead of the empty box her script text left behind.
+		# Cable Club receptionist (gh #5): the full CableClubNPC flow — HOST/JOIN stands in
+		# for the cable, then the asm's save-warning/sync/LinkMenu beats over the link.
 		if npc.file == "link_receptionist":
-			_say("Welcome to the\nCable Club!\fThis is a place to\nlink with another\ngame to trade or\nbattle POKéMON.")
+			cutscene.cable_club_npc(npc)
 			return true
 		# In-game trade NPC -> the full trade dialog (incl. the after-trade line).
 		var tt: Dictionary = trades_data.get("text_trades", {})
@@ -5027,6 +5034,105 @@ func _monrecordtest() -> void:
 
 	print("[monrecord] %s" % ("ALL GREEN" if ok else "FAIL"))
 	get_tree().quit()
+
+
+## gh #5: the Cable Club attendant. Single-instance (`--clubtest`) drives every refusal/
+## timeout path scripted: the no-Pokédex brush-off, CANCEL at the cable menu, a HOST wait
+## that times out, and a JOIN to a dead address — each must land back on the overworld with
+## no modal, no cutscene, and the link closed (no soft-lock; spec story 21). The full
+## two-instance flow (`--clubtest --clubhost` / `--clubjoin`, from the attendant to the
+## Trade Center floor) is driven by `python tools/linktest.py`.
+func _clubtest() -> void:
+	await get_tree().process_frame
+	var args := OS.get_cmdline_user_args()
+	var hosting := "--clubhost" in args
+	var joining := "--clubjoin" in args
+	for a in args:
+		if str(a).begins_with("--port="):
+			link_port = int(str(a).substr(7))
+		elif str(a).begins_with("--tamper="):
+			link.tamper = str(a).substr(9)      # drive the in-dialogue refusal path
+	player_name = "RED"
+	load_world("CeruleanPokecenter", -1, Vector2i(11, 3), false)
+	player.facing = player.UP                      # the receptionist is at (11,2), STAY DOWN
+
+	if hosting or joining:
+		# --- the two-instance in-game flow: attendant -> link -> save beat -> LinkMenu ->
+		# the Trade Center floor. The joiner never picks a destination: the host's choice
+		# arrives as club_go and closes its menu (the LinkMenu arbiter path).
+		link_wait_s = 25.0
+		story_events = {"GOT_POKEDEX": true}
+		interact(player)
+		var g := 0
+		while center_label != "TradeCenter" and (cutscene_active or g < 200) and g < 6000:
+			if modal == menu and menu_mode == "cutscene":
+				var items: Array = menu.items
+				if items.size() == 3 and str(items[0]) == "HOST":
+					menu.chosen.emit(0 if hosting else 1)
+				elif items.size() == 2:            # the save-warning YES/NO
+					menu.chosen.emit(0)
+				elif items.size() == 3 and str(items[0]) == "TRADE CENTER" and hosting:
+					await get_tree().create_timer(0.5).timeout   # let the joiner's menu open
+					if modal == menu:
+						menu.chosen.emit(0)
+				await get_tree().process_frame
+			elif modal == naming:
+				naming.done.emit(str(naming.presets[0]))         # ED on empty -> the default
+				await get_tree().process_frame
+			elif modal == textbox and textbox.active:
+				await _press("ui_accept")
+			else:
+				await get_tree().process_frame
+			g += 1
+		print("[club] %s: map=%s cell=%s link=%s addr='%s' modal_clear=%s" % [
+			"host" if hosting else "join", center_label, player.cell, link.state,
+			link_last_addr, modal == null and not cutscene_active])
+		get_tree().quit()
+		return
+
+	# --- single-instance: every path that must come back to the attendant cleanly ---
+	link_wait_s = 2.0
+	# (a) no Pokédex: "We're making preparations."
+	story_events = {}
+	interact(player)
+	await _club_pump(-1)
+	print("[club] no-dex brush-off: clean=%s link=%s" % [_club_clean(), link.state])
+	# (b) CANCEL at the cable menu -> the area-reserved line.
+	story_events = {"GOT_POKEDEX": true}
+	interact(player)
+	await _club_pump(2)
+	print("[club] cancel: clean=%s link=%s" % [_club_clean(), link.state])
+	# (c) HOST with nobody coming: the wait times out politely.
+	interact(player)
+	await _club_pump(0)
+	print("[club] host timeout: clean=%s link=%s" % [_club_clean(), link.state])
+	# (d) JOIN a dead address (the ED default): the connect times out politely.
+	interact(player)
+	await _club_pump(1)
+	print("[club] join dead addr: clean=%s link=%s" % [_club_clean(), link.state])
+	get_tree().quit()
+
+
+func _club_clean() -> bool:
+	return modal == null and not cutscene_active and link.state in ["idle", "closed"]
+
+
+## Pump one attendant visit: answer the cable menu with `pickidx`, confirm the naming
+## screen's default, A through text, and wait out the link's own timeouts.
+func _club_pump(pickidx: int, budget := 3000) -> void:
+	var g := 0
+	while (cutscene_active or modal != null) and g < budget:
+		if modal == menu and menu_mode == "cutscene":
+			menu.chosen.emit(pickidx)
+			await get_tree().process_frame
+		elif modal == naming:
+			naming.done.emit(str(naming.presets[0]) if naming.presets.size() > 0 else "")
+			await get_tree().process_frame
+		elif modal == textbox and textbox.active:
+			await _press("ui_accept")
+		else:
+			await get_tree().process_frame
+		g += 1
 
 
 func _has_join_arg(args: Array) -> bool:
