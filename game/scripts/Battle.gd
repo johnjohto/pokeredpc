@@ -1629,6 +1629,7 @@ func _submit_action(action: Dictionary) -> void:
 		return
 	_link_pact = action
 	main.link.send_message({"t": "col_act", "action": _det_action(action)})
+	main._maybe_kill("act%d" % (turn_no + 1))    # gh #9: cable pull after our turn-N action
 	_link_wait = "act"
 	_link_elapsed = 0.0
 	msg = "Waiting..."

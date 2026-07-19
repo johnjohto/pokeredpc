@@ -175,6 +175,34 @@ and the one-sided Transform/Mimic backup (link battles keep the copy-on-write ba
 both sides so a switch-out reverts identically; backups are excluded from the digest as
 side-owned bookkeeping).
 
+## Drops + the dupe easter egg (gh #9)
+
+**The disconnect story, proven under injection** (`python tools/linkdrop.py`; `--killat=X`
+pulls the cable at a scripted point — the just-sent datagram is flushed, then the process
+dies with no goodbye):
+
+- A **mid-battle** pull ends the survivor's session **stakeless** (`END|winner=void`, the
+  party snapshot restored) — spec story 17.
+- The trade journal is **phased**: `ready` (records exchanged, our ack not yet sent — the
+  peer cannot have completed) and `acked` (written immediately *before* our ack goes out —
+  the point of no return). Recovery runs when a save loads: `ready` → **roll back**;
+  `acked` → **roll forward** (apply the journaled trade, silent trade evolution included,
+  and save) — matching the peer who completed on our ack. The injection matrix:
+  pick/confirm/commit pulls leave **both saves untraded**; an ack-window pull leaves
+  **both traded**. No duplication, no loss, at every scripted point.
+- The un-closable residue is the two-generals bound: an ack lost *in transit* at the very
+  instant of a real cable pull (not reproducible by the scripted matrix, which flushes)
+  can strand the peers on opposite sides of the decision; closing it fully needs a
+  reconnect/reconcile conversation — noted for post-1.1 hardening.
+
+**The dupe easter egg** (ADR-014 decision 7 — the one deliberate divergence): the opt-in
+flag travels in the handshake; an **asymmetric opt-in refuses the whole session** naming
+it, so the egg can never fire one-sided. With **both** peers opted in, an ack-window pull
+deliberately reproduces the cartridge's save-timing duplication: the survivor's save holds
+the received copy, and the puller's relaunch **keeps the original** (the acked journal
+rolls *back* on purpose) — the mon lives in both saves, exactly the Gen-1 lore, by mutual
+consent only.
+
 ## Debug flags (the tracer bullet)
 
 | Flag | What it does |

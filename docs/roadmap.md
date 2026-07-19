@@ -80,8 +80,16 @@ legal fixed DVs, a mirror match that speed-ties every turn), deterministic varie
 policies — and gates green only on byte-identical streams in every battle, naming the
 battle/turn/first-diff on failure. The first battery caught three real lockstep bugs
 (illegal fixture DVs; forced-continuation PP spent on one sim only; the one-sided
-Transform/Mimic backup+revert) — all fixed; **8/8 in sync, repeatedly**. Next: gh #9
-(drop-injection + the dupe easter egg), then gh #10 (the 1.1 gate).
+Transform/Mimic backup+revert) — all fixed; **8/8 in sync, repeatedly**. **Landed: gh #9 —
+drop-injection + the dupe easter egg** (2026-07-19): `--killat` cable pulls at scripted
+points, the phased trade journal (`ready` → rollback, `acked` = the point of no return →
+roll-forward on the next load, silent trade evo included), and `python tools/linkdrop.py`
+proving the matrix — battle drops stakeless, pick/confirm/commit pulls leave both saves
+untraded, ack-window pulls leave both traded; the dupe egg reproduces the cartridge's
+duplication **only** under mutual opt-in (asymmetric opt-in refuses the session). ALL
+GREEN. **All automatable v1.1 work is done — what remains is gh #10: the Stage-2 real
+remote human session, then the v1.1.0 release** (and gh #12 cross-platform, which needs a
+second platform's build). Next: gh #10.
 Earlier: the playthrough bug waves (gh #23–#52, 27 issues) are fully fixed across 0.9.1–0.9.12:
 and the playthrough bug waves (gh #23–#52, 27 issues) are fully fixed across 0.9.1–0.9.12:
 options/start/yes-no boxes, party + summary + battle-item screens, Pokédex (with working

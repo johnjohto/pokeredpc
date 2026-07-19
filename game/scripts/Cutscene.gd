@@ -1434,6 +1434,7 @@ func _tc_flow() -> void:
 			await say("The trade was\ncanceled.")          # costs nothing (spec story 12)
 			return
 		main.link.send_message({"t": "tc_pick", "idx": idx})
+		main._maybe_kill("pick")
 		# --- the partner's pick ---
 		main.modal = main.textbox
 		main.textbox.show_ask("Waiting for your\nfriend to choose...")
@@ -1457,6 +1458,7 @@ func _tc_flow() -> void:
 		var yes := await ask("Trade %s\nfor %s?" % [
 			str(main.player_party[idx]["name"]), _tc_rec_name(theirs)])
 		main.link.send_message({"t": "tc_confirm", "yes": yes})
+		main._maybe_kill("confirm")
 		got = await _tc_wait(func() -> bool: return not _tc_q_confirm.is_empty())
 		if not got:
 			_tc_result = "aborted"
@@ -1477,6 +1479,7 @@ func _tc_flow() -> void:
 func _tc_commit(idx: int) -> bool:
 	var give: Dictionary = main.player_party[idx]
 	main.link.send_message({"t": "tc_commit", "record": main.monrecord.encode(give)})
+	main._maybe_kill("commit")
 	var got := await _tc_wait(func() -> bool: return not _tc_q_record.is_empty())
 	if not got:
 		_tc_result = "aborted"
@@ -1491,8 +1494,13 @@ func _tc_commit(idx: int) -> bool:
 		await say("The trade data\nwas invalid!\fThe trade did not\nhappen.")
 		return true
 	var received: Dictionary = decoded["mon"]
-	main._tc_journal_write(give, peer_record)              # the pending window, on disk
+	var dupe := bool(main.link.session.get("dupe", false))
+	main._tc_journal_write("ready", give, peer_record, dupe)   # pre-ack: recovery rolls back
+	# The point of no return: from the instant our ack CAN reach them, they may complete —
+	# so the journal flips to "acked" (recovery rolls forward) BEFORE the ack is sent.
+	main._tc_journal_write("acked", give, peer_record, dupe)
 	main.link.send_message({"t": "tc_ack"})
+	main._maybe_kill("ack")
 	got = await _tc_wait(func() -> bool: return _tc_q_ack > 0)
 	if not got:
 		main._tc_journal_clear()                           # never acknowledged: nothing applied

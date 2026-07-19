@@ -90,6 +90,17 @@ design ADR-014).
   fixture DVs, the forced-continuation PP asymmetry, and the one-sided Transform/Mimic
   backup/revert.
 
+- **Drop-injection + the dupe easter egg** (gh #9): `--killat=<point>` simulates a cable
+  pull (flushed send, then the process dies) and `tools/linkdrop.py` proves the disconnect
+  story — a mid-battle pull is stakeless for the survivor; the trade journal is phased
+  (`ready` → roll back, `acked` — written before the ack leaves — → roll forward on the
+  next load, silent trade evolution included), so pulls at pick/confirm/commit leave both
+  saves untraded and an ack-window pull leaves both traded: no duplication, no loss, at
+  every scripted point (the in-transit-ack two-generals residue is documented). The dupe
+  easter egg: an asymmetric opt-in refuses the whole session; with both peers opted in,
+  the same ack-window pull deliberately reproduces the cartridge's duplication — the
+  survivor keeps the copy, the puller's relaunch keeps the original.
+
 ### Fixed
 - **Healing-machine ball alignment** (gh #11): the right (x-flipped) ball of each pair drew
   one cell right of the machine's slot panel. A negative-width rect flips the texture but

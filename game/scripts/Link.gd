@@ -222,6 +222,11 @@ func _mismatch(ours: Dictionary, theirs: Dictionary) -> String:
 	if str(theirs.get("version", "?")) != str(ours.get("version", "?")):
 		return "game version differs: ours %s, theirs %s" % [
 			ours.get("version", "?"), theirs.get("version", "?")]
+	# gh #9: the dupe easter egg is strictly mutual — an asymmetric opt-in refuses the whole
+	# session, so the egg can never fire one-sided (ADR-014 decision 7; spec story 20).
+	if bool((ours.get("flags", {}) as Dictionary).get("dupe", false)) \
+			!= bool((theirs.get("flags", {}) as Dictionary).get("dupe", false)):
+		return "the dupe easter egg is enabled on only one side — both friends must opt in"
 	var op: Dictionary = ours.get("parts", {})
 	var tp: Dictionary = theirs.get("parts", {})
 	var names: Array = op.keys()

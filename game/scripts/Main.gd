@@ -141,6 +141,7 @@ var link_port := 0               # Cable Club port override (0 = Link.DEFAULT_PO
 var link_return_map := ""        # gh #6: where the club room's exit leads back to
 var link_return_cell := Vector2i.ZERO
 var _col_snapshot: Array = []    # gh #7: the party before a link battle — restored after (stakeless)
+var kill_at := ""                # gh #9 drop injection: --killat=<point> pulls the cable there
 var _club_leaving := false       # guards the room's link-closed watcher during our own exit
 var play_seconds := 0.0          # total play time in seconds (shown on the save screen)
 var player_coins := 0                       # Game Corner coins (BCD 0..9999 in wPlayerCoins)
@@ -454,11 +455,10 @@ func _ready() -> void:
 		for ua in OS.get_cmdline_user_args():
 			if str(ua).begins_with("--saveslot="):          # two-instance tests keep separate slots
 				SAVE_PATH = "user://pokeredpc_save_%s.json" % str(ua).substr(11)
-	# gh #6: a leftover trade journal marks a trade interrupted inside the commit window —
-	# it was never applied here, so it rolls back (the save is the truth). gh #9 hardens this.
+	# gh #9: a leftover trade journal marks a trade interrupted inside the commit window.
+	# Recovery runs in load_game (it needs the party); here it is only surfaced.
 	if FileAccess.file_exists(_tc_journal_path()):
-		print("[trade] interrupted trade journal found — rolled back (never applied)")
-		_tc_journal_clear()
+		print("[trade] interrupted trade journal present — will recover on load")
 	battle.fast_hp = not OS.get_cmdline_user_args().is_empty()   # skip HP-drain animation in tests
 	apply_options()                   # text speed etc. (defaults; a loaded save re-applies)
 	player = preload("res://scripts/Player.gd").new()
@@ -556,6 +556,8 @@ func _ready() -> void:
 		_battledettest()
 	elif "--monrecordtest" in args:
 		_monrecordtest()
+	elif "--recovertest" in args:
+		_recovertest()
 	elif "--clubtest" in args:
 		_clubtest()
 	elif "--colsoak" in args:
@@ -1002,6 +1004,7 @@ func load_game() -> bool:
 		load_world(str(data["map"]), -1, cell, true)
 		player.facing = int(data["facing"])
 	player.queue_redraw()
+	_tc_journal_recover()                      # gh #9: finish/roll back an interrupted trade
 	return true
 
 
@@ -5130,22 +5133,85 @@ func _club_room_kicked() -> void:
 	club_room_leave()
 
 
-## gh #6: the two-phase trade journal — written before our ack goes out, cleared only after
-## apply + save. Its presence at boot marks a trade interrupted inside the commit window.
+## gh #6/#9: the two-phase trade journal. Phase "ready" = records exchanged, our ack NOT
+## yet sent — the peer cannot have completed, so an interrupted trade ROLLS BACK. Phase
+## "acked" = written immediately before our ack goes out — from that instant the peer may
+## complete on our ack, so recovery ROLLS FORWARD (presumed commit). Cleared after
+## apply + save. The un-closable residue — the ack lost in transit the same instant the
+## cable is pulled — is the two-generals bound, documented in engine/link.md.
 func _tc_journal_path() -> String:
 	return SAVE_PATH.get_basename() + "_trade_journal.json"
 
 
-func _tc_journal_write(give: Dictionary, peer_record: Dictionary) -> void:
+func _tc_journal_write(phase: String, give: Dictionary, peer_record: Dictionary, dupe: bool) -> void:
 	var f := FileAccess.open(_tc_journal_path(), FileAccess.WRITE)
 	if f:
-		f.store_string(JSON.stringify({"give": monrecord.encode(give), "get": peer_record}))
+		f.store_string(JSON.stringify({"phase": phase, "dupe": dupe,
+			"give": monrecord.encode(give), "get": peer_record}))
 		f.close()
 
 
 func _tc_journal_clear() -> void:
 	if FileAccess.file_exists(_tc_journal_path()):
 		DirAccess.open("user://").remove(_tc_journal_path().get_file())
+
+
+## Recovery, run when a save loads (gh #9). ready -> roll back (nothing was applied here,
+## and the peer can't have our ack). acked + dupe armed -> roll back ON PURPOSE: that IS
+## the cartridge's cable-pull duplication — we keep our mon, their save keeps the copy.
+## acked otherwise -> roll forward: apply the journaled trade (with its silent trade
+## evolution) and save, matching the peer who completed on our ack.
+func _tc_journal_recover() -> void:
+	if not FileAccess.file_exists(_tc_journal_path()):
+		return
+	var f := FileAccess.open(_tc_journal_path(), FileAccess.READ)
+	var j = JSON.parse_string(f.get_as_text()) if f else null
+	_tc_journal_clear()
+	if not j is Dictionary:
+		return
+	if str(j.get("phase", "ready")) != "acked":
+		print("[trade] interrupted before the point of no return — rolled back (both sides untraded)")
+		return
+	if bool(j.get("dupe", false)):
+		print("[trade] dupe easter egg: the cable pull kept your mon — their copy lives on")
+		return
+	var d: Dictionary = monrecord.decode(j.get("get", {}))
+	if not bool(d["ok"]):
+		return
+	# Canonicalize the journaled give record through decode->encode before comparing:
+	# JSON parsing turned its ints into floats, and "level":40.0 never string-matches
+	# the fresh encode's "level":40.
+	var gived: Dictionary = monrecord.decode(j.get("give", {}))
+	if bool(gived["ok"]):
+		var give_wire := JSON.stringify(monrecord.encode(gived["mon"]))
+		for i in player_party.size():
+			if JSON.stringify(monrecord.encode(player_party[i])) == give_wire:
+				player_party.remove_at(i)
+				break
+	var got: Dictionary = d["mon"]
+	if player_party.size() < 6:
+		player_party.append(got)
+	else:
+		pc_box.append(got)
+	mark_owned(str(got["species"]))
+	for ev in mon_base[str(got["species"])]["evolutions"]:
+		if str(ev[0]) == "EVOLVE_TRADE" and int(got["level"]) >= int(ev[1]):
+			_evolve_mon(got, str(ev[2]))
+			break
+	save_game()
+	print("[trade] recovered an interrupted trade — rolled forward (both sides traded)")
+
+
+## gh #9: the drop-injection hook — a simulated cable pull. The ENet flush first means the
+## datagram just sent DID get out (the scripted points test protocol windows, not packet
+## loss); then the process dies with no goodbye.
+func _maybe_kill(point: String) -> void:
+	if kill_at != point:
+		return
+	if link._enet != null:
+		link._enet.flush()
+	print("[kill] simulated cable pull at '%s'" % point)
+	get_tree().quit()
 
 
 # gh #8: the desync-soak party roster. Fixed DVs so mirror matches produce REAL speed ties
@@ -5186,6 +5252,8 @@ func _colsoaktest() -> void:
 			pidx = int(str(a).substr(11)) % _SOAK_PARTIES.size()
 		elif str(a).begins_with("--colseed="):
 			seed_v = int(str(a).substr(10))
+		elif str(a).begins_with("--killat="):
+			kill_at = str(a).substr(9)          # gh #9: mid-battle cable pull
 	player_name = "HOSTA" if hosting else "JOINB"
 	player_id = 111 if hosting else 222
 	# Fixed DVs so mirror matches really tie — and LEGAL ones: Gen 1 derives the hp DV from
@@ -5264,6 +5332,19 @@ func _colsoaktest() -> void:
 	get_tree().quit()
 
 
+## gh #9: relaunch a killed instance's slot — loading the save runs the trade-journal
+## recovery (ready -> rollback, acked -> roll-forward, dupe -> the egg); print the outcome.
+func _recovertest() -> void:
+	await get_tree().process_frame
+	var okl := load_game()
+	var sp: Array = []
+	for m in player_party:
+		sp.append(str(m["species"]))
+	print("[recover] loaded=%s party=%s box=%d journal=%s" % [
+		okl, sp, pc_box.size(), FileAccess.file_exists(_tc_journal_path())])
+	get_tree().quit()
+
+
 ## gh #5: the Cable Club attendant. Single-instance (`--clubtest`) drives every refusal/
 ## timeout path scripted: the no-Pokédex brush-off, CANCEL at the cable menu, a HOST wait
 ## that times out, and a JOIN to a dead address — each must land back on the overworld with
@@ -5280,6 +5361,10 @@ func _clubtest() -> void:
 			link_port = int(str(a).substr(7))
 		elif str(a).begins_with("--tamper="):
 			link.tamper = str(a).substr(9)      # drive the in-dialogue refusal path
+		elif str(a).begins_with("--killat="):
+			kill_at = str(a).substr(9)          # gh #9: pull the cable at a scripted point
+		elif str(a) == "--dupe":
+			link.dupe_opt_in = true             # gh #9: the easter-egg opt-in
 	player_name = "RED"
 	load_world("CeruleanPokecenter", -1, Vector2i(11, 3), false)
 	player.facing = player.UP                      # the receptionist is at (11,2), STAY DOWN
@@ -5356,6 +5441,7 @@ func _clubtest() -> void:
 		if "--trade" in args and center_label == "TradeCenter":
 			player_party = [make_mon("kadabra" if hosting else "machoke", 40, []),
 				make_mon("pidgey", 20, [])]
+			save_game()          # the trade party is save-truth, as a real player's would be
 			player.facing = player.RIGHT if hosting else player.LEFT   # face the table
 			interact(player)
 			g = 0
