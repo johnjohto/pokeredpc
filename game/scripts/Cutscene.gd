@@ -1327,6 +1327,15 @@ func _tc_on_message(msg: Dictionary) -> void:
 			_tc_q_record.append(msg.get("record", {}))
 		"tc_ack":
 			_tc_q_ack += 1
+		# ---- Colosseum (gh #7) ----
+		"col_party":
+			_col_peer = msg
+		"col_act":
+			if main.battle.link_battle:
+				main.battle.link_actions.append(str(msg.get("action", "")))
+		"col_swap":
+			if main.battle.link_battle:
+				main.battle.link_swaps.append(int(msg.get("idx", 0)))
 
 
 ## Wait for `cond` while the link lives; false on link death or timeout (no soft-lock).
@@ -1345,6 +1354,7 @@ func _tc_wait(cond: Callable) -> bool:
 ## then wait each other out. Disarmed when the room is left.
 func tc_room_arm() -> void:
 	_tc_peer_party = []
+	_col_peer = {}
 	_tc_q_pick = []
 	_tc_q_confirm = []
 	_tc_q_record = []
@@ -1520,6 +1530,55 @@ func _tc_commit(idx: int) -> bool:
 
 func _tc_rec_name(rec: Dictionary) -> String:
 	return str(rec.get("nickname", str(rec.get("species", "?")).replace("species:", "").to_upper()))
+
+
+# ---- the Colosseum (gh #7, ADR-014) ----------------------------------------
+# Both players at the battle table: parties cross as mon records, the HOST fixes the shared
+# seed, and both engines run the identical lockstep battle (Battle.start_link) — only
+# chosen actions cross from here on (col_act / col_swap, routed to the battle's queues by
+# the room handler above).
+
+var _col_peer := {}                 # the partner's col_party message
+
+
+func colosseum_table() -> void:
+	if main.link.state != "linked":
+		await say("The link has been\nclosed.")
+		return
+	main.cutscene_active = true
+	var mine: Array = []
+	for m in main.player_party:
+		mine.append(main.monrecord.encode(m))
+	var my_seed := int(randi() & 0x7fffffff)             # only the host's is used
+	main.link.send_message({"t": "col_party", "mons": mine,
+		"name": main.player_name, "seed": my_seed})
+	main.modal = main.textbox
+	main.textbox.show_ask("Waiting for your\nfriend...")
+	var stood_up := false
+	while _col_peer.is_empty() and main.link.state == "linked":
+		if Input.is_action_just_pressed("ui_cancel"):
+			stood_up = true
+			break
+		await main.get_tree().process_frame
+	main.textbox.visible = false
+	main.textbox.active = false
+	main.textbox.held = false
+	main.modal = null
+	if stood_up:
+		main.cutscene_active = false
+		return
+	if _col_peer.is_empty():
+		await say("The link has been\nclosed.")
+		main.cutscene_active = false
+		return
+	var seed_v := my_seed if main.link.is_host else int(_col_peer.get("seed", 0))
+	var pname := str(_col_peer.get("name", "FRIEND"))
+	var records: Array = _col_peer.get("mons", [])
+	_col_peer = {}                                       # a rematch re-exchanges
+	main.cutscene_active = false
+	if not main.start_colosseum_battle(records, seed_v, pname):
+		main.link.close("bad-party")
+		await say("The battle data\nwas invalid!")
 
 
 ## gh #5: the joiner types a direct IP on the naming-screen keyboard (address mode); the

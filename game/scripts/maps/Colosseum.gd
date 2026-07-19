@@ -15,6 +15,6 @@ func on_step(cell: Vector2i) -> bool:
 
 func on_interact(front: Vector2i, npc) -> bool:
 	if npc != null or front in TABLE:
-		main.cutscene.say("Your friend is\nready to battle!")   # the battle lands with gh #7
+		main.cutscene.colosseum_table()
 		return true
 	return false

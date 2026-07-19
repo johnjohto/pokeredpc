@@ -160,6 +160,32 @@ def main():
     except OSError as e:
         ok &= check("trade: save files readable", False, str(e))
 
+    # gh #7: the Colosseum lockstep battle — two real instances fight over the wire (moves,
+    # faints, replacements, the win), and their [battledet] event streams must be
+    # BYTE-IDENTICAL: equality of streams is ADR-014's definition of "in sync".
+    col_port = BASE_PORT + 7
+    h = launch(["--clubtest", "--clubhost", "--battle", f"--port={col_port}",
+                "--saveslot=colhost"])
+    time.sleep(6)
+    j = launch(["--clubtest", "--clubjoin", "--battle", f"--port={col_port}",
+                "--saveslot=coljoin"])
+    hout = collect(h, 300)
+    jout = collect(j, 240)
+    hcol = next((l for l in hout.splitlines() if "[col] host:" in l), "")
+    jcol = next((l for l in jout.splitlines() if "[col] join:" in l), "")
+    hstream = [l.split("] ", 1)[1] for l in hout.splitlines() if "[battledet]" in l]
+    jstream = [l.split("] ", 1)[1] for l in jout.splitlines() if "[battledet]" in l]
+    ok &= check("colosseum: battle completed on both sides",
+                "winner=" in hcol and "winner=" in jcol)
+    ok &= check("colosseum: peers agree on the winner",
+                hcol.split("end=")[-1].split(" ")[0] == jcol.split("end=")[-1].split(" ")[0]
+                if hcol and jcol else False)
+    ok &= check("colosseum: LOCKSTEP — event streams byte-identical",
+                len(hstream) > 3 and hstream == jstream,
+                f"{len(hstream)}/{len(jstream)} events")
+    ok &= check("colosseum: stakeless — both parties restored",
+                "party_restored=true" in hcol and "party_restored=true" in jcol)
+
     lone = launch(["--join", "127.0.0.1", f"--port={BASE_PORT + 3}", "--linktimeout=5"])
     t0 = time.time()
     lout = collect(lone, 60)

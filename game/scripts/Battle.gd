@@ -191,6 +191,26 @@ var turn_no := 0
 var _det_paction := "-"        # the player action driving the current turn, canonical form
 var _det_eaction := "-"        # the enemy action (in a link battle: the peer's choice)
 
+# ---- link battle (gh #7, ADR-014): deterministic lockstep ------------------
+# Both peers run the FULL simulation, each with itself as the "player" side (mirrored, as
+# pokered's link battles do), from a shared seed fixed at the table; only chosen actions
+# cross the wire. Everything player/enemy-asymmetric that draws RNG or shifts stats is
+# neutralized exactly as the asm neutralizes it for LINK_STATE_BATTLING: badge boosts off
+# (ApplyBadgeStatBoosts rets), the enemy stat-down hidden 65/256 miss off, no EXP — and the
+# speed-tie coin is interpreted canonically ("heads = the HOST acts first"), so the two
+# mirrored sims order the same tie the same way. For the lockstep oracle, event lines are
+# emitted in host/join labels (h[]/j[]) and the digest orders the host's side first on both
+# peers, so byte-equality of the two streams remains the definition of "in sync".
+var link_battle := false
+var link_host := false
+var peer_name := ""            # the partner's player name (their trainer label)
+var link_actions: Array = []   # the peer's col_act actions, in turn order (fed by Cutscene)
+var link_swaps: Array = []     # the peer's col_swap faint replacements, in order
+var _link_wait := ""           # "" | "act" (their turn action) | "swap" (their replacement)
+var _link_pact := {}           # our pending action while waiting for theirs
+var _link_elapsed := 0.0
+var link_over := false         # set when the link died mid-battle (stakeless end)
+
 
 ## Battle-logic random draws (the ONLY randomness battle rules may use): each advances the
 ## cursor, so two lockstep peers can compare how much randomness every turn consumed.
@@ -221,6 +241,25 @@ func _det_event(kind: String, info: String) -> void:
 ## Canonical digest of everything the battle rules can read or write. Field order is fixed
 ## throughout — the digest must not depend on dictionary construction history.
 func _det_digest() -> String:
+	# Link battles (gh #7): the two peers simulate MIRRORED (each is its own "player"), so
+	# the canonical digest orders the HOST's side first on both, and drops the asymmetric
+	# bookkeeping that has no rule effect under link (exp participants, AI counters, run
+	# attempts, the end flags — the winner is canonicalized on the END line instead).
+	if link_battle:
+		var sides: Array = [[active, party, p_stages, p_mod, p_vol],
+			[enemy_active, enemy_party, e_stages, e_mod, e_vol]]
+		if not link_host:
+			sides.reverse()
+		var s2 := "a%d/b%d;" % [sides[0][0], sides[1][0]]
+		for m in sides[0][1]:
+			s2 += _det_mon(m)
+		s2 += "~"
+		for m in sides[1][1]:
+			s2 += _det_mon(m)
+		s2 += "~" + _det_kv(sides[0][2]) + _det_kv(sides[1][2]) \
+			+ _det_kv(sides[0][3]) + _det_kv(sides[1][3])
+		s2 += "~" + _det_kv(sides[0][4]) + _det_kv(sides[1][4])
+		return s2.md5_text()
 	var s := "a%d/e%d;" % [active, enemy_active]
 	for m in party:
 		s += _det_mon(m)
@@ -322,7 +361,11 @@ const _BADGE_STAT := {"atk": "BOULDERBADGE", "def": "THUNDERBADGE", "spd": "SOUL
 
 
 ## One ×1.125 badge application: v += v/8, capped at MAX_STAT_VALUE (999).
+## Link battles take none (ApplyBadgeStatBoosts rets on LINK_STATE_BATTLING) — and the two
+## mirrored lockstep sims would disagree on the numbers if either side's badges applied.
 func _badge_boost(v: int, key: String) -> int:
+	if link_battle:
+		return v
 	if main and str(_BADGE_STAT.get(key, "")) in main.badges:
 		return mini(999, v + (v >> 3))
 	return v
@@ -414,6 +457,35 @@ func start_trainer(p_party: Array, enemy_data: Array, tname: String, money_base:
 	_say(q, "menu")
 
 
+## Link battle (gh #7): the peer's decoded party is the enemy team, the seed is the shared
+## one fixed at the Colosseum table, and no AI runs — the enemy's actions arrive over the
+## wire. Trainer semantics (RUN blocked, thrown balls blocked); no prize, no EXP, stakeless.
+func start_link(p_party: Array, e_party: Array, host: bool, seed_v: int, pname: String) -> void:
+	next_seed = seed_v
+	_begin(p_party)
+	link_battle = true
+	link_host = host
+	peer_name = pname
+	is_trainer = true
+	no_blackout = true                 # a lost link battle is stakeless — never a whiteout
+	trainer_name = pname
+	enemy_party = e_party
+	prize = 0
+	link_actions = []
+	link_swaps = []
+	_link_wait = ""
+	link_over = false
+	_set_enemy(0)
+	trainer_pic_tex = null
+	var q: Array = [{"intro": "silhouette"}, {"intro": "reveal"}, {"intro": "pokeballs"},
+		{"auto": "%s\nwants to fight!" % pname},
+		{"auto": "%s sent\nout %s!" % [pname, enemy_mon["name"]]},
+		{"intro": "enemy_grow"}, {"intro": "enemy_hud"}, {"intro": "pause"},
+		{"intro": "slide_off"}, {"auto": "Go! %s!" % player_mon["name"]}, {"intro": "throw"}]
+	_det_event("S", "link seed=%d" % battle_seed)
+	_say(q, "menu")
+
+
 ## Safari Zone encounter: throw BALL/BAIT/ROCK or RUN; the mon can flee, you can't fight.
 func start_safari(p_party: Array, e_species: String, e_level: int) -> void:
 	_begin(p_party)
@@ -432,6 +504,9 @@ func start_safari(p_party: Array, e_species: String, e_level: int) -> void:
 
 
 func _begin(p_party: Array) -> void:
+	link_battle = false
+	link_host = false
+	peer_name = ""
 	# Determinism oracle (gh #2): seed the battle-local RNG. Outside a link/test, the seed
 	# itself comes off the global RNG — the battle stays as unpredictable as before, but
 	# every draw AFTER this line is battle-local and replayable from the seed alone.
@@ -797,11 +872,20 @@ func _next_msg() -> void:
 func _resolve_after() -> void:
 	match after:
 		"menu":
+			# Link: a fainted enemy waits for the peer's replacement before anything else.
+			if link_battle and int(enemy_mon["hp"]) <= 0 and _link_enemy_has_usable():
+				_link_wait = "swap"
+				_link_elapsed = 0.0
+				msg = "Waiting..."
+				revealed = 999
+				state = "linkwait"
+				queue_redraw()
+				return
 			var fm := _forced_move(p_vol)
 			if fm != "":
-				_resolve({"kind": "forced", "move": fm})
+				_submit_action({"kind": "forced", "move": fm})
 			elif not _has_usable_move(player_mon, p_vol):
-				_resolve({"kind": "forced", "move": "STRUGGLE"})
+				_submit_action({"kind": "forced", "move": "STRUGGLE"})
 			else:
 				state = "menu"; cursor = 0; queue_redraw()
 		"moves":
@@ -809,7 +893,17 @@ func _resolve_after() -> void:
 		"party_forced":
 			state = "party_forced"; cursor = _first_usable(); queue_redraw()
 		_:
-			_det_event("END", "won=%s caught=%s blackout=%s" % [won, caught, blacked_out])
+			if link_battle:
+				var winner := "draw"
+				if link_over:
+					winner = "void"          # the link died mid-battle
+				elif won:
+					winner = "host" if link_host else "join"
+				elif blacked_out:
+					winner = "join" if link_host else "host"
+				_det_event("END", "winner=" + winner)
+			else:
+				_det_event("END", "won=%s caught=%s blackout=%s" % [won, caught, blacked_out])
 			if not caught:
 				visible = false        # a catch keeps the scene up for the dex/nickname beats
 			_revert_battle_copy(player_mon, p_vol)
@@ -828,6 +922,21 @@ func _process(delta: float) -> void:
 	if demo and state == "menu" and not _demo_ran:
 		_demo_ran = true
 		_run_demo()
+	# Link lockstep (gh #7): "linkwait" holds until the peer's action/replacement arrives.
+	# No artificial clock on a live link — a friend may think — but a dead link ends it
+	# (ENet detects a vanished peer; spec stories 16/21).
+	if link_battle and state == "linkwait" and _link_wait != "":
+		if _link_wait == "act" and not link_actions.is_empty():
+			var ea := _parse_peer_action(str(link_actions.pop_front()))
+			_link_wait = ""
+			_resolve_link(_link_pact, ea)
+		elif _link_wait == "swap" and not link_swaps.is_empty():
+			var si2 := int(link_swaps.pop_front())
+			_link_wait = ""
+			_link_enemy_swap_in(si2)
+		elif main == null or main.link.state != "linked":
+			_link_wait = ""
+			_link_dead()
 	if state == "msg" and revealed < _msg_glyphs():
 		revealed += speed * delta
 		queue_redraw()
@@ -899,7 +1008,7 @@ func handle_input() -> void:
 			if Input.is_action_just_pressed("ui_accept"):
 				_move_swap = -1                          # A/B deselect the held move (SelectMenuItem)
 				if int(player_mon["moves"][cursor]["pp"]) > 0:
-					_resolve({"kind": "move", "idx": cursor})
+					_submit_action({"kind": "move", "idx": cursor})
 				else:
 					queue_redraw()
 			elif Input.is_action_just_pressed("ui_cancel"):
@@ -1148,7 +1257,13 @@ func _choose_party() -> void:
 		_sub_shown["player"] = false
 		if not participants.has(active):
 			participants.append(active)
-		_det_event("X", "w:%d" % active)   # faint replacement: a player decision mid-flow (gh #2)
+		# Faint replacement: a player decision mid-flow (gh #2). In link, role-labeled so the
+		# peer's matching event (emitted at swap arrival) is byte-identical.
+		if link_battle:
+			_det_event("X", "%s:w:%d" % ["h" if link_host else "j", active])
+			main.link.send_message({"t": "col_swap", "idx": active})
+		else:
+			_det_event("X", "w:%d" % active)
 		_say([{"auto": "Go! %s!" % player_mon["name"]}, {"send_player": true}], "menu")
 	elif state == "party_shift":
 		# SHIFT style: a free switch before the trainer's next mon comes out; the queued
@@ -1169,7 +1284,7 @@ func _choose_party() -> void:
 		queue.push_front({"recall": true})
 		_next_msg()
 	else:
-		_resolve({"kind": "switch", "idx": cursor})
+		_submit_action({"kind": "switch", "idx": cursor})
 
 
 # ---- items & catching ------------------------------------------------------
@@ -1187,6 +1302,12 @@ func _consume(item: String) -> void:
 
 
 func _use_item(item: String) -> void:
+	if link_battle:
+		# v1.1 divergence, documented: the cartridge allows items in link battles; the
+		# lockstep port refuses them for now (the enemy-side application of every bag item
+		# is a later faithfulness pass). Both sims refuse identically — no desync surface.
+		_say(["Items can't be\nused in a link\nbattle!"], "menu")
+		return
 	if not demo and int(main.player_bag.get(item, 0)) <= 0:
 		return                                    # (the old man throws his own ball)
 	_det_paction = "i:" + item
@@ -1491,6 +1612,132 @@ func _enemy_turn_after_item(msgs: Array) -> void:
 		if enemy_mon["hp"] > 0 and player_mon["hp"] > 0:
 			_residual(player_mon, p_vol, enemy_mon, msgs)
 	_end_of_turn(msgs)
+
+
+# ---- link lockstep (gh #7) -------------------------------------------------
+
+## Where a chosen action enters the engine. Non-link: resolve immediately (the AI supplies
+## the enemy's move). Link: send ours, hold in "linkwait" until the peer's arrives, then
+## both sims resolve the same pair.
+func _submit_action(action: Dictionary) -> void:
+	if not link_battle:
+		_resolve(action)
+		return
+	_link_pact = action
+	main.link.send_message({"t": "col_act", "action": _det_action(action)})
+	_link_wait = "act"
+	_link_elapsed = 0.0
+	msg = "Waiting..."
+	revealed = 999
+	state = "linkwait"                 # ignores input; _process watches the queues
+	queue_redraw()
+
+
+## The peer's canonical action string back into an enemy action.
+func _parse_peer_action(s: String) -> Dictionary:
+	if s.begins_with("w:"):
+		return {"kind": "eswitch", "idx": int(s.substr(2))}
+	if s.begins_with("m:") or s.begins_with("f:"):
+		return {"kind": "emove", "move": s.substr(2)}
+	return {"kind": "emove", "move": "STRUGGLE"}
+
+
+## Both actions in hand: switches first (independent), then the moves in canonical speed
+## order — a tie draws the shared coin as "heads = the HOST acts first", so the mirrored
+## sims order it identically (pokered's link battles resolve ties off the shared random
+## list the same way).
+func _resolve_link(pact: Dictionary, eact: Dictionary) -> void:
+	_det_paction = _det_action(pact) if str(pact.get("kind", "")) != "" else "-"
+	_det_eaction = ("w:%d" % int(eact["idx"])) if str(eact["kind"]) == "eswitch" \
+		else "m:" + str(eact["move"])
+	var msgs: Array = []
+	if str(pact["kind"]) == "switch":
+		_player_act(pact, msgs)
+	if str(eact["kind"]) == "eswitch":
+		_link_enemy_switch(int(eact["idx"]), msgs)
+	var p_moves: bool = str(pact["kind"]) in ["move", "forced"]
+	var e_moves: bool = str(eact["kind"]) == "emove"
+	if p_moves or e_moves:
+		var pf := true
+		if p_moves and e_moves:
+			var ps := _eff_speed(true)
+			var es := _eff_speed(false)
+			if ps == es:
+				var host_first := _rf() < 0.5
+				pf = host_first if link_host else not host_first
+			else:
+				pf = ps > es
+		elif e_moves:
+			pf = false
+		var emove := str(eact.get("move", ""))
+		if pf:
+			if p_moves:
+				_player_act(pact, msgs)
+				if enemy_mon["hp"] > 0 and player_mon["hp"] > 0:
+					_residual(player_mon, p_vol, enemy_mon, msgs)
+			if e_moves and enemy_mon["hp"] > 0 and player_mon["hp"] > 0:
+				_link_enemy_act(emove, msgs)
+				if enemy_mon["hp"] > 0 and player_mon["hp"] > 0:
+					_residual(enemy_mon, e_vol, player_mon, msgs)
+		else:
+			if e_moves:
+				_link_enemy_act(emove, msgs)
+				if enemy_mon["hp"] > 0 and player_mon["hp"] > 0:
+					_residual(enemy_mon, e_vol, player_mon, msgs)
+			if p_moves and enemy_mon["hp"] > 0 and player_mon["hp"] > 0:
+				_player_act(pact, msgs)
+				if enemy_mon["hp"] > 0 and player_mon["hp"] > 0:
+					_residual(player_mon, p_vol, enemy_mon, msgs)
+	p_vol["flinch"] = false
+	e_vol["flinch"] = false
+	_end_of_turn(msgs)
+
+
+## The peer's move, no AI anywhere near it (the item/switch handler is theirs to choose).
+func _link_enemy_act(move: String, msgs: Array) -> void:
+	if str(e_vol["charging"]) == "" and not _is_two_turn(move):
+		for mv in enemy_mon["moves"]:
+			if str(mv["move"]) == move:
+				mv["pp"] = max(0, int(mv["pp"]) - 1)
+				break
+	_do_move(enemy_mon, player_mon, move, msgs, e_stages, p_stages, false)
+
+
+## The peer switched: their pick lands on our enemy side (mirrors _ai_switch's markers).
+func _link_enemy_switch(idx: int, msgs: Array) -> void:
+	if idx < 0 or idx >= enemy_party.size() or int(enemy_party[idx]["hp"]) <= 0:
+		return
+	msgs.append("%s withdrew\n%s!" % [peer_name, enemy_mon["name"]])
+	msgs.append({"hide_pic": "enemy"})
+	msgs.append({"auto": "%s sent\nout %s!" % [peer_name, enemy_party[idx]["name"]]})
+	msgs.append({"next_enemy": idx})
+
+
+func _link_enemy_has_usable() -> bool:
+	for i in enemy_party.size():
+		if i != enemy_active and int(enemy_party[i]["hp"]) > 0:
+			return true
+	return false
+
+
+## The peer's faint replacement arrived: send it out. The swap applies SYNCHRONOUSLY (the
+## presentation's next_enemy marker re-applies it, idempotently) so this side's X event
+## digests the same post-swap state the replacing side digested — byte-identical streams.
+func _link_enemy_swap_in(idx: int) -> void:
+	if idx < 0 or idx >= enemy_party.size():
+		idx = 0
+	_set_enemy(idx)
+	_det_event("X", "%s:w:%d" % ["j" if link_host else "h", idx])   # mirror of the peer's X
+	_say([{"auto": "%s sent\nout %s!" % [peer_name, enemy_party[idx]["name"]]},
+		{"next_enemy": idx}], "menu")
+
+
+## The link died mid-battle: the session simply ends, stakeless (spec story 17).
+func _link_dead() -> void:
+	link_over = true
+	won = false
+	blacked_out = false
+	_say(["The link has been\nclosed."], "end")
 
 
 # ---- turn resolution -------------------------------------------------------
@@ -1829,7 +2076,11 @@ func _end_of_turn(msgs: Array) -> void:
 		msgs.append({"faint": "enemy"})
 		msgs.append("%s\nfainted!" % enemy_mon["label"])
 		_award_exp(msgs)
-		if is_trainer and enemy_active < enemy_party.size() - 1:
+		if link_battle and _link_enemy_has_usable():
+			# The next enemy is the PEER's pick, arriving as col_swap — _resolve_after's
+			# "menu" gate holds in linkwait until it does. No SHIFT prompt in link (asm).
+			nxt = "menu"
+		elif is_trainer and not link_battle and enemy_active < enemy_party.size() - 1:
 			# SHIFT battle style (the default): the trainer announces the next mon and offers a
 			# free switch first (EnemySendOutFirstMon's TrainerAboutToUseText + party menu).
 			# Tests (fast_hp) run as SET — the prompt needs interactive input.
@@ -1874,8 +2125,14 @@ func _end_of_turn(msgs: Array) -> void:
 			nxt = "end"
 	_say(msgs, nxt)
 	# Determinism oracle (gh #2): every turn kind funnels through here — emit its event.
+	# Link (gh #7): host/join labels, host first, so both peers' lines are byte-identical.
 	turn_no += 1
-	_det_event("T%d" % turn_no, "p[%s]e[%s]" % [_det_paction, _det_eaction])
+	if link_battle:
+		_det_event("T%d" % turn_no, "h[%s]j[%s]" % [
+			_det_paction if link_host else _det_eaction,
+			_det_eaction if link_host else _det_paction])
+	else:
+		_det_event("T%d" % turn_no, "p[%s]e[%s]" % [_det_paction, _det_eaction])
 	_det_paction = "-"
 	_det_eaction = "-"
 
@@ -1889,6 +2146,8 @@ func _end_of_turn(msgs: Array) -> void:
 ## (A fainted participant loses its gain-exp flag in RemoveFaintedPlayerMon, so N is the living
 ## count both here and in DivideExpDataByNumMonsGainingExp.)
 func _award_exp(msgs: Array) -> void:
+	if link_battle:
+		return                       # link battles award nothing — stakeless (gh #7)
 	var alive: Array = []
 	for idx in participants:
 		if idx < party.size() and int(party[idx]["hp"]) > 0:
@@ -2503,9 +2762,11 @@ func _do_status_move(att: Dictionary, defn: Dictionary, move: String, md: Dictio
 				if str(att["moves"][i]["move"]) == "MIMIC":
 					slot = i
 					break
-			if att_is_player:
+			if att_is_player and not link_battle:
 				# the player picks the technique to copy (.letPlayerChooseMove, gh #65):
-				# the menu pops when the move executes, mid-turn
+				# the menu pops when the move executes, mid-turn. In a LINK battle both
+				# sims take the deterministic random pick below instead — a mid-turn menu
+				# choice can't cross the wire mid-resolution (documented v1.1 divergence).
 				var names: Array = []
 				for mv2 in defn["moves"]:
 					names.append(str(mv2["move"]))
@@ -2761,7 +3022,9 @@ func _apply_stat_move(att: Dictionary, defn: Dictionary, md: Dictionary, msgs: A
 		# stat-down moves carry a hidden 65/256 miss in a non-link battle (the player's
 		# don't); a substitute blocks; MIST protects; a mid-FLY/DIG target can't be hit
 		# (the INVULNERABLE check).
-		if is_same(defn, player_mon) and _ri(256) < 65:
+		if not link_battle and is_same(defn, player_mon) and _ri(256) < 65:
+			# ...and in a LINK battle no side rolls it (the asm checks wLinkState) — the
+			# mirrored sims would otherwise draw on one peer and not the other.
 			msgs.append("%s's\nattack missed!" % att["label"])
 			return
 		if bool(def_vol["sub_up"]):

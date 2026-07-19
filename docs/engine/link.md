@@ -118,6 +118,39 @@ Verified by the `linktest.py` **trade** scenario: kadabra ↔ machoke across the
 arriving mons trade-evolving (ALAKAZAM / MACHAMP) with foreign OT/ID intact, journals
 cleared, and **both save files** read back holding the traded parties.
 
+## The Colosseum (gh #7) — lockstep link battles
+
+`Cutscene.colosseum_table`: parties cross as mon records, the **host fixes the shared
+seed**, and both engines run `Battle.start_link` — the full battle engine, each peer
+simulating with itself as the "player" side (mirrored, as pokered's link battles are), and
+**only chosen actions crossing the wire** (`col_act` per turn, `col_swap` for faint
+replacements). A desync is a determinism bug by definition, never reconciled.
+
+What keeps two mirrored sims identical (each faithful to the asm's `LINK_STATE_BATTLING`
+special cases):
+
+- **No badge boosts** (`ApplyBadgeStatBoosts` rets in link) and **no hidden 65/256
+  stat-down miss** — both player/enemy-asymmetric rules that would diverge the sims.
+- **No EXP/stat exp/money**; the whole battle is **stakeless**: the party is snapshotted at
+  start and restored at the end, win or lose (spec story 17). A loss is not a whiteout.
+- **Speed ties draw the shared coin canonically** — "heads = the HOST acts first" — so both
+  sims order the tie identically. Switches resolve before moves; the peer's replacement
+  applies synchronously on arrival so both peers digest the same post-swap state.
+- **The event stream is role-canonical in link mode**: `T` lines label actions `h[…]j[…]`
+  (host first), the digest orders the host's side first on both peers, faint-replacement
+  `X` lines carry the role, and `END` carries `winner=host|join|draw|void`. **Byte-equality
+  of the two peers' `[battledet]` streams is the definition of "in sync"** — asserted by
+  the `linktest.py` colosseum scenario across two real networked instances.
+- Waiting on the partner (`linkwait`) has no artificial clock — a friend may think; ENet's
+  own dead-peer detection ends a vanished session, stakeless ("Waiting..." reads as the
+  game working, spec story 16).
+
+**Documented v1.1 divergences** (each refused/handled identically on both sims, so no
+desync surface): items can't be used in a link battle (the cartridge allows them; the
+enemy-side application of every bag item is a later faithfulness pass), and a link-battle
+MIMIC copies a deterministic random technique on both sims instead of opening the mid-turn
+pick menu (a menu choice can't cross the wire mid-resolution).
+
 ## Debug flags (the tracer bullet)
 
 | Flag | What it does |

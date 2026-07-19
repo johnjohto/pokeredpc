@@ -140,6 +140,7 @@ var link_wait_s := 30.0          # Cable Club wait/connect/sync timeout (tests s
 var link_port := 0               # Cable Club port override (0 = Link.DEFAULT_PORT; tests set it)
 var link_return_map := ""        # gh #6: where the club room's exit leads back to
 var link_return_cell := Vector2i.ZERO
+var _col_snapshot: Array = []    # gh #7: the party before a link battle — restored after (stakeless)
 var _club_leaving := false       # guards the room's link-closed watcher during our own exit
 var play_seconds := 0.0          # total play time in seconds (shown on the save screen)
 var player_coins := 0                       # Game Corner coins (BCD 0..9999 in wPlayerCoins)
@@ -3804,6 +3805,11 @@ func start_trainer_battle(opp_class: String, num: int, npc_id := "") -> void:
 
 
 func _on_battle_finished() -> void:
+	# gh #7: a link battle changes no lasting party state, win or lose — the party is
+	# restored from the pre-battle snapshot (the battle mutated the live dicts).
+	if battle.link_battle and not _col_snapshot.is_empty():
+		player_party = _col_snapshot
+		_col_snapshot = []
 	# EndOfBattle sets BIT_WILD_ENCOUNTER_COOLDOWN and the post-battle map reload arms
 	# wNumberOfNoRandomBattleStepsLeft = 3: three battle-free steps after EVERY battle.
 	wild_cooldown_steps = 3
@@ -5052,6 +5058,31 @@ func _monrecordtest() -> void:
 	get_tree().quit()
 
 
+## gh #7: raise the Colosseum link battle. The peer's party arrives as mon records (decoded
+## and validated at the boundary), the seed is the shared one the host fixed at the table,
+## and the party is snapshotted for the stakeless restore. The event stream always logs in
+## a link battle — the [battledet] lines ARE the sync oracle.
+func start_colosseum_battle(peer_records: Array, seed_v: int, pname: String) -> bool:
+	var eparty: Array = []
+	for r in peer_records:
+		var d: Dictionary = monrecord.decode(r)
+		if not bool(d["ok"]):
+			print("[col] refused peer party: %s" % d["error"])
+			return false
+		eparty.append(d["mon"])
+	if eparty.is_empty():
+		return false
+	_col_snapshot = []
+	for m in player_party:
+		_col_snapshot.append(JSON.parse_string(JSON.stringify(m)))   # deep copy
+	if audio:
+		audio.play_song("trainerbattle")
+	battle.det_log = true
+	modal = battle
+	battle.start_link(player_party, eparty, link.is_host, seed_v, pname)
+	return true
+
+
 # ---- Cable Club rooms (gh #6) ----------------------------------------------
 
 ## Entering a club room: seat the partner's avatar in the opposite chair, facing the player
@@ -5144,8 +5175,9 @@ func _clubtest() -> void:
 		player_name = "HOSTA" if hosting else "JOINB"      # distinct OTs: outsider status is visible
 		player_id = 111 if hosting else 222
 		interact(player)
+		var club_room := "Colosseum" if "--battle" in args else "TradeCenter"
 		var g := 0
-		while center_label != "TradeCenter" and (cutscene_active or g < 200) and g < 6000:
+		while center_label != club_room and (cutscene_active or g < 200) and g < 6000:
 			if modal == menu and menu_mode == "cutscene":
 				var items: Array = menu.items
 				if items.size() == 3 and str(items[0]) == "HOST":
@@ -5155,7 +5187,7 @@ func _clubtest() -> void:
 				elif items.size() == 3 and str(items[0]) == "TRADE CENTER" and hosting:
 					await get_tree().create_timer(0.5).timeout   # let the joiner's menu open
 					if modal == menu:
-						menu.chosen.emit(0)
+						menu.chosen.emit(1 if "--battle" in args else 0)
 				await get_tree().process_frame
 			elif modal == naming:
 				naming.done.emit(str(naming.presets[0]))         # ED on empty -> the default
@@ -5168,6 +5200,40 @@ func _clubtest() -> void:
 		print("[club] %s: map=%s cell=%s link=%s addr='%s' modal_clear=%s" % [
 			"host" if hosting else "join", center_label, player.cell, link.state,
 			link_last_addr, modal == null and not cutscene_active])
+		# --- gh #7: the Colosseum lockstep battle — scripted m0 on both sides ---
+		if "--battle" in args and center_label == "Colosseum":
+			player_party = [make_mon("tauros", 50, ["BODY_SLAM", "EARTHQUAKE", "BLIZZARD", "TACKLE"]),
+					make_mon("lapras", 50, ["SURF", "ICE_BEAM", "BODY_SLAM", "GROWL"])] if hosting \
+				else [make_mon("arcanine", 50, ["BODY_SLAM", "QUICK_ATTACK", "AGILITY", "BITE"]),
+					make_mon("slowbro", 50, ["SURF", "PSYCHIC_M", "AMNESIA", "POUND"])]
+			player.facing = player.RIGHT if hosting else player.LEFT
+			interact(player)
+			g = 0
+			while modal != battle and g < 18000:           # the first sitter waits on the link
+				await get_tree().process_frame
+				g += 1
+			g = 0
+			while modal == battle and g < 36000:
+				if battle.state == "menu":
+					battle.cursor = 0
+					await _press("ui_accept")              # FIGHT
+					if battle.state == "moves":
+						battle.cursor = 0
+						await _press("ui_accept")          # the first move
+				elif battle.state == "party_forced":
+					battle.cursor = battle._first_usable()
+					await _press("ui_accept")
+				elif battle.state == "msg":
+					await _press("ui_accept")
+				else:
+					await get_tree().process_frame
+				g += 1
+			var stream: Array = battle.det_stream
+			print("[col] %s: end=%s events=%d stream_md5=%s party_restored=%s" % [
+				"host" if hosting else "join",
+				str(stream[-1]).split("|")[1] if stream.size() > 0 else "?", stream.size(),
+				"\n".join(PackedStringArray(stream)).md5_text(),
+				int(player_party[0]["hp"]) == int(player_party[0]["maxhp"])])
 		# --- gh #6: the trade — kadabra <-> machoke, both trade evolutions on arrival ---
 		if "--trade" in args and center_label == "TradeCenter":
 			player_party = [make_mon("kadabra" if hosting else "machoke", 40, []),

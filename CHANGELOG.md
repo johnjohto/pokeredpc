@@ -68,6 +68,18 @@ design ADR-014).
   newline-normalized bytes — text-mode `json.dump` writes CRLF on Windows and LF elsewhere,
   and a Windows↔Linux pair must not refuse over line endings.
 
+- **The Colosseum — lockstep link battles** (gh #7): both peers run the full asm-faithful
+  battle engine from a shared seed (fixed by the host at the table), mirrored sims with only
+  chosen actions crossing the wire (`col_act`, `col_swap` for faint replacements). Faithful
+  to the asm's link special cases: no badge boosts, no hidden 65/256 enemy stat-down miss,
+  no EXP, no SHIFT prompt — and the whole battle is stakeless (party snapshot restored, a
+  loss is not a whiteout). Speed ties draw the shared coin as "heads = host acts first" so
+  the mirrored sims agree; the lockstep oracle's event stream is role-canonical in link mode
+  (host side first on both peers) and the `linktest.py` colosseum scenario asserts
+  byte-identical streams across two real networked instances. Non-link battles are untouched
+  (`--battledettest` stream md5s unchanged). Documented divergences: items refused in link
+  battles; link MIMIC copies a deterministic random technique.
+
 ### Fixed
 - **Healing-machine ball alignment** (gh #11): the right (x-flipped) ball of each pair drew
   one cell right of the machine's slot panel. A negative-width rect flips the texture but

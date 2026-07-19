@@ -63,7 +63,17 @@ machoke and reads ALAKAZAM/MACHAMP with foreign OTs back out of **both save file
 behavior (partner avatar opposite, doormat exit, link-death kick-out) lives in the
 TradeCenter/Colosseum adapters. Also: gh #12 filed (cross-platform link) and its first fix
 landed — the identity manifest hashes newline-normalized bytes, so a Windows↔Linux pair
-can't refuse over line endings. Next: gh #7 (Colosseum lockstep battle).
+can't refuse over line endings. **Landed: gh #7 — the Colosseum lockstep battle**
+(2026-07-19): both engines run the full battle from the host's shared seed, mirrored
+(each peer is its own "player"), with only chosen actions crossing (`col_act`/`col_swap`);
+the asm's link special-cases are faithful (no badge boosts, no hidden stat-down miss, no
+EXP, stakeless party restore, no SHIFT prompt), speed ties break on the shared coin read
+canonically ("heads = host first"), and the event stream is role-canonical — the
+`linktest.py` colosseum scenario asserts **byte-identical `[battledet]` streams across two
+real networked instances** (ADR-014's definition of "in sync"), agreeing winners, and
+restored parties. Non-link battles untouched (`--battledettest` md5s unchanged).
+Documented divergences: no items in link battles, link MIMIC picks deterministically.
+Next: gh #8 (the desync soak) then gh #9 (drop-injection + the dupe easter egg).
 Earlier: the playthrough bug waves (gh #23–#52, 27 issues) are fully fixed across 0.9.1–0.9.12:
 and the playthrough bug waves (gh #23–#52, 27 issues) are fully fixed across 0.9.1–0.9.12:
 options/start/yes-no boxes, party + summary + battle-item screens, Pokédex (with working
