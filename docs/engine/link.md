@@ -89,6 +89,35 @@ each back to the overworld with no modal, no cutscene, link closed) and two
 `tools/linktest.py` scenarios (the full two-instance flow onto the Trade Center floor;
 a tampered joiner turned away at the desk on both sides).
 
+## The Trade Center (gh #6)
+
+`Cutscene.trade_center_table` runs when either the table or the partner's avatar is
+interacted with in `TradeCenter` (the avatar sits in the opposite chair, as
+`TradeCenter_Script` repositions it; walking onto the doormat row leaves the club and
+closes the link — `scripts/maps/TradeCenter.gd`).
+
+- **Parties exchange as mon records** (`tc_party`) when each player sits; the first sitter
+  waits bounded only by the link's liveness (B stands up). Messages that arrive before a
+  listener exists (the partner sat first) are held in the **Link inbox** and drained on
+  room entry; the partner's protocol steps land in **ordered queues**, never scalar slots —
+  under load a partner can be a whole step ahead, and a scalar reset would clobber it.
+- **Pick + partner's pick + mutual confirm**: your list opens over the partner's (both
+  parties on screen); picks cross as `tc_pick`, the confirm as `tc_confirm`; either side
+  canceling costs nothing (spec story 12), a declined confirm returns to the pick screens.
+- **The commit is two-phase**: both sides exchange the authoritative record (`tc_commit`),
+  journal the pending trade to disk (`<save>_trade_journal.json`), then ack (`tc_ack`);
+  only when both acks are in does either side apply — remove the given mon, play the
+  in-game trade-movie ceremony, add the received mon (party, or box when full), fire a
+  trade evolution on arrival (forced), **save**, and clear the journal. A drop before
+  completion applies on neither side; a leftover journal at boot logs and rolls back
+  (gh #9 proves the windows under injected failures).
+- The received mon keeps its **nickname, OT, and trainer ID** off the record — outsider
+  status is exactly what the engine's boosted-exp rule and the Name Rater already key on.
+
+Verified by the `linktest.py` **trade** scenario: kadabra ↔ machoke across the table, both
+arriving mons trade-evolving (ALAKAZAM / MACHAMP) with foreign OT/ID intact, journals
+cleared, and **both save files** read back holding the traded parties.
+
 ## Debug flags (the tracer bullet)
 
 | Flag | What it does |

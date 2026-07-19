@@ -52,6 +52,22 @@ design ADR-014).
   address times out politely back to the attendant. Verified by `--clubtest` and two new
   two-instance `linktest.py` scenarios.
 
+- **The Trade Center** (gh #6): the full link trade — parties exchanged as mon records at
+  the table, pick + partner's pick + mutual confirm, a two-phase atomic commit (authoritative
+  records exchanged, the pending trade journaled to disk, both acks required before either
+  side applies + saves; a drop before completion applies on neither), the in-game trade-movie
+  ceremony, nickname/OT/trainer-ID preserved (outsider status feeds the existing boosted-exp
+  rule), party-full overflow to the box, and trade evolutions firing on arrival. The club
+  rooms got their behavior: the partner's avatar seated opposite, the doormat exit closing
+  the link, a dead link walking you back out. The link layer gained an inbox (messages
+  arriving before a listener connects are held, not dropped) and the trade protocol consumes
+  the partner's steps from ordered queues — both load-race fixes found by the two-instance
+  suite. The `linktest.py` trade scenario verifies kadabra ↔ machoke with both trade
+  evolutions and both save files read back.
+- **Cross-platform link identity** (gh #12, first fix): the extraction manifest hashes
+  newline-normalized bytes — text-mode `json.dump` writes CRLF on Windows and LF elsewhere,
+  and a Windows↔Linux pair must not refuse over line endings.
+
 ### Fixed
 - **Healing-machine ball alignment** (gh #11): the right (x-flipped) ball of each pair drew
   one cell right of the machine's slot panel. A negative-width rect flips the texture but

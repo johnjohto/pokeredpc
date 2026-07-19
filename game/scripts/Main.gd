@@ -138,6 +138,9 @@ var player_id := 0               # trainer ID number (IDNo on the stats screen);
 var link_last_addr := ""         # gh #5: the last successfully joined address (saved; the ED default)
 var link_wait_s := 30.0          # Cable Club wait/connect/sync timeout (tests shrink it)
 var link_port := 0               # Cable Club port override (0 = Link.DEFAULT_PORT; tests set it)
+var link_return_map := ""        # gh #6: where the club room's exit leads back to
+var link_return_cell := Vector2i.ZERO
+var _club_leaving := false       # guards the room's link-closed watcher during our own exit
 var play_seconds := 0.0          # total play time in seconds (shown on the save screen)
 var player_coins := 0                       # Game Corner coins (BCD 0..9999 in wPlayerCoins)
 var fossil_mon := ""                         # the species the Cinnabar lab is reviving (wFossilMon)
@@ -377,6 +380,11 @@ func _ready() -> void:
 	link.main = self
 	monrecord = preload("res://scripts/MonRecord.gd").new()
 	monrecord.main = self
+	# gh #6: a link that dies while standing in a Cable Club room walks you back out
+	# (during a table flow the flow's own waits handle it — cutscene_active is true there).
+	link.closed.connect(func(_r: String) -> void:
+		if center_label in ["TradeCenter", "Colosseum"] and not cutscene_active and not _club_leaving:
+			_club_room_kicked())
 	slots = preload("res://scripts/SlotMachine.gd").new()
 	ui.add_child(slots)
 	slots.setup(ft, fcols, cmap, self)
@@ -442,6 +450,14 @@ func _ready() -> void:
 	audio.enabled = OS.get_cmdline_user_args().is_empty()   # no music synthesis during tests
 	if not OS.get_cmdline_user_args().is_empty():
 		SAVE_PATH = "user://pokeredpc_save_test.json"       # never clobber the real save (gh #40)
+		for ua in OS.get_cmdline_user_args():
+			if str(ua).begins_with("--saveslot="):          # two-instance tests keep separate slots
+				SAVE_PATH = "user://pokeredpc_save_%s.json" % str(ua).substr(11)
+	# gh #6: a leftover trade journal marks a trade interrupted inside the commit window —
+	# it was never applied here, so it rolls back (the save is the truth). gh #9 hardens this.
+	if FileAccess.file_exists(_tc_journal_path()):
+		print("[trade] interrupted trade journal found — rolled back (never applied)")
+		_tc_journal_clear()
 	battle.fast_hp = not OS.get_cmdline_user_args().is_empty()   # skip HP-drain animation in tests
 	apply_options()                   # text speed etc. (defaults; a loaded save re-applies)
 	player = preload("res://scripts/Player.gd").new()
@@ -5036,6 +5052,69 @@ func _monrecordtest() -> void:
 	get_tree().quit()
 
 
+# ---- Cable Club rooms (gh #6) ----------------------------------------------
+
+## Entering a club room: seat the partner's avatar in the opposite chair, facing the player
+## (TradeCenter_Script moves TRADECENTER_OPPONENT to (6,4)/LEFT for the host's view,
+## (3,4)/RIGHT for the partner's).
+func club_room_enter() -> void:
+	cutscene.tc_room_arm()        # catch a partner's tc_party sent before we reach the table
+	var opp = _npc_by_key("SPRITE_RED@2,2")
+	if opp == null:
+		print("[club] WARNING: opponent avatar not found in %s" % center_label)
+		return
+	var seat := Vector2i(6, 4) if link.is_host else Vector2i(3, 4)
+	opp.cell = seat
+	opp.home = seat
+	opp.position = Vector2(seat * 16)
+	opp.face(opp.LEFT if link.is_host else opp.RIGHT)
+
+
+## Stepping onto the room's doormat row leaves the club: the link closes and the player is
+## back beside the attendant (cable_club.asm watches the exit the same way).
+func club_room_step(cell: Vector2i) -> bool:
+	if cell.y >= 6:
+		club_room_leave()
+		return true
+	return false
+
+
+func club_room_leave() -> void:
+	_club_leaving = true
+	cutscene.tc_room_disarm()
+	if link.state == "linked":
+		link.close("left-room")
+	var back := link_return_map if link_return_map != "" else respawn_map
+	load_world(back, -1, link_return_cell, false)
+	_club_leaving = false
+
+
+## The partner's link died while we stood in the room: say so and walk back out.
+func _club_room_kicked() -> void:
+	cutscene_active = true
+	await cutscene.say("The link has been\nclosed.")
+	cutscene_active = false
+	club_room_leave()
+
+
+## gh #6: the two-phase trade journal — written before our ack goes out, cleared only after
+## apply + save. Its presence at boot marks a trade interrupted inside the commit window.
+func _tc_journal_path() -> String:
+	return SAVE_PATH.get_basename() + "_trade_journal.json"
+
+
+func _tc_journal_write(give: Dictionary, peer_record: Dictionary) -> void:
+	var f := FileAccess.open(_tc_journal_path(), FileAccess.WRITE)
+	if f:
+		f.store_string(JSON.stringify({"give": monrecord.encode(give), "get": peer_record}))
+		f.close()
+
+
+func _tc_journal_clear() -> void:
+	if FileAccess.file_exists(_tc_journal_path()):
+		DirAccess.open("user://").remove(_tc_journal_path().get_file())
+
+
 ## gh #5: the Cable Club attendant. Single-instance (`--clubtest`) drives every refusal/
 ## timeout path scripted: the no-Pokédex brush-off, CANCEL at the cable menu, a HOST wait
 ## that times out, and a JOIN to a dead address — each must land back on the overworld with
@@ -5062,6 +5141,8 @@ func _clubtest() -> void:
 		# arrives as club_go and closes its menu (the LinkMenu arbiter path).
 		link_wait_s = 25.0
 		story_events = {"GOT_POKEDEX": true}
+		player_name = "HOSTA" if hosting else "JOINB"      # distinct OTs: outsider status is visible
+		player_id = 111 if hosting else 222
 		interact(player)
 		var g := 0
 		while center_label != "TradeCenter" and (cutscene_active or g < 200) and g < 6000:
@@ -5087,6 +5168,28 @@ func _clubtest() -> void:
 		print("[club] %s: map=%s cell=%s link=%s addr='%s' modal_clear=%s" % [
 			"host" if hosting else "join", center_label, player.cell, link.state,
 			link_last_addr, modal == null and not cutscene_active])
+		# --- gh #6: the trade — kadabra <-> machoke, both trade evolutions on arrival ---
+		if "--trade" in args and center_label == "TradeCenter":
+			player_party = [make_mon("kadabra" if hosting else "machoke", 40, []),
+				make_mon("pidgey", 20, [])]
+			player.facing = player.RIGHT if hosting else player.LEFT   # face the table
+			interact(player)
+			g = 0
+			while str(cutscene._tc_result) == "" and g < 12000:
+				if modal == menu and menu_mode == "cutscene":
+					menu.chosen.emit(0)                    # pick the first mon / YES
+					await get_tree().process_frame
+				elif modal == textbox and textbox.active:
+					await _press("ui_accept")
+				else:
+					await get_tree().process_frame
+				g += 1
+			var names: Array = []
+			for m in player_party:
+				names.append("%s(%s/%d)" % [m["name"], str(m.get("ot", "?")), int(m.get("otid", -1))])
+			print("[trade] %s: result=%s party=%s box=%d journal=%s" % [
+				"host" if hosting else "join", cutscene._tc_result, names, pc_box.size(),
+				FileAccess.file_exists(_tc_journal_path())])
 		get_tree().quit()
 		return
 

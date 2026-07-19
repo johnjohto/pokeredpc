@@ -123,6 +123,43 @@ def main():
                 "map=CeruleanPokecenter" in hout and "map=CeruleanPokecenter" in jout
                 and hout.count("modal_clear=true") == 1 and jout.count("modal_clear=true") == 1)
 
+    # gh #6: the round-trip trade — kadabra <-> machoke across the table, both arriving
+    # mons trade-evolving (ALAKAZAM / MACHAMP), nickname/OT/trainer ID intact, the commit
+    # two-phase, and BOTH save files holding the traded party (read directly below).
+    tr_port = BASE_PORT + 6
+    h = launch(["--clubtest", "--clubhost", "--trade", f"--port={tr_port}",
+                "--saveslot=tradehost"])
+    time.sleep(6)
+    j = launch(["--clubtest", "--clubjoin", "--trade", f"--port={tr_port}",
+                "--saveslot=tradejoin"])
+    hout = collect(h, 180)
+    jout = collect(j, 120)
+    trade_ok = ("result=done" in hout and "MACHAMP(JOINB/222)" in hout
+                and "result=done" in jout and "ALAKAZAM(HOSTA/111)" in jout)
+    if not trade_ok:                     # dump the flow trace for diagnosis
+        for tag, out in (("host", hout), ("join", jout)):
+            for line in out.splitlines():
+                if any(k in line for k in ("[tc]", "[trade]", "[club]", "[link]")):
+                    print(f"[linktest]   {tag}| {line.strip()}")
+    ok &= check("trade: host done, MACHOKE arrived as MACHAMP (outsider OT kept)",
+                "result=done" in hout and "MACHAMP(JOINB/222)" in hout)
+    ok &= check("trade: joiner done, KADABRA arrived as ALAKAZAM (outsider OT kept)",
+                "result=done" in jout and "ALAKAZAM(HOSTA/111)" in jout)
+    ok &= check("trade: journals cleared", "journal=false" in hout and "journal=false" in jout)
+    import json as _json
+    udir = Path.home() / "AppData/Roaming/Godot/app_userdata/pokeredpc"
+    try:
+        hsave = _json.loads((udir / "pokeredpc_save_tradehost.json").read_text(encoding="utf-8"))
+        jsave = _json.loads((udir / "pokeredpc_save_tradejoin.json").read_text(encoding="utf-8"))
+        hsp = [m["species"] for m in hsave["party"]]
+        jsp = [m["species"] for m in jsave["party"]]
+        ok &= check("trade: host SAVE holds machamp, kadabra gone",
+                    "machamp" in hsp and "kadabra" not in hsp, str(hsp))
+        ok &= check("trade: join SAVE holds alakazam, machoke gone",
+                    "alakazam" in jsp and "machoke" not in jsp, str(jsp))
+    except OSError as e:
+        ok &= check("trade: save files readable", False, str(e))
+
     lone = launch(["--join", "127.0.0.1", f"--port={BASE_PORT + 3}", "--linktimeout=5"])
     t0 = time.time()
     lout = collect(lone, 60)

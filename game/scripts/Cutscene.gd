@@ -1200,6 +1200,8 @@ func _club_flow() -> void:
 		await say("The link was\ncanceled.")
 		return
 	await say("OK, please wait\njust a moment.")
+	main.link_return_map = main.center_label       # walking out of the room comes back here
+	main.link_return_cell = main.player.cell
 	var room := "TradeCenter" if dest == 0 else "Colosseum"
 	var cell := Vector2i(3, 4) if main.link.is_host else Vector2i(6, 4)
 	main.load_world(room, -1, cell, false)
@@ -1287,6 +1289,237 @@ func _club_link_menu() -> int:
 		await main.get_tree().process_frame
 		waited += main.get_process_delta_time()
 	return _club_go if _club_go >= 0 else 2
+
+
+# ---- the Trade Center (gh #6, ADR-014) -------------------------------------
+# Both players at the table: parties are exchanged as mon records, each player picks a mon
+# and sees the partner's pick, both confirm, and the commit is TWO-PHASE — each side sends
+# its mon's authoritative record (`tc_commit`), journals the pending trade to disk, then
+# acknowledges (`tc_ack`); only when BOTH acks are in does either side apply and save, so a
+# drop before completion applies on neither (the journal marks the window; gh #9 proves it
+# under injected failures). The ceremony reuses the in-game trade movie, the received mon
+# keeps its nickname/OT/trainer ID (outsider status feeds the existing boosted-exp rule),
+# lands in the party or the box, and a trade-evo species evolves on arrival (forced).
+
+# The partner's messages land in QUEUES, not scalar slots: delivery is reliable-ordered,
+# and under load a partner can be a whole protocol step ahead (their pick arriving between
+# our party-received and our round setup) — a scalar reset would clobber it and both sides
+# would wait each other out. Queues consume in order and can lose nothing.
+var _tc_peer_party: Array = []      # the partner's party, as wire records
+var _tc_q_pick: Array = []          # their picks (-1 = canceled), in round order
+var _tc_q_confirm: Array = []       # their confirms (bool), in round order
+var _tc_q_record: Array = []        # their tc_commit records
+var _tc_q_ack := 0                  # their acks (a counter)
+var _tc_result := ""                # "" while running; "done"/"canceled"/"aborted" after
+
+
+func _tc_on_message(msg: Dictionary) -> void:
+	match str(msg.get("t", "")):
+		"tc_party":
+			_tc_peer_party = msg.get("mons", [])
+		"tc_pick":
+			_tc_q_pick.append(int(msg.get("idx", -1)))
+		"tc_cancel":
+			_tc_q_pick.append(-1)
+		"tc_confirm":
+			_tc_q_confirm.append(bool(msg.get("yes", false)))
+		"tc_commit":
+			_tc_q_record.append(msg.get("record", {}))
+		"tc_ack":
+			_tc_q_ack += 1
+
+
+## Wait for `cond` while the link lives; false on link death or timeout (no soft-lock).
+func _tc_wait(cond: Callable) -> bool:
+	var waited := 0.0
+	while not cond.call():
+		if main.link.state != "linked" or waited > main.link_wait_s:
+			return false
+		await main.get_tree().process_frame
+		waited += main.get_process_delta_time()
+	return true
+
+
+## Armed on ROOM ENTRY (not at the table): the partner may sit down and send `tc_party`
+## seconds before we do, and a message with no listener would be dropped — both sides would
+## then wait each other out. Disarmed when the room is left.
+func tc_room_arm() -> void:
+	_tc_peer_party = []
+	_tc_q_pick = []
+	_tc_q_confirm = []
+	_tc_q_record = []
+	_tc_q_ack = 0
+	if not main.link.message.is_connected(_tc_on_message):
+		main.link.message.connect(_tc_on_message)
+	for m in main.link.take_inbox():       # the partner may have sat down before we loaded in
+		_tc_on_message(m)
+
+
+func tc_room_disarm() -> void:
+	if main.link.message.is_connected(_tc_on_message):
+		main.link.message.disconnect(_tc_on_message)
+
+
+func trade_center_table() -> void:
+	if main.link.state != "linked":
+		await say("The link has been\nclosed.")
+		return
+	main.cutscene_active = true
+	_tc_result = ""
+	print("[tc] table: sitting (link=%s, peer_party=%d)" % [main.link.state, _tc_peer_party.size()])
+	await _tc_flow()
+	print("[tc] table: done (%s, link=%s)" % [_tc_result, main.link.state])
+	main.cutscene_active = false
+
+
+func _tc_flow() -> void:
+	# Exchange parties: both players must be at the table before the screens open.
+	var mine: Array = []
+	for m in main.player_party:
+		mine.append(main.monrecord.encode(m))
+	main.link.send_message({"t": "tc_party", "mons": mine})
+	main.modal = main.textbox
+	main.textbox.show_ask("Waiting for your\nfriend...")
+	# The first player to sit waits for the other to reach the table — that can take as long
+	# as the partner's attendant dialogue takes, so this wait is bounded by the LINK's
+	# liveness (and B to stand up), not by the turn timer.
+	var stood_up := false
+	while _tc_peer_party.is_empty() and main.link.state == "linked":
+		if Input.is_action_just_pressed("ui_cancel"):
+			stood_up = true
+			break
+		await main.get_tree().process_frame
+	main.textbox.visible = false
+	main.textbox.active = false
+	main.textbox.held = false
+	main.modal = null
+	if stood_up:
+		_tc_result = "canceled"
+		return
+	if _tc_peer_party.is_empty():
+		_tc_result = "aborted"
+		print("[tc] abort: link died before the partner sat down")
+		await say("The link has been\nclosed.")
+		return
+	print("[tc] parties exchanged (%d theirs)" % _tc_peer_party.size())
+	while true:
+		# --- pick: your list over the partner's (both parties on screen) ---
+		var partner_labels: Array = []
+		for r in _tc_peer_party:
+			partner_labels.append("%s L%d" % [_tc_rec_name(r), int(r.get("level", 0))])
+		var my_labels: Array = []
+		for m in main.player_party:
+			my_labels.append("%s L%d" % [str(m["name"]), int(m["level"])])
+		my_labels.append("CANCEL")
+		main.menu_mode = "cutscene"
+		main.modal = main.menu
+		main.menu.open(partner_labels, Vector2(88, 8))     # the partner's side, frozen
+		main.menu.push_under()
+		main.menu.open(my_labels, Vector2(8, 8), true)     # your side, live
+		var idx: int = await main.menu.chosen
+		main.modal = null
+		if idx < 0 or idx >= main.player_party.size():
+			main.link.send_message({"t": "tc_cancel"})
+			_tc_result = "canceled"
+			await say("The trade was\ncanceled.")          # costs nothing (spec story 12)
+			return
+		main.link.send_message({"t": "tc_pick", "idx": idx})
+		# --- the partner's pick ---
+		main.modal = main.textbox
+		main.textbox.show_ask("Waiting for your\nfriend to choose...")
+		var got := await _tc_wait(func() -> bool: return not _tc_q_pick.is_empty())
+		main.textbox.visible = false
+		main.textbox.active = false
+		main.textbox.held = false
+		main.modal = null
+		if not got:
+			_tc_result = "aborted"
+			print("[tc] abort: no partner pick (link=%s)" % main.link.state)
+			await say("The link has been\nclosed.")
+			return
+		var peer_pick := int(_tc_q_pick.pop_front())
+		if peer_pick < 0 or peer_pick >= _tc_peer_party.size():
+			_tc_result = "canceled"
+			await say("Your friend\ncanceled the trade.")
+			return
+		var theirs: Dictionary = _tc_peer_party[peer_pick]
+		# --- mutual confirm ---
+		var yes := await ask("Trade %s\nfor %s?" % [
+			str(main.player_party[idx]["name"]), _tc_rec_name(theirs)])
+		main.link.send_message({"t": "tc_confirm", "yes": yes})
+		got = await _tc_wait(func() -> bool: return not _tc_q_confirm.is_empty())
+		if not got:
+			_tc_result = "aborted"
+			print("[tc] abort: no partner confirm (link=%s)" % main.link.state)
+			await say("The link has been\nclosed.")
+			return
+		if not (yes and bool(_tc_q_confirm.pop_front())):
+			await say("The trade was\ncanceled.")
+			continue                                       # back to the pick screens, as on cartridge
+		# --- two-phase commit ---
+		if await _tc_commit(idx):
+			return
+		return
+
+
+## Phase 1: exchange the authoritative records; journal. Phase 2: exchange acks; only when
+## both are in does either side apply + save. Returns true when the flow is over.
+func _tc_commit(idx: int) -> bool:
+	var give: Dictionary = main.player_party[idx]
+	main.link.send_message({"t": "tc_commit", "record": main.monrecord.encode(give)})
+	var got := await _tc_wait(func() -> bool: return not _tc_q_record.is_empty())
+	if not got:
+		_tc_result = "aborted"
+		print("[tc] abort: no partner record (link=%s)" % main.link.state)
+		await say("The link has been\nclosed.\fThe trade did not\nhappen.")
+		return true
+	var peer_record: Dictionary = _tc_q_record.pop_front()
+	var decoded: Dictionary = main.monrecord.decode(peer_record)
+	if not bool(decoded["ok"]):
+		main.link.close("bad-record")
+		_tc_result = "aborted"
+		await say("The trade data\nwas invalid!\fThe trade did not\nhappen.")
+		return true
+	var received: Dictionary = decoded["mon"]
+	main._tc_journal_write(give, peer_record)              # the pending window, on disk
+	main.link.send_message({"t": "tc_ack"})
+	got = await _tc_wait(func() -> bool: return _tc_q_ack > 0)
+	if not got:
+		main._tc_journal_clear()                           # never acknowledged: nothing applied
+		_tc_result = "aborted"
+		print("[tc] abort: no partner ack (link=%s)" % main.link.state)
+		await say("The link has been\nclosed.\fThe trade did not\nhappen.")
+		return true
+	_tc_q_ack -= 1
+	# --- both acknowledged: apply, ceremony, save ---
+	var give_sp := str(give["species"])
+	var give_ot := str(give.get("ot", main.player_name))
+	var give_otid := int(give.get("otid", main.player_id))
+	main.player_party.remove_at(idx)
+	await main.trademovie.play(give_sp, give_ot, give_otid,
+		str(received["species"]), int(received.get("otid", 0)))
+	if main.player_party.size() < 6:                       # a trade never strands a mon
+		main.player_party.append(received)
+	else:
+		main.pc_box.append(received)
+	main.mark_owned(str(received["species"]))
+	if main.audio:
+		main.audio.play_sfx("get_key_item")
+	await say("%s traded\n%s for\n%s!" % [main.player_name, give["name"], received["name"]])
+	# Trade evolution on arrival, forced (InGameTrade_CheckForTradeEvo; spec story 9).
+	for ev in main.mon_base[str(received["species"])]["evolutions"]:
+		if str(ev[0]) == "EVOLVE_TRADE" and int(received["level"]) >= int(ev[1]):
+			await main.run_evolution(received, str(ev[2]), true)
+			break
+	main.save_game()                                       # finalize
+	main._tc_journal_clear()
+	_tc_peer_party = []           # a second trade re-exchanges the (changed) parties
+	_tc_result = "done"
+	return true
+
+
+func _tc_rec_name(rec: Dictionary) -> String:
+	return str(rec.get("nickname", str(rec.get("species", "?")).replace("species:", "").to_upper()))
 
 
 ## gh #5: the joiner types a direct IP on the naming-screen keyboard (address mode); the

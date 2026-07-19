@@ -37,6 +37,9 @@ var tamper := ""                     # debug (--tamper=X): corrupt OUR version/p
 var _enet: ENetConnection
 var _peer: ENetPacketPeer
 var _elapsed := 0.0
+var inbox: Array = []                # session messages that arrived with no `message` listener
+                                     # connected (e.g. the partner sat at the table before we
+                                     # loaded the room) — drained via take_inbox() on connect
 var _remote: Dictionary = {}         # the peer's hello identity
 var _remote_ok := false              # we validated their identity
 var _accepted := false               # they validated ours
@@ -107,10 +110,18 @@ func close(reason := "closed") -> void:
 		_finish(reason)
 
 
+## Hand over (and clear) the messages that arrived before a listener connected.
+func take_inbox() -> Array:
+	var held := inbox
+	inbox = []
+	return held
+
+
 func _finish(reason: String) -> void:
 	if state == "closed":
 		return
 	state = "closed"
+	inbox = []
 	if _enet != null:
 		_enet.destroy()
 		_enet = null
@@ -199,7 +210,10 @@ func _on_message(msg: Dictionary) -> void:
 			_finish("refused-by-peer")
 		_:
 			if state == "linked":
-				message.emit(msg)
+				if message.get_connections().is_empty():
+					inbox.append(msg)      # nobody listening yet: hold it (ordering preserved)
+				else:
+					message.emit(msg)
 
 
 ## Compare two link identities; "" on a match, else a reason NAMING what differed. Version

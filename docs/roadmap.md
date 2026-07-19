@@ -54,7 +54,16 @@ save → "Please wait." sync → LinkMenu (first press wins, host arbitrates), a
 warp onto the TradeCenter/Colosseum floor (host (3,4), partner (6,4)). Every wait/dead-end
 path returns to the attendant cleanly. Verified by `--clubtest` + two new `linktest.py`
 scenarios (full two-instance flow to the Trade Center floor; tampered joiner turned away on
-both sides). Next: gh #6 (Trade Center) or gh #7 (Colosseum lockstep).
+both sides). **Landed: gh #6 — the Trade Center** (2026-07-19): parties exchange as mon
+records at the table, pick + partner's pick + mutual confirm, a **two-phase atomic commit**
+(records → journal → both acks → apply + save; a drop applies on neither side), the in-game
+trade-movie ceremony, nickname/OT/trainer-ID preserved, party-full overflow to the box, and
+**trade evolutions firing on arrival** — the `linktest.py` trade scenario swaps kadabra ↔
+machoke and reads ALAKAZAM/MACHAMP with foreign OTs back out of **both save files**. Room
+behavior (partner avatar opposite, doormat exit, link-death kick-out) lives in the
+TradeCenter/Colosseum adapters. Also: gh #12 filed (cross-platform link) and its first fix
+landed — the identity manifest hashes newline-normalized bytes, so a Windows↔Linux pair
+can't refuse over line endings. Next: gh #7 (Colosseum lockstep battle).
 Earlier: the playthrough bug waves (gh #23–#52, 27 issues) are fully fixed across 0.9.1–0.9.12:
 and the playthrough bug waves (gh #23–#52, 27 issues) are fully fixed across 0.9.1–0.9.12:
 options/start/yes-no boxes, party + summary + battle-item screens, Pokédex (with working

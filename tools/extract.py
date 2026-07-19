@@ -1584,7 +1584,9 @@ def build_link_manifest():
     }
     parts = {}
     for name, path in sorted(part_files.items()):
-        parts[name] = hashlib.md5(path.read_bytes()).hexdigest()
+        # Normalize newlines before hashing: text-mode json.dump writes CRLF on Windows and
+        # LF elsewhere, and a Windows<->Linux pair must not refuse over line endings.
+        parts[name] = hashlib.md5(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
     content = hashlib.md5("".join(parts[k] for k in sorted(parts)).encode()).hexdigest()
     json.dump({"schema": 1, "parts": parts, "content_hash": content},
               open(OUT / "link_manifest.json", "w"), indent=1)
