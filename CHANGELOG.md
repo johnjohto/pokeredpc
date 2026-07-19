@@ -21,6 +21,17 @@ design ADR-014).
   per seed and asserts byte-identical streams, with a different-seed divergence check and
   cross-process-stable per-scenario stream md5s. See `docs/engine/battle.md` "Determinism".
 
+- **The link tracer bullet** (gh #3): `Link.gd` — the one module that touches networking —
+  raises a link session between two instances over ENet (LAN/direct IP, two reliable
+  channels, polled with no awaits; every wait state times out cleanly). The extractor now
+  writes `link_manifest.json` (md5 per link-relevant part: base_stats, moves, types), and
+  the link identity handshake (exact version + part hashes) refuses mismatched peers with a
+  message naming the differing part, delivered to BOTH sides before a graceful disconnect.
+  The dupe easter-egg opt-in travels in the handshake; the session records the mutual AND
+  only. `--host` / `--join <ip>` script the connect flow headlessly; `tools/linktest.py`
+  drives two-instance scenarios (clean link + round-trip, tampered part, tampered version,
+  no-host timeout). See `docs/engine/link.md`.
+
 ### Fixed
 - `--dblkotest` no longer depends on a lucky TAKE DOWN accuracy roll: the double-KO setup
   re-arms and retries until the hit lands.

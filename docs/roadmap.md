@@ -31,8 +31,16 @@ oracle** (2026-07-19): every battle-logic random draw now comes from a battle-lo
 both actions, RNG cursor, state digest — `det_stream`/`[battledet]`), and `--battledettest`
 replays scenario battles twice per seed asserting byte-identical streams (plus a
 different-seed divergence check and cross-process-stable per-scenario md5s). See
-[engine/battle.md](engine/battle.md) "Determinism". Next: gh #3 (the localhost link tracer
-bullet) or gh #4 (the mon record codec).
+[engine/battle.md](engine/battle.md) "Determinism". **Landed: gh #3 — the link tracer
+bullet** (2026-07-19): `Link.gd` is the one networking module (low-level ENet, two reliable
+channels, no awaits — every wait state times out cleanly), the extractor writes
+`link_manifest.json` (md5s over base_stats/moves/types — the ADR-014 link identity), and
+`--host`/`--join <ip>` script the whole connect flow headlessly: hello both ways, each side
+validates version + per-part hashes, refusals NAME the differing part and are delivered
+before the graceful drop (`peer_disconnect_later`), and the session records the mutual-only
+dupe flag. `python tools/linktest.py` drives four two-instance scenarios (clean + round-trip,
+tampered part, tampered version, no-host timeout) — ALL GREEN. See
+[engine/link.md](engine/link.md). Next: gh #4 (the mon record codec).
 Earlier: the playthrough bug waves (gh #23–#52, 27 issues) are fully fixed across 0.9.1–0.9.12:
 and the playthrough bug waves (gh #23–#52, 27 issues) are fully fixed across 0.9.1–0.9.12:
 options/start/yes-no boxes, party + summary + battle-item screens, Pokédex (with working

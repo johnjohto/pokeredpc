@@ -1568,6 +1568,29 @@ def parse_script_text():
     return text_ptrs, resolved, direct
 
 
+def build_link_manifest():
+    """gh #3 (ADR-014 link identity): hash the link-relevant extracted data at extraction
+    time, so two peers can compare identities in one handshake instead of re-deriving (or
+    silently drifting into an undebuggable mid-battle desync). Parts are the tables both
+    engines must agree on to simulate the identical battle / speak the same mon record:
+    species (base stats + growth + evolutions + learnsets), moves, and the type chart.
+    The per-part hashes let a refusal name WHICH part differs; content_hash is the md5 of
+    the part hashes joined in sorted part order."""
+    import hashlib
+    part_files = {
+        "base_stats": OUT / "pokemon" / "base_stats.json",
+        "moves": OUT / "moves.json",
+        "types": OUT / "types.json",
+    }
+    parts = {}
+    for name, path in sorted(part_files.items()):
+        parts[name] = hashlib.md5(path.read_bytes()).hexdigest()
+    content = hashlib.md5("".join(parts[k] for k in sorted(parts)).encode()).hexdigest()
+    json.dump({"schema": 1, "parts": parts, "content_hash": content},
+              open(OUT / "link_manifest.json", "w"), indent=1)
+    print(f"link manifest: {len(parts)} parts, content_hash={content}")
+
+
 def build_text():
     cols = extract_font()
     charmap = parse_charmap()
@@ -2197,6 +2220,7 @@ def main():
     build_dex()
     build_marts()
     build_battle()
+    build_link_manifest()
     build_trades()
     extract_trade_gfx()
     build_title()

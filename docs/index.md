@@ -35,6 +35,7 @@ as development proceeds — when a format, rule, or decision is discovered, reco
 - **[engine/save.md](engine/save.md)** — save/continue, title screen, Pokécenter heal, whiteout, poison.
 - **[engine/wild.md](engine/wild.md)** — per-map grass encounter tables + slot probabilities.
 - **[engine/audio.md](engine/audio.md)** — GB music synthesis (extract song commands, 4-channel synth).
+- **[engine/link.md](engine/link.md)** — v1.1 link layer: ENet transport, link identity handshake, session lifecycle.
 
 ### Guides ("how do I…")
 - **[guides/build-and-run.md](guides/build-and-run.md)** — setup, build, run, debug flags.

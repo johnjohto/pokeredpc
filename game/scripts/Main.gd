@@ -118,6 +118,7 @@ var statsscreen                              # Pokémon stats/summary screen mod
 var martscreen                               # Poké Mart shop modal (MartScreen.gd)
 var title
 var battle
+var link                                     # v1.1 link layer (Link.gd, gh #3): the one networking seam
 var transition                              # screen transitions: battle wipes + warp fade (Transition.gd)
 var dungeon_maps: Array = []                # map labels using the dungeon battle transitions
 var slots                                   # Game Corner slot machine modal
@@ -367,6 +368,9 @@ func _ready() -> void:
 	battle.setup(ft, fcols, cmap, mon_base, mon_moves, _load_json("res://assets/types.json"))
 	battle.main = self
 	battle.finished.connect(_on_battle_finished)
+	link = preload("res://scripts/Link.gd").new()
+	add_child(link)
+	link.main = self
 	slots = preload("res://scripts/SlotMachine.gd").new()
 	ui.add_child(slots)
 	slots.setup(ft, fcols, cmap, self)
@@ -527,6 +531,10 @@ func _ready() -> void:
 		_movefxtest()
 	elif "--battledettest" in args:
 		_battledettest()
+	elif "--host" in args:
+		_linktest(true)
+	elif _has_join_arg(args):
+		_linktest(false)
 	elif "--moveanimtest" in args:
 		_moveanimtest()
 	elif "--wipetest" in args:
@@ -4914,6 +4922,79 @@ func _wraptest() -> void:
 	await get_tree().create_timer(0.9).timeout
 	get_viewport().get_texture().get_image().save_png("res://wrap1.png")
 	get_tree().quit()
+
+
+func _has_join_arg(args: Array) -> bool:
+	for a in args:
+		if str(a) == "--join" or str(a).begins_with("--join="):
+			return true
+	return false
+
+
+## gh #3 (ADR-014): the link tracer bullet. `--host [--port=N]` waits for a partner;
+## `--join <ip>` / `--join=<ip>` connects to one. The whole connect flow runs headlessly:
+## Link.gd raises the session (link identity handshake: exact version + the extraction
+## manifest's content hashes), then the host sends a ping, the joiner answers pong, and both
+## quit — `tools/linktest.py` launches a pair and asserts both logs. `--tamper=version` or
+## `--tamper=<part>` (base_stats/moves/types) corrupts this side's identity so the refusal
+## path can be driven; `--linktimeout=N` shortens the no-partner timeout for tests.
+func _linktest(hosting: bool) -> void:
+	await get_tree().process_frame
+	var args := OS.get_cmdline_user_args()
+	var port: int = link.DEFAULT_PORT
+	var ip := "127.0.0.1"
+	link.timeout_s = 20.0
+	for i in args.size():
+		var a := str(args[i])
+		if a.begins_with("--port="):
+			port = int(a.substr(7))
+		elif a.begins_with("--tamper="):
+			link.tamper = a.substr(9)
+		elif a.begins_with("--linktimeout="):
+			link.timeout_s = float(a.substr(14))
+		elif a.begins_with("--join="):
+			ip = a.substr(7)
+		elif a == "--join" and i + 1 < args.size() and not str(args[i + 1]).begins_with("--"):
+			ip = str(args[i + 1])
+		elif a == "--dupe":
+			link.dupe_opt_in = true
+	link.established.connect(_linktest_on_established)
+	link.message.connect(_linktest_on_message)
+	_linktest_hosting = hosting
+	_linktest_done = false
+	link.closed.connect(func(_reason: String) -> void: _linktest_done = true)
+	if hosting:
+		link.host(port)
+	else:
+		link.join(ip, port)
+	var g := 0
+	while not _linktest_done and g < 60 * 120:  # hard cap ~2 min; Link's own timeout fires first
+		await get_tree().process_frame
+		g += 1
+	print("[link] exit state=%s" % link.state)
+	get_tree().quit()
+
+
+var _linktest_hosting := false
+var _linktest_done := false
+
+
+func _linktest_on_established(_session: Dictionary) -> void:
+	if _linktest_hosting:
+		link.send_message({"t": "ping"})
+
+
+func _linktest_on_message(msg: Dictionary) -> void:
+	var t := str(msg.get("t", ""))
+	if t == "ping":
+		print("[link] ping received — answering")
+		link.send_message({"t": "pong"})
+	elif t == "pong":
+		print("[link] echo round-trip ok")
+		link.send_message({"t": "bye"})
+		link.close("done")
+	elif t == "bye":
+		link.close("done")
 
 
 ## gh #2 (ADR-014): the battle determinism oracle. Each scenario drives a REAL battle — the

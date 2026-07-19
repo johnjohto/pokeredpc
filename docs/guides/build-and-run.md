@@ -143,6 +143,8 @@ where noted (git-ignored), prints results, and quits — used to verify features
 | `--statustest` | Status conditions: poison tick, sleep skip+countdown, paralysis Speed ÷4 → `status1.png`. |
 | `--movefxtest` | Move effects: fixed/super-fang/drain/recoil/leech/heal/confuse + level-up evolution. |
 | `--battledettest` | The battle determinism oracle (gh #2, ADR-014): scenario battles replayed twice per seed — canonical per-turn event streams must be byte-identical, a different seed must diverge; prints per-scenario `stream_md5` (stable across invocations). `--verbose` echoes every event line. |
+| `--host [--port=N]` | v1.1 link (gh #3): host a link session and wait; on link, a ping/pong round-trip, then close. See [engine/link.md](../engine/link.md). |
+| `--join <ip>` | v1.1 link (gh #3): connect to a host. Modifiers for both: `--tamper=version\|<part>` (drive the identity refusal), `--linktimeout=N`, `--dupe`. Pairs are driven by `python tools/linktest.py`. |
 | `--moveanimtest` | Move animations (gh #19): step building + enemy-turn transform + timed `{"moveanim"}` markers + a real fight turn → `moveanim_thunder.png`, `moveanim_gust_enemy.png`. |
 | `--wipetest` | Battle transitions: the 8-wipe pick (level/trainer/dungeon bits) + each wipe over the overworld + the warp fade → `wipe_*.png`. |
 | `--introshot` | Poses the boot intro at key beats (splash star, fight, logo bounce, version) → `intro_*.png`, `title_*.png`. |
