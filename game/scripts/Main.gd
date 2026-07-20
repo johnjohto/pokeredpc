@@ -10001,7 +10001,8 @@ func _pt_spin_dest(cell: Vector2i) -> Vector2i:
 	return cur
 
 
-func _pt_plan(start: Vector2i, goal: Vector2i, avoid_warps := false, spin_aware := false) -> Array:
+func _pt_plan(start: Vector2i, goal: Vector2i, avoid_warps := false, spin_aware := false,
+		blocked := {}) -> Array:
 	if start == goal:
 		return []
 	var came := {start: null}          # cell -> [prev_cell, dir]
@@ -10028,11 +10029,21 @@ func _pt_plan(start: Vector2i, goal: Vector2i, avoid_warps := false, spin_aware 
 			# floor (the goal exemption above still lets a walk END on one). Without this, the
 			# gh #142 door-step (which pushes an arrival OFF its landing warp, re-arming it) makes
 			# the planner bounce straight back through paired stairs like Rocket Hideout B3F's.
-			var fires_en_route: bool = _warp_at(nx) != null \
-					and _feet_tile(nx) in _WARP_DOOR_TILES.get(center_tileset, [])
-			if not came.has(eff) and not _tile_pair_blocked(cur, nx) \
+			# gh #27: mirror the step's solid-warp rule (gh #149, Player.gd) — a warp set
+			# into a SOLID tile (a gate door in a wall, e.g. Route 7's (11,9)) bumps unless
+			# this step's facing fires it, so from a non-firing side it is not an edge at
+			# all (not even as the goal); from the firing side it ejects the walker, i.e.
+			# it behaves like fires_en_route. Before #149 the bot crossed Route 7 by
+			# walking THROUGH the solid door; after it, an unmodeled planner stranded the
+			# sabrina->blaine leg at the gate mat.
+			var solid_warp: bool = _warp_at(nx) != null and not _cell_walkable(nx)
+			var solid_warp_bump: bool = solid_warp and not _warp_should_fire(nx, d)
+			var fires_en_route: bool = (_warp_at(nx) != null \
+					and _feet_tile(nx) in _WARP_DOOR_TILES.get(center_tileset, [])) \
+					or (solid_warp and not solid_warp_bump)
+			if not came.has(eff) and not _tile_pair_blocked(cur, nx) and not blocked.has(nx) \
 					and (eff == goal or (_pt_on_center(nx) and player_can_enter(nx) \
-					and _pt_on_center(eff) and not fires_en_route \
+					and _pt_on_center(eff) and not fires_en_route and not solid_warp_bump \
 					and not (avoid_warps and _warp_at(nx) != null))):
 				came[eff] = [cur, d]
 				q.append(eff)
@@ -10104,6 +10115,14 @@ func _pt_settle(budget := 600) -> void:
 func _pt_walk_to(goal: Vector2i, budget := 1200, avoid_warps := false, spin_aware := false) -> bool:
 	var start_map := str(center_label)
 	var stuck := 0
+	# gh #27: cells this walk has been PUSHED OFF. A map script can answer a step by shoving
+	# the player somewhere else — Cinnabar's locked Gym door (18,4) faces you up, says "The
+	# door is locked...", and walks you back down. That lands the player on a *different*
+	# cell than planned, so `_pt_step` reports success and `stuck` never trips: the walk
+	# re-plans the same route and bounces forever until its budget dies, silently. Treating
+	# an unplanned landing as "that cell is impassable, for this walk" makes the planner
+	# route around exactly like a player who just read the sign.
+	var bumped := {}
 	for _i in budget:
 		if center_label != start_map:
 			return true                       # a step crossed a warp/connection — arrived elsewhere
@@ -10122,15 +10141,34 @@ func _pt_walk_to(goal: Vector2i, budget := 1200, avoid_warps := false, spin_awar
 		if modal != null or cutscene_active:
 			await _drive_until(func() -> bool: return modal == null and not cutscene_active, 300)
 			continue
-		var dirs := _pt_plan(player.cell, goal, avoid_warps, spin_aware)
+		var dirs := _pt_plan(player.cell, goal, avoid_warps, spin_aware, bumped)
 		if dirs.is_empty():
 			return false
+		var want: Vector2i = player.cell + DIRV4[int(dirs[0])]
 		if await _pt_step(int(dirs[0])):
-			stuck = 0
+			# Landed somewhere the plan never chose — a script pushed us off (see `bumped`).
+			# A ledge hop legitimately lands two cells ahead, so it is not a bump.
+			if center_label == start_map and player.cell != want \
+					and player.cell != want + DIRV4[int(dirs[0])]:
+				bumped[want] = true
+				stuck += 1
+				print("[playthrough] bumped off %s (pushed to %s) — routing around" % [
+					str(want), str(player.cell)])
+			else:
+				stuck = 0
 		else:
+			# The step was refused. A wandering NPC clears on its own, so retry a few
+			# times first; a cell that keeps refusing is a fact about the map (Cinnabar's
+			# locked Gym door answers a step by facing you up, printing "The door is
+			# locked..." and walking you back — the player never leaves the cell, so this
+			# is the same silent trap as a push-back). Mark it and re-plan around it.
 			stuck += 1
-			if stuck > 8:                     # a dynamic obstacle we can't route around
-				return false
+			if stuck >= 3:
+				bumped[want] = true
+				stuck = 0
+				print("[playthrough] %s refuses (%d tries) — routing around" % [str(want), 3])
+		if bumped.size() > 40:                # too much of the map refuses us: give up
+			return false
 	return player.cell == goal
 
 
