@@ -7,7 +7,7 @@ writes the full game state; `Main.load_game()` restores it. The serialized field
 
 | Field | Source |
 |---|---|
-| `map` | `center_label` — the active map to reload |
+| `map` | `center_label` — the active map to reload. **Never a Cable Club room** (gh #6/#9: the trade commit saves at the table, but a reload has no link session — a club-room save writes the attendant-side return point instead, and `load_game` rescues legacy club-room saves via the escape warp) |
 | `cell` | `[player.cell.x, player.cell.y]` |
 | `facing` | `player.facing` (enum int) |
 | `last_outside_map` | for `LAST_MAP` warps |
@@ -18,6 +18,7 @@ writes the full game state; `Main.load_game()` restores it. The serialized field
 | `events` | `story_events` (story EVENT flags) + `player_name`/`rival_name`/`*_starter` |
 | `badges` | gym badges earned, in order (e.g. `["BOULDERBADGE"]`) |
 | `pc_box` | Pokémon stored in the PC (full mon dicts) |
+| `link_addr` | v1.1 (additive): the last successfully joined Cable Club address — the joiner's ED default |
 | `pokedex_seen` / `pokedex_owned` | Pokédex species sets (seen in battle / caught-obtained) |
 
 The party mons are already plain dictionaries of primitives + arrays, so they serialize

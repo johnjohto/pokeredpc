@@ -1,33 +1,49 @@
-# pokeredpc v1.0.0
+# pokeredpc v1.1.0
 
 A native PC port of Pokémon Red (pret/pokered) in Godot 4.7 — not an emulator. The data is
 extracted from the disassembly and the engine reimplemented natively.
 
-**1.0 is here. The 1:1 recreation is complete.**
+**Multiplayer is here. The Cable Club works.**
 
-"1.0" was always defined as two things, and both closed today:
+Gen 1 was designed around the link cable — trading is why version exclusives exist, four
+Pokémon can't evolve without it, and battling a friend was the whole endgame. So v1.1 is
+the Cable Club, exactly where the cartridge put it: walk up to the receptionist in any
+Pokémon Center, and instead of plugging in a cable, one of you hosts and the other types
+their address on the Gen-1 naming-screen keyboard (the host's own address is shown while
+they wait, and the game asks your router to open the port for you). From the moment the
+link is up, everything follows the original — the save warning, the "Please wait.", the
+TRADE CENTER / COLOSSEUM choice, your friend appearing across the table.
 
-- **Audited parity**: every system in the game's engine — battle formulas, catching, EXP,
-  status effects, trainer AI, encounters, every map script and hidden event, menus, the
-  Pokédex, animations, audio, the overworld's movement/warp/collision rules — has been read
-  line-by-line against the original disassembly and reimplemented to match, Gen-1 quirks and
-  glitches included. A super-effective hit rounds like the cartridge rounds; Blaine wastes
-  potions at full HP; the Leech Seed/Toxic counter glitch drains extra; AGILITY cures
-  paralysis slowness.
-- **The playthrough sign-off**: an automated bot first played the whole game legitimately —
-  one unbroken run from NEW GAME to the HALL OF FAME, real battles, real grinding, real
-  money — and then a complete human playthrough followed, filing bug waves (~60 issues)
-  that were fixed batch by batch until the tracker hit zero.
+- **Trading**: pick a Pokémon, see your friend's pick, both confirm, and the full trade
+  animation plays — the ball rolling down the link cable, the farewell, your friend's
+  actual name on their Game Boy. Trade evolutions finally work: send a Kadabra, an
+  Alakazam arrives. Nicknames and original trainers are preserved, and a dropped
+  connection can never duplicate or lose a Pokémon — a trade completes on both sides or
+  on neither.
+- **Battling**: the full battle engine, link-style — no badge boosts, nothing at stake,
+  and both players provably watch the *identical* battle: the two games simulate in
+  lockstep from a shared seed, and the test suite asserts their turn-by-turn records are
+  byte-for-byte the same. Your opponent appears as the rival, just like on cartridge.
+- **The dupe glitch lives** — on purpose, as an easter egg. If (and only if) *both*
+  players enable it, the classic cable-pull duplication works at the same moment it did
+  in 1998. One-sided attempts are refused at the handshake.
+- Mismatched copies (different version, or data extracted from a different pokered) are
+  politely turned away with a message naming exactly what differs — under lockstep,
+  silent drift would mean desyncs, so the door is strict.
 
-The final stretch (0.9.38–0.9.43) brought the Pokémon Center's frame-real healing ceremony,
-the in-game trade movie with the ball crawling the link cable, the DIPLOMA, Oak's 16-tier
-Pokédex rating, boulder dust, and the title screen's Up+Select+B save clear.
+All of it was gated the way 1.0 was: automated two-instance suites first (a desync soak
+running seeded battles until the streams prove identical, and a "cable pull" matrix that
+kills the connection at every dangerous moment), then a real remote session between two
+humans — trades, trade evolutions, battles both directions, and genuine disconnects.
 
-Deliberately out of scope: link-cable play, Super Game Boy colors (this is DMG-green), and
-raw-memory glitches like Missingno (no memory emulation).
+Known limits, documented: items can't be used in link battles yet, link MIMIC copies a
+random technique, and there's no NAT traversal — it's LAN or a directly reachable address,
+between two people who trust each other. Reconnecting into an interrupted session is on
+the list.
 
-What's next: multiplayer (v1.1) is the next conversation, and after that a fan-game creation
-toolkit (v2) built on this engine.
+What's next: the fan-game creation toolkit (v2), built on this engine — the trade record
+and the lockstep contract this release shipped are its foundation.
 
-Personal-use project; extracted assets and builds aren't distributed. Thanks for following
-along.
+Personal-use project; extracted assets and builds aren't distributed — your friend builds
+their own copy from their own disassembly, and the handshake keeps everyone honest.
+Thanks for following along.

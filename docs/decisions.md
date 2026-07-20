@@ -2,6 +2,33 @@
 
 Newest first. Each entry: context → decision → consequences.
 
+## ADR-015 — Lockstep implementation: mirrored sims, canonical streams, presumed-commit trades (2026-07-19)
+
+**Context:** Building ADR-014 (gh #2–#9) forced implementation-level choices the design left open, several
+of them non-obvious and one a deliberate divergence pair.
+**Decision:** (1) **Mirrored simulations with canonical labels** — each peer simulates with itself as the
+"player" side (as pokered's link battles do) rather than one side rendering a flipped "host view". The
+asymmetric rules are neutralized exactly as the asm neutralizes them for `LINK_STATE_BATTLING` (no badge
+boosts, no hidden stat-down miss, no EXP), speed ties read the shared coin canonically ("heads = the HOST
+acts first"), the opponent presents as **OPP_RIVAL1** (cable_club.asm), and the lockstep oracle emits
+role-canonical lines (host side first on both peers) so byte-equality still defines "in sync". (2) **The
+mon record carries `maxpp` explicitly** — deriving it from the current move table refused real saves whose
+PP history predates a table fix; what the save says is what travels, bounded only by Gen 1's 64 ceiling.
+(3) **Trades are presumed-commit past the ack** — the journal phases `ready` (roll back) and `acked`
+(written before the ack leaves; recovery rolls forward, silent trade evo included). The un-closable
+residue — an ack lost in transit at the instant of a real cable pull — is the two-generals bound,
+documented in engine/link.md; closing it needs the gh #13 reconnect conversation. The dupe easter egg is
+implemented as a deliberate `acked`-rollback under mutual opt-in; an asymmetric opt-in refuses the whole
+session. (4) **Two documented divergences** keep both sims trivially identical until a later faithfulness
+pass: items are refused in link battles (the cartridge allows them; enemy-side application of every bag
+item is deferred), and link MIMIC copies a deterministic random technique (a mid-turn menu pick can't
+cross the wire mid-resolution). (5) **Human-paced waits are liveness-bound** — only machine-paced protocol
+replies keep timers, and a machine timeout actively closes the link; a friend thinking for a minute is the
+game working, not a drop (the first playtest's "frequent disconnects" were a 30 s timer).
+**Consequences:** the desync soak (gh #8) validates the whole construction at volume (its first battery
+caught three real lockstep bugs); every divergence and the two-generals bound are documented rather than
+silent; gh #13 (session resume) and the items/Mimic faithfulness pass are the recorded follow-ups.
+
 ## ADR-014 — v1.1 multiplayer is the faithful Cable Club over deterministic lockstep (2026-07-17)
 
 **Context:** ADR-013 committed multiplayer as a v1.1 feature whose extended design conversation happens

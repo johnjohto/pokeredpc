@@ -32,6 +32,7 @@ See [docs/roadmap.md](docs/roadmap.md) for the live tracker. In short:
 | Save / continue, Pokécenter healing, overworld poison | ✅ done |
 | Music (GB sound-chip synthesis of pokered song data) | ✅ done |
 | Sound effects + Pokémon cries (pitch/length per species) | ✅ done |
+| Multiplayer (v1.1): the Cable Club — link trades (trade evolutions incl.) + lockstep link battles | ✅ done |
 
 ## Layout
 
