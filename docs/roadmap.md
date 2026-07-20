@@ -41,9 +41,12 @@ ALL GREEN on each; what remains is one live two-machine Windows↔Linux session
 2026-07-20**: the build-out is tracked as **gh #14 (epic)** with phase issues **#15–#21** — Core &
 project format → ruleset seam + `gen1` → Event VM → Studio MVP → map/event editors → sandboxed
 scripting + config UI → packaging + the second sample, each phase gated by the bot + the audits +
-the determinism suites (see [v2/plan.md](v2/plan.md) §7). First up: **gh #15 Phase 1**, opening
-with its design conversation (serialization, the schema system, the project manifest/identity
-grown from the link manifest, the stable-ID scheme). (The *v1.1* work had been broken down as
+the determinism suites (see [v2/plan.md](v2/plan.md) §7). **Phase 1's design is pinned
+(ADR-017, 2026-07-20)**: JSON + JSON Schema in canonical form, hybrid per-record granularity, the
+reserved `custom` bag, format-speaks-IDs with the loader resolving, interim map JSON until the
+Phase-5 TMX bridge, the extractor *emitting* the project (the importer born, not a converter),
+and `format: 1` + linear migrations. Sub-issues **gh #22–#25** (schemas/Core → manifest+identity
+→ extractor emission → runtime loading, which carries the phase gate). First up: **gh #22**. (The *v1.1* work had been broken down as
 gh #1 (spec) with sub-issues #2–#10.) **Landed: gh #2 — the battle determinism
 oracle** (2026-07-19): every battle-logic random draw now comes from a battle-local seeded RNG
 (never the frame-paced global RNG), each battle emits a canonical per-turn event stream (turn,

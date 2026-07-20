@@ -2,6 +2,52 @@
 
 Newest first. Each entry: context → decision → consequences.
 
+## ADR-017 — The v2 project format: JSON-schema'd, per-record, ID-addressed, importer-emitted (2026-07-20)
+
+**Context:** v2 Phase 1 (gh #15, ADR-013, plan §4.1) separates Engine from Project: today's
+`game/assets/` is ~30 extractor-emitted per-type JSON monoliths + PNGs, loaded from hardcoded
+`res://` paths and resolved *positionally* in pokered's constant order. The project format is a
+public API from its first version, so its shape — including the escape hatches it will need
+later — is a now-decision. Design conversation held 2026-07-20. Three things were treated as
+settled going in: **Core lives in this repo** (`core/`: schemas + the shared loader — every
+phase refactors v1 in place toward flagship-sample status, and the bot must gate each step);
+the **manifest carries a content-hash identity** grown from `link_manifest.json`, hashing
+*canonical* bytes (the gh #12 newline lesson generalized); and **schemas are data, not code**
+(JSON Schema documents in `core/schemas/`, one per content type — the single source that later
+drives Studio's forms, validation, and docs).
+**Decision:** (1) **Serialization: JSON + JSON Schema** — native to Godot and the web-export
+portability budget, machine-validatable, diff-friendly pretty-printed with sorted keys; the
+canonical form doubles as the identity-hash input. No comments is acceptable: the editor is the
+primary authoring surface, and `description`/`$comment` fields carry prose. (2) **Granularity:
+hybrid by shape** — per-record files for entity collections (`data/species/bulbasaur.json`,
+moves, items, trainers, maps, events: clean diffs, no merge collisions, the editor writes one
+file per edit); single files for genuine tables and singletons (the type chart, per-map
+encounter tables, the world graph). (3) **Extensions: a reserved `custom: {}` bag on every
+record now** — validated free-form; everything else `additionalProperties: false`, so strict
+validation catches typos from day one while Phase-6 creator fields land inside a namespace
+Phase-1 projects already carry. Schema overlays (whole new content types) stay deferred until
+demanded. (4) **Stable string IDs (`species:bulbasaur`, `move:tackle`) are the format's
+addressing; the Phase-1 loader resolves them onto v1's existing internal structures** — the
+positional-index internals migrate opportunistically in Phase 2, where the ruleset seam
+re-touches every mechanic anyway. (5) **Maps carry v1's extracted map JSON as a documented
+interim format**; the TMX switch lands with the Phase-5 Studio/Tiled bridge, whose design owns
+the object/property convention — under the versioning policy below that switch is just a
+format bump with a migration, not a break. (6) **One tool, not two: the extractor emits the
+project.** `tools/extract.py`'s output format *becomes* the v2 project — pokered clone in,
+Kanto project folder out — so the "v1 → project converter" and plan §4.6's permanent pokered
+importer are the same artifact from day one and no second asset format ever exists.
+(7) **Versioning: an integer `format` in the manifest + linear, explicit, tested migrations**
+(1→2→3…); the engine migrates older projects forward and refuses newer ones naming both
+versions — the link-identity refusal pattern applied to loading.
+**Consequences:** Phase 1 decomposes into sub-issues cut from this ADR (schemas + Core loader;
+manifest + identity; the extractor's project emission; the runtime's project loading — gh
+#22–#25). Project identity is cross-OS by construction (canonical-form hashing). The schema
+set written here is the exact input Studio's Phase-4 form engine consumes. The interim map
+format is explicitly versioned data, so its TMX migration is routine rather than a compat
+crisis. The deliverable and gate are unchanged: v1 runs unchanged from a project folder, the
+seeded bot beats it, `--battledettest` md5s stay put, and the cross-OS determinism workflow
+re-dispatches green.
+
 ## ADR-016 — Link session resume: live-transport reconnect + reconcile (2026-07-20)
 
 **Context:** v1.1 tears down any dead link — battles end stakeless, trades resolve via the phased
