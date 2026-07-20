@@ -12642,6 +12642,8 @@ func _pt_push_boulder(at: Vector2i, dir: int, times := 1) -> bool:
 	for i in times:
 		var boulder = _npc_at(at + DIRV4[dir] * i)
 		if boulder == null or not str(boulder.key).begins_with("SPRITE_BOULDER@"):
+			print("[playthrough] boulder shove: nothing to push at %s (tile %d of %d)" % [
+				str(at + DIRV4[dir] * i), i + 1, times])
 			return false                                   # nothing there to push
 		# gh #129: pokered requires two consecutive same-direction pushes per tile — the first only arms
 		# BIT_TRIED_PUSH_BOULDER (a bump in place), the second slides the boulder and advances the player.
@@ -12652,7 +12654,14 @@ func _pt_push_boulder(at: Vector2i, dir: int, times := 1) -> bool:
 				moved_tile = true
 				break
 		if not moved_tile:
-			return false                                   # the cell beyond is solid — a mis-aimed shove
+			# The boulder is there but won't budge: the cell beyond is solid, occupied, or the
+			# shove crosses an elevation edge (gh #105's CheckForCollisionWhenPushingBoulder).
+			# Name the tile — a stale derived route fails here, and "which tile" is the whole
+			# diagnosis (gh #28).
+			print("[playthrough] boulder shove refused at %s -> %s (tile %d of %d, %s)" % [
+				str(at + DIRV4[dir] * i), str(at + DIRV4[dir] * (i + 1)), i + 1, times,
+				_PT_DIR_NAME[dir]])
+			return false
 		if modal != null or cutscene_active:               # a cave-floor wild encounter fired on landing —
 			await _pt_settle()                             # win it before the next shove (gh #105/#106)
 	return true
