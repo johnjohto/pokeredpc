@@ -1,7 +1,7 @@
 # The ruleset seam (v2 Phase 2 — gh #16, ADR-018)
 
-**Status:** in build-out. gh #31 (the skeleton + the Types tracer) landed; gh #32–#35 migrate
-the remaining mechanics behind the seam module by module.
+**Status:** in build-out. gh #31 (the skeleton + the Types tracer) and gh #32 (the formula
+kernels) landed; gh #33–#35 migrate the remaining mechanics behind the seam module by module.
 
 The engine core knows five **interfaces** (in `game/core/ruleset/`); the built-in, asm-faithful
 **`gen1` ruleset** (`game/rulesets/gen1/`) implements them. A project's `manifest.json` names its
@@ -11,7 +11,7 @@ unknown name by naming both sides (the refuse-newer pattern applied to mechanics
 | Interface | Contract | gen1 status |
 |---|---|---|
 | `RulesetTypes` | `eff(move_type, def_types)` (composed, single-fire per table entry), `mult(atk, def)`, `row(move_type)` (table-ordered — Gen-1's damage loop applies each entry with its own floor, so iteration order is behavior; `row` is scaffolding that can retire once gh #32 pulls the damage loop inside) | **live** (`Gen1Types`, gh #31 — the tracer bullet) |
-| `RulesetFormulas` | damage / accuracy / crit / catch-rate / stat-calc / exp-curve provider | fused; migrates in gh #32 |
+| `RulesetFormulas` | the pure arithmetic kernels: `stat_calc`, `exp_for_level`/`level_for_exp`, `crit_roll`, `damage_core` (GetDamageVars' byte-overflow scale + CalculateDamage), `randomize_damage`, `accuracy_roll`, `stage_apply`, `special_damage`, `catch_attempt`. Stat *selection* (which stat, unmodified-on-crit, screens, EXPLODE halving) is battle-module logic and stays with the battle state. RNG-drawing kernels take the battle's draw helpers as Callables so implementations own the math, never the draw order. | **live** (`Gen1Formulas`, gh #32 — moved verbatim from `Battle.gd`/`Main.gd`) |
 | `RulesetBattle` | `battle state + chosen actions → the ordered event stream` (v1's ADR-009 queue is this contract); the Gen-1 trainer AI lives inside it (ADR-018 §2) | fused; migrates in gh #33 |
 | `RulesetCatch` | ball + target state → caught / shake count | fused; migrates in gh #34 |
 | `RulesetProgression` | progression flags + gate conditions (badges, HM gates generalized) | fused; migrates in gh #34 |

@@ -63,6 +63,18 @@ equivalence sweep; config-first knobs are **only what is already data** (`data/r
 additive under `format: 1`); extraction is strangler-fig with `--battledettest` between every
 move. Sub-issues **gh #31–#35** (interfaces+registry → types+formulas → battle+link →
 catch/progression/config → expression evaluator, which carries the phase gate).
+**Landed: gh #32** (2026-07-20): the formula layer is behind the seam — `Gen1Formulas`
+carries the pure kernels moved verbatim (`stat_calc` with the sexp sqrt term, the four
+growth curves + inverse, `crit_roll` incl. the Focus Energy bug, `damage_core` =
+GetDamageVars' /4 byte-overflow scale + CalculateDamage's floored pipeline,
+`randomize_damage`, `accuracy_roll` with the 1/256 sure-miss, `stage_apply`,
+`special_damage`, and ItemUseBall's byte-exact `catch_attempt`); RNG-drawing kernels take
+the battle's draw helpers as Callables so draw ORDER never moved. Stat *selection*
+(unmodified-on-crit, screens, EXPLODE halving) stays with the battle state for gh #33.
+`Battle.gd`/`Main.gd` delegate; the stage tables + HIGH_CRIT left them. Verified: the four
+`--battledettest` md5s unchanged again, `--rulesettest` grew nine formula ground-truth
+checks (exp book values, Mew's 298/403, the crit byte, MASTER BALL...), `--movefxtest`
+fully green (wobble spread, CalcStat, badges), `--selftest` + `linktest.py` ALL GREEN.
 **Landed: gh #31** (2026-07-20): the seam exists — `game/core/ruleset/` (the five interface
 classes + `RulesetRegistry`, which now actually consumes the manifest's `ruleset` field: boot
 refuses an unknown name naming both sides) and `game/rulesets/gen1/`, with **Types routed

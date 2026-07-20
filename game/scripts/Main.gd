@@ -4065,16 +4065,10 @@ func show_dex_entry(species: String, owned := true) -> void:
 
 # ---- Pokémon (persistent party mons) ---------------------------------------
 
-## Gen-1 stat: floor((base + DV) * 2 * level / 100) + 5  (+ level + 10 for HP). EV=0.
+## Gen-1 stat (CalcStat with the stat-exp sqrt term) — the ruleset's stat_calc kernel
+## now (gh #32, ADR-018).
 func stat(base: int, level: int, dv: int, is_hp: bool, sexp := 0) -> int:
-	# CalcStat: floor(((base + DV)*2 + floor(ceil(sqrt(statExp))/4)) * level/100) + 5
-	# (+ level + 10 for HP). Stat exp is Gen 1's "EV" pool: every defeated mon's raw base
-	# stats accumulate on the victors, picked up at the next stat recalc (level-up).
-	var eb := 0
-	if sexp > 0:
-		eb = mini(255, int(ceilf(sqrt(float(sexp))))) / 4
-	var v := int(((base + dv) * 2 + eb) * level / 100.0)
-	return v + level + 10 if is_hp else v + 5
+	return ruleset.formulas.stat_calc(base, level, dv, is_hp, sexp)
 
 
 ## Random Gen-1 DVs (0..15 per stat; the HP DV is the LSBs of the other four).
@@ -4087,20 +4081,14 @@ func _random_dvs() -> Dictionary:
 	return {"hp": hp, "atk": a, "def": d, "spd": s, "spc": c}
 
 
+## The growth curves live in the ruleset's formula layer now (gh #32, ADR-018).
 func exp_for_level(n: int, growth: String) -> int:
-	match growth:
-		"GROWTH_FAST": return int(4 * n * n * n / 5.0)
-		"GROWTH_SLOW": return int(5 * n * n * n / 4.0)
-		"GROWTH_MEDIUM_SLOW": return int(6.0 * n * n * n / 5.0 - 15 * n * n + 100 * n - 140)
-		_: return n * n * n   # MEDIUM_FAST (+ unused slightly_fast/slow fallback)
+	return ruleset.formulas.exp_for_level(n, growth)
 
 
 ## Highest level whose EXP threshold the mon has reached (inverse of exp_for_level).
 func level_for_exp(xp: int, growth: String) -> int:
-	var lvl := 1
-	while lvl < 100 and exp_for_level(lvl + 1, growth) <= xp:
-		lvl += 1
-	return lvl
+	return ruleset.formulas.level_for_exp(xp, growth)
 
 
 ## Day Care: store the chosen party mon (it then earns EXP per overworld step).
@@ -5157,6 +5145,35 @@ func _rulesettest() -> void:
 					mism += 1
 	ok = _rs_check("type resolver matches the chart over %d combos" % checked, mism == 0,
 		"%d mismatches" % mism) and ok
+	# gh #32: the formula kernels — spot ground truths (Gen-1's book values); the md5
+	# oracle + the bot hold everything these compose into.
+	var F: RulesetFormulas = ruleset.formulas
+	ok = _rs_check("gen1 carries a Formulas module", F != null, "") and ok
+	ok = _rs_check("exp curves: L100 book values (800k/1M/1.05986M/1.25M)",
+		F.exp_for_level(100, "GROWTH_FAST") == 800000
+		and F.exp_for_level(100, "GROWTH_MEDIUM_FAST") == 1000000
+		and F.exp_for_level(100, "GROWTH_MEDIUM_SLOW") == 1059860
+		and F.exp_for_level(100, "GROWTH_SLOW") == 1250000, "") and ok
+	ok = _rs_check("level_for_exp inverts the curve",
+		F.level_for_exp(1059860, "GROWTH_MEDIUM_SLOW") == 100
+		and F.level_for_exp(7, "GROWTH_MEDIUM_FAST") == 1, "") and ok
+	ok = _rs_check("stat_calc: Mew L100 maxed = 298 / HP 403",
+		F.stat_calc(100, 100, 15, false, 65535) == 298
+		and F.stat_calc(100, 100, 15, true, 65535) == 403, "") and ok
+	ok = _rs_check("stage_apply: 200% at +2, floor-clamped at -6",
+		F.stage_apply(100, 2) == 200 and F.stage_apply(100, -6) == 25
+		and F.stage_apply(1, -6) == 1, "") and ok
+	ok = _rs_check("damage_core: L50 p100 150/100 = 68",
+		F.damage_core(50, false, 100, 150, 100) == 68, "") and ok
+	ok = _rs_check("crit_roll: SLASH caps the byte at 255, plain spd-90 reads 45/256",
+		F.crit_roll(90, false, "SLASH", func(): return 0.99)
+		and not F.crit_roll(90, false, "TACKLE", func(): return 0.5), "") and ok
+	ok = _rs_check("accuracy_roll: the 1/256 sure-miss quirk",
+		F.accuracy_roll(100, 0, 0, func(_n): return 254)
+		and not F.accuracy_roll(100, 0, 0, func(_n): return 255), "") and ok
+	ok = _rs_check("catch_attempt: MASTER BALL always catches",
+		bool(F.catch_attempt("MASTER BALL", "", 3, 10, 10, func(_n): return 0)["caught"]),
+		"") and ok
 	print("[ruleset] %s" % ("ALL GREEN" if ok else "FAIL"))
 	get_tree().quit(0 if ok else 1)
 

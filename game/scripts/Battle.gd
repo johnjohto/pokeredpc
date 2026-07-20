@@ -15,11 +15,9 @@ const GLYPH := 8
 var speed := 20.0            # glyphs/s: 60 / letter-delay frames (the OPTION text-speed setting)
 const MAXCHARS := 18         # glyphs that fit on one line of the message box
 const SPECIAL_TYPES := ["FIRE", "WATER", "GRASS", "ELECTRIC", "PSYCHIC_TYPE", "ICE", "DRAGON"]
-const STAGE_MULT := {-6: 0.25, -5: 0.28, -4: 0.33, -3: 0.4, -2: 0.5, -1: 0.66,
-	0: 1.0, 1: 1.5, 2: 2.0, 3: 2.5, 4: 3.0, 5: 3.5, 6: 4.0}
+# (the stage-multiplier tables + HIGH_CRIT are Gen1Formulas' data now — gh #32)
 const STAT_KEY := {"ATTACK": "atk", "DEFENSE": "def", "SPECIAL": "spc",
 	"SPEED": "spd", "ACCURACY": "acc", "EVASION": "eva"}
-const HIGH_CRIT := ["SLASH", "KARATE_CHOP", "RAZOR_LEAF", "CRABHAMMER"]
 const TWO_TURN := ["CHARGE_EFFECT", "FLY_EFFECT", "SOLARBEAM"]   # turn 1 charges
 const _VANISH_CHARGE := ["DIG", "FLY"]          # ...and these two go out of sight while they do (gh #122)
 # stat-down side effects -> the stat they lower
@@ -1588,31 +1586,11 @@ func _catch_succeeds(msgs: Array) -> void:
 ## it at .failedToCapture whichever stage failed — a rand1-stage failure uses the same
 ## HP-derived X as a rand2-stage one, never the catch rate (gh #176).
 func _attempt_catch(ball := "POKé BALL", rate_override := -1) -> Dictionary:
-	if ball == "MASTER BALL":
-		return {"caught": true, "shakes": 3}
-	var span := 256
-	var bf := 12
-	var bf2 := 255
-	if ball == "GREAT BALL":
-		span = 201; bf = 8; bf2 = 200
-	elif ball in ["ULTRA BALL", "SAFARI BALL"]:
-		span = 151; bf2 = 150
-	var st := str(enemy_mon["status"])
-	var r1 := _ri(span)
-	r1 -= 25 if st in ["slp", "frz"] else (12 if st != "" else 0)
-	if r1 < 0:
-		return {"caught": true, "shakes": 3}
+	# The byte-exact ItemUseBall algorithm is the ruleset's catch_attempt kernel (gh #32).
 	var rate := rate_override if rate_override >= 0 \
 		else int(base_stats[enemy_mon["species"]]["catch"])
-	var x := int(int(enemy_mon["maxhp"]) * 255 / bf) / maxi(1, int(int(enemy_mon["hp"]) / 4))
-	if r1 <= rate:
-		if x > 255 or _ri(256) <= x:
-			return {"caught": true, "shakes": 3}
-	var y := rate * 100 / bf2
-	if y > 255:
-		return {"caught": false, "shakes": 3}
-	var z := mini(x, 255) * y / 255 + (10 if st in ["slp", "frz"] else (5 if st != "" else 0))
-	return {"caught": false, "shakes": 0 if z < 10 else (1 if z < 30 else (2 if z < 70 else 3))}
+	return rset.formulas.catch_attempt(ball, str(enemy_mon["status"]), rate,
+		int(enemy_mon["hp"]), int(enemy_mon["maxhp"]), _ri)
 
 
 func _enemy_turn_after_item(msgs: Array) -> void:
@@ -2406,15 +2384,12 @@ func _do_move(att: Dictionary, defn: Dictionary, move: String, msgs: Array,
 		_on_miss(att, md, msgs)
 		return
 
-	# Accuracy (MoveHitTest, Swift never misses): byte math — 100% accuracy is 255, rolled
-	# against rand(256), so even a sure move misses 1/256 of the time (the famous Gen-1
-	# quirk). Accuracy and evasion stages scale the byte sequentially, capped at 255.
+	# Accuracy (MoveHitTest, Swift never misses) — the byte math (100% = 255 vs rand(256),
+	# the 1/256 sure-miss quirk, sequential stage scaling) is the ruleset's accuracy_roll
+	# kernel now (gh #32).
 	if eff_name != "SWIFT_EFFECT" and int(md["accuracy"]) > 0:
-		var acc := int(int(md["accuracy"]) * 255 / 100.0)
-		acc = int(acc * float(STAGE_MULT[clampi(int(att_st["acc"]), -6, 6)]))
-		acc = int(acc * float(STAGE_MULT[clampi(-int(def_st["eva"]), -6, 6)]))
-		acc = mini(acc, 255)
-		if _ri(256) >= acc:
+		if not rset.formulas.accuracy_roll(int(md["accuracy"]), int(att_st["acc"]),
+				int(def_st["eva"]), _ri):
 			msgs.append("%s's\nattack missed!" % att["label"])
 			_on_miss(att, md, msgs)
 			return
@@ -2554,18 +2529,10 @@ func _do_damage_move(att: Dictionary, defn: Dictionary, move: String, md: Dictio
 ## A single hit's damage (Gen-1 formula, with crit / stages / screens / burn).
 func _calc_hit(att: Dictionary, defn: Dictionary, md: Dictionary, att_st: Dictionary, def_st: Dictionary,
 		att_vol: Dictionary, def_vol: Dictionary) -> Dictionary:
-	# Gen-1 critical-hit probability (faithful, including the Focus Energy bug).
-	var b := int(int(att["base_spd"]) / 2)
-	if bool(att_vol["focus"]):
-		b = int(b / 2)                            # BUG: Focus Energy quarters crit chance
-	else:
-		b = mini(255, b * 2)
-	if str(md["name"]).replace(" ", "_") in HIGH_CRIT:
-		b = mini(255, mini(255, b * 2) * 2)
-	else:
-		b = int(b / 2)
-	var crit := _rf() < (b / 256.0)
-	var lvl: int = int(att["level"]) * 2 if crit else int(att["level"])
+	# Crit probability + damage arithmetic are the ruleset's formula kernels now (gh #32);
+	# the stat SELECTION below (unmodified-on-crit, screens, EXPLODE) stays battle state.
+	var crit: bool = rset.formulas.crit_roll(int(att["base_spd"]), bool(att_vol["focus"]),
+		str(md["name"]), _rf)
 	var special: bool = str(md["type"]) in SPECIAL_TYPES
 	var akey := "spc" if special else "atk"
 	var dkey := "spc" if special else "def"
@@ -2587,16 +2554,8 @@ func _calc_hit(att: Dictionary, defn: Dictionary, md: Dictionary, att_st: Dictio
 			d_stat *= 2                            # uncapped in pokered too (512+ wraps on GB)
 	if str(md["effect"]) == "EXPLODE_EFFECT":
 		d_stat = maxi(1, int(d_stat / 2))          # CalculateDamage: EXPLODE_EFFECT halves defense
-	# GetDamageVars*: if either stat overflows a byte, BOTH scale by /4 at byte precision.
-	# (pokered can reach a 0 divisor here and freeze; the port clamps to 1 instead of hanging.)
-	if a_stat > 255 or d_stat > 255:
-		a_stat = maxi(1, int(a_stat / 4))
-		d_stat = maxi(1, int(d_stat / 4))
-	# CalculateDamage, integer-exact: every step floors like the GB divides, the quotient caps
-	# at 997 and MIN_NEUTRAL_DAMAGE (+2) lands on top — max 999 (gh #176 phase 2).
-	var dmg := int((2 * lvl) / 5) + 2
-	dmg = int(dmg * int(md["power"]) * a_stat / maxi(1, d_stat))
-	dmg = mini(int(dmg / 50), 997) + 2
+	var dmg: int = rset.formulas.damage_core(int(att["level"]), crit, int(md["power"]),
+		a_stat, d_stat)
 	# AdjustDamageForMoveType: STAB adds a floored half, then each matching TypeEffects TABLE
 	# ENTRY applies ×n/10 with its own floor, in table order. A pure-type defender (stored
 	# TYPE,TYPE) matches an entry ONCE — the old product over both slots squared it. A pair
@@ -2612,19 +2571,13 @@ func _calc_hit(att: Dictionary, defn: Dictionary, md: Dictionary, att_st: Dictio
 			dmg = int(dmg * mult)                  # ×20/10 / ×5/10 / ×0, floored per entry
 			if dmg == 0:
 				return {"dmg": 0, "crit": crit, "eff": eff, "floored_miss": true}
-	# RandomizeDamage: damage below 2 is not randomized
-	if dmg > 1:
-		dmg = maxi(1, int(dmg * _rr(217, 255) / 255.0))
+	dmg = rset.formulas.randomize_damage(dmg, _rr)
 	return {"dmg": dmg, "crit": crit, "eff": eff}
 
 
-# pokered's stat-stage ratios (StatModifier n/100); the modified stat floors and lives in [1, 999].
-const _STAGE_NUM := {-6: 25, -5: 28, -4: 33, -3: 40, -2: 50, -1: 66,
-	0: 100, 1: 150, 2: 200, 3: 250, 4: 300, 5: 350, 6: 400}
-
-
+## The StatModifier n/100 stage table is the ruleset's stage_apply kernel now (gh #32).
 func _stage_apply(base: int, stage: int) -> int:
-	return clampi(int(base * _STAGE_NUM[clampi(stage, -6, 6)] / 100), 1, 999)
+	return rset.formulas.stage_apply(base, stage)
 
 
 ## The composed type multiplier, through the ruleset seam (gh #31) — the Gen-1 algorithm
@@ -2665,12 +2618,7 @@ func _deal(defn: Dictionary, def_vol: Dictionary, dmg: int, msgs: Array) -> void
 
 
 func _special_damage(att: Dictionary, move: String) -> int:
-	match move:
-		"SEISMIC_TOSS", "NIGHT_SHADE": return int(att["level"])
-		"DRAGON_RAGE": return 40
-		"SONICBOOM": return 20
-		"PSYWAVE": return max(1, _rr(1, int(1.5 * int(att["level"]))))
-	return int(att["level"])
+	return rset.formulas.special_damage(move, int(att["level"]), _rr)
 
 
 func _on_miss(att: Dictionary, md: Dictionary, msgs: Array) -> void:
@@ -2978,15 +2926,10 @@ func _can_act(att: Dictionary, vol: Dictionary, other_vol: Dictionary, msgs: Arr
 ## attack against its own STORED defense (the asm swaps the enemy's defense bytes for the
 ## user's — stages/penalties/boosts all baked) — typeless, critless, never misses, no random.
 func _confusion_self_damage(att: Dictionary, vol: Dictionary) -> int:
+	# A typeless 40-power hit through the same damage kernel (incl. the /4 byte scaling).
 	var mod: Dictionary = p_mod if is_same(vol, p_vol) else e_mod
-	var a_stat := int(mod["atk"])
-	var d_stat := int(mod["def"])
-	if a_stat > 255 or d_stat > 255:                   # the GetDamageVars* /4 byte scaling
-		a_stat = maxi(1, int(a_stat / 4))
-		d_stat = maxi(1, int(d_stat / 4))
-	var dmg := int((2 * int(att["level"])) / 5) + 2
-	dmg = int(dmg * 40 * a_stat / maxi(1, d_stat))
-	return mini(int(dmg / 50), 997) + 2
+	return rset.formulas.damage_core(int(att["level"]), false, 40,
+		int(mod["atk"]), int(mod["def"]))
 
 
 ## .MonHurtItselfOrFullyParalysed: bide, thrash, charge and trapping locks all break (the
