@@ -175,6 +175,8 @@ where noted (git-ignored), prints results, and quits — used to verify features
 | `--monrecordtest` | The mon record codec (gh #4): round-trips varied mons through the `mon/1` wire schema, refuses an unknown version, rejects ~24 malformed fixtures cleanly. Single-process. |
 | `--schematest` | v2 Core (gh #22, ADR-017): the project-format schema suite — the valid fixture project validates clean (ids registered per prefix), seven broken fixtures each rejected with exactly one error naming file + path. Headless. |
 | `--validate=<dir>` | v2 Core (gh #22): validate any project directory (res:// or OS path) against the format — schema violations, unclaimed files, record-id mismatches, dangling references. Exit 0 only when clean. Headless. |
+| `--projparitytest` | v2 Core (gh #25): the reconstruction oracle — `ProjectData.legacy()` must deep-equal the legacy `res://assets` file for every data table, and all 223 interim maps must load identically, modulo the two documented emission filters. Headless. |
+| `--project=<dir>` | **Modifier** for any run (gh #25): load a different project directory instead of the default `res://project` (the extractor's emission). |
 | `--host [--port=N]` | v1.1 link (gh #3): host a link session and wait; on link, a ping/pong round-trip, then close. See [engine/link.md](../engine/link.md). |
 | `--join <ip>` | v1.1 link (gh #3): connect to a host. Modifiers for both: `--tamper=version\|engine\|<part>` (drive the identity refusal), `--linktimeout=N`, `--dupe`. Pairs are driven by `python tools/linktest.py`. |
 | `--clubtest` | The Cable Club attendant (gh #5). Alone: every single-instance refusal/timeout path lands back cleanly. With `--clubhost` / `--clubjoin [--port=N] [--tamper=X]`: one side of the full in-game link flow — `--trade` continues into the Trade Center round-trip (gh #6), `--battle` into the Colosseum lockstep battle (gh #7). Driven in pairs by `tools/linktest.py`. |
@@ -243,7 +245,7 @@ where noted (git-ignored), prints results, and quits — used to verify features
 | `--surftest` | Surf: HM03 from the Safari secret house → teach SURF → hop onto water (badge-gated) wearing the SEEL sheet (gh #170), land dismounts back to the walking sheet. Headless. |
 | `--strengthtest` | Strength: Warden trades GOLD TEETH for HM04 → teach → activate → push a boulder one tile (no-strength blocked). Headless. |
 | `--elitetest` | Elite Four: an E4 member (Lorelei) via the trainer system + the Champion (rival OPP_RIVAL3) → Hall of Fame. Headless. |
-| `--flytest` | Fly: HM02 from the Route 16 house → teach FLY → visited-town menu → warp to a town. Headless. |
+| `--flytest` | Fly: HM02 from the Route 16 house → teach FLY → visited-town menu → warp to a town, shooting the bird mid-swoop → `fly_bird.png`. **GUI (windowed)** — it awaits `frame_post_draw` for that screenshot, so under `--headless` it suspends forever (gh #103's rule: a `*test` driver may await it, but only run windowed). |
 | `--silphtest` | Silph Co: 7F Lapras gift + Saffron rival, 11F Giovanni #2, and the president's MASTER BALL. Headless. |
 | `--dockscene` | PLAYABLE: spawn on the Vermilion Dock with HM01 — the S.S. ANNE departure fires on arrival (gh #118) — then keep playing. Isolated test save. |
 | `--safaribattletest` | Safari battle: BALL/BAIT/ROCK/RUN menu, rock doubles & bait halves the catch rate, ball use, encounter ends. Shoots the faithful full-width menu (gh #169) to `game/safari_menu.png`. Windowed (screenshot). |

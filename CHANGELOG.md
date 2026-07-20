@@ -9,6 +9,18 @@ milestones, `PATCH` bumps are fixes/polish. See `docs/roadmap.md` for the live p
 ## [Unreleased]
 
 ### Fixed
+- **Two latent navigator traps on the road to Blaine** (gh #27), surfaced by the v2 Phase-1
+  gate — the first full seeded bot run since v1.1 shipped, and neither is project fallout
+  (both reproduce on the pre-flip build). **Route 7:** gh #149 made a warp set into a solid
+  tile (a gate door in a wall) enterable only from the side that fires it, enforced in the
+  step but never modeled by the planner, so every plan west routed through the door and
+  every step bumped. **Cinnabar:** the locked Gym door answers a step with a face-up, "The
+  door is locked...", and a scripted walk-back — which reads either as an ordinary blocked
+  step (walk gives up) or, when it moves the player, as *progress* (walk re-plans the same
+  route until its budget dies, silently). The walk now treats an unplanned landing or a
+  thrice-refusing cell as a fact about the map and routes around it, like a player who just
+  read the sign.
+
 - **The link-battle item refusal is faithful, not a divergence** (correction to the 1.1.0
   notes + ADR-015). Those docs claimed the cartridge allows items in link battles and framed
   the port's refusal as a documented divergence — but `core.asm`'s BagWasSelected guard

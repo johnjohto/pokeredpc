@@ -11170,6 +11170,16 @@ func _pt_use_field_move(move: String, settle := true) -> bool:
 ## FLY to a town we have already visited. The party field-move submenu opens the Town Map picker,
 ## filtered by `visited_fly`, and picking one runs the fly transition. FLY is
 ## Thunder-Badge gated and refuses indoors, so surface first.
+## Press one action AT a modal and let the real input path consume it (Player._process
+## dispatches to `modal.handle_input()` each frame). Driving a modal by calling its
+## handle_input() directly on top of a press double-steps it — gh #27.
+func _pt_press_modal(action: String) -> void:
+	Input.action_press(action)
+	await get_tree().process_frame
+	Input.action_release(action)
+	await get_tree().process_frame
+
+
 func _pt_fly_to(town: String) -> bool:
 	if str(center_label) == town:
 		return true
@@ -11187,14 +11197,27 @@ func _pt_fly_to(town: String) -> bool:
 		townmap.handle_input()
 		Input.action_release("ui_cancel")
 		return false
+	# gh #27: step the FLY cursor to `town`, BOUNDED by the cycle length. Two traps, and the
+	# run that found them burned 54 CPU-minutes in total silence:
+	#  * the cursor moved TWICE per press. Player._process already dispatches every frame to
+	#    `game.modal.handle_input()`, so calling `townmap.handle_input()` ourselves after a
+	#    press double-stepped `idx` — the cycle then only ever visited same-parity entries and
+	#    a town on the other parity (VIRIDIAN, from Cinnabar) was unreachable forever. Press
+	#    the action and let the REAL input path consume it, exactly like a player.
+	#  * the loop must end. It used to be `while label != town` with no cap, so a cursor that
+	#    can't reach the town spins forever — no log line, no timeout, just a headless process
+	#    pinning a core. Flying home to Pallet hid both: Pallet is the cursor's own start, so
+	#    the loop body never ran.
+	var hops := 0
 	while townmap.current_fly_label() != town:
-		Input.action_press("ui_up")
-		townmap.handle_input()
-		Input.action_release("ui_up")
-		await get_tree().process_frame
-	Input.action_press("ui_accept")
-	townmap.handle_input()
-	Input.action_release("ui_accept")
+		if hops > townmap.fly_dests.size():
+			print("[playthrough] FLY: cursor never reached %s (stuck on '%s' after %d hops)" % [
+				town, townmap.current_fly_label(), hops])
+			await _pt_press_modal("ui_cancel")
+			return false
+		await _pt_press_modal("ui_up")
+		hops += 1
+	await _pt_press_modal("ui_accept")
 	await _drive_until(func() -> bool: return str(center_label) == town and modal == null \
 		and not cutscene_active, 1200)
 	return str(center_label) == town
@@ -15503,11 +15526,22 @@ func _flytest() -> void:
 	_open_party_view(); _on_menu_chosen(0); _on_menu_chosen(_mon_menu_opts.find("FLY"))
 	var town_map_shown: bool = modal == townmap and townmap.is_fly_mode()
 	assert(town_map_shown, "FLY should open the Town Map picker")
+	# Same bounded, frame-separated cursor stepping as _pt_fly_to (gh #27): handle_input()
+	# reads is_action_just_pressed, so the press needs its own frame — and the loop needs a
+	# cap, or a cursor that won't move hangs the test instead of failing it.
+	var fly_hops := 0
 	while townmap.current_fly_label() != "PewterCity":
+		assert(fly_hops <= townmap.fly_dests.size(),
+			"FLY cursor never reached PewterCity (stuck on '%s')" % townmap.current_fly_label())
+		if fly_hops > townmap.fly_dests.size():
+			break
+		Input.action_release("ui_up")
+		await get_tree().process_frame
 		Input.action_press("ui_up")
 		townmap.handle_input()
 		Input.action_release("ui_up")
 		await get_tree().process_frame
+		fly_hops += 1
 	Input.action_press("ui_accept")
 	townmap.handle_input()
 	Input.action_release("ui_accept")

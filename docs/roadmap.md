@@ -59,8 +59,20 @@ consolidated + every reference prefixed, interim maps byte-copied, `.gdignore` a
 Gates: `--validate` **0 errors** with all six id sets registered; **byte-identical trees across
 two extractions**; `--schematest` + `--selftest` green. The clean run took two honest rounds —
 the validator caught 2189 real mismatches first (row-array blocks, string cry keys, numeric
-ai_mods, empty unused parties, dead mart stock, Mew's UNUSED TM padding). Next: **gh #23**
-(manifest identity), then **gh #25** (the runtime loads the project — the phase gate). (The *v1.1* work had been broken down as
+ai_mods, empty unused parties, dead mart stock, Mew's UNUSED TM padding). **Landed: gh #23** (2026-07-20): `manifest.identity` — 13 per-part hashes over the emitted
+canonical bytes + a `content_hash` by the generalized link-manifest rule — and the **v1.1 link
+manifest is now a derived view of it** (`species`/`moves`/`types`, schema 2), so link refusals
+and project identity can never drift apart; `Link.gd` unchanged (parts compare generically),
+full linktest ALL GREEN. **Landed: gh #25** (2026-07-20): **`ProjectData`** opens the project at
+boot (`--project=<dir>`; refuse-newer manifest gate) and rebuilds every v1-shaped table, so all
+~35 load sites across `Main`/`Battle`/`TradeMovie`/`TitleScreen` now read the **project**, not
+`res://assets`. Proven by the new **`--projparitytest`** (every table + all 223 maps deep-equal
+vs the legacy files) *and* by `--battledettest`, which caught what parity structurally cannot:
+**dict iteration order is behavior** (Metronome/Mimic pick over the move table's order), so
+move/item/trainer records carry **`num`**, the canonical Gen-1 table index. The phase gate's
+full bot run also surfaced **gh #27** — two latent navigator traps (Route 7's solid gate door
+unmodeled by the planner; Cinnabar's locked-Gym push-back reading as *progress*, burning a whole
+walk budget in silence), both latent since v1.1, both fixed. (The *v1.1* work had been broken down as
 gh #1 (spec) with sub-issues #2–#10.) **Landed: gh #2 — the battle determinism
 oracle** (2026-07-19): every battle-logic random draw now comes from a battle-local seeded RNG
 (never the frame-paced global RNG), each battle emits a canonical per-turn event stream (turn,
