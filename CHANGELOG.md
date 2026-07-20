@@ -9,6 +9,16 @@ milestones, `PATCH` bumps are fixes/polish. See `docs/roadmap.md` for the live p
 ## [Unreleased]
 
 ### Added
+- **A playable Windows export** (`pwsh tools/export.ps1`): `build/windows/pokeredpc.exe`
+  (release template, embedded PCK) with the project data as a loose `project/` folder
+  beside the exe — `res://project` is `.gdignore`'d raw data, invisible to Godot's exporter
+  by design, so the runtime now falls back to `<exe dir>/project` in exported builds and
+  derives its link identity from the project manifest (the same per-part hashes the
+  extractor writes to `link_manifest.json`). Verified: the packaged build passes
+  `--selftest`/`--victorytest`, and an exported host links a source-run joiner with
+  matching content hashes. Personal use only — the export is for playing your own copy
+  without the toolchain, never for distribution.
+
 - **Link session resume — a Wi-Fi blip no longer ends the trade or battle** (gh #13,
   ADR-016; the headline of the next feature milestone, v1.2.0). Scope: transport blips —
   both games alive, the socket died. An armed table session now enters a `lost` state

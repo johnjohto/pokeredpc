@@ -77,6 +77,14 @@ var _close_reason := "closed"        # carried through the graceful "closing" st
 ## refusal path is tested.
 func identity() -> Dictionary:
 	var manifest: Dictionary = main._load_json("res://assets/link_manifest.json")
+	if manifest.is_empty():
+		# Exported build: res://assets' raw JSONs aren't packed. The link manifest is a
+		# DERIVED VIEW of the project identity (gh #23) — species/moves/types re-emitted
+		# from the same per-part hashes — so deriving the identical view here changes
+		# nothing: source-run and exported peers compare the same values.
+		var ip: Dictionary = (ProjectData.manifest.get("identity", {}) as Dictionary).get("parts", {})
+		manifest = {"parts": {"species": str(ip.get("species", "?")),
+			"moves": str(ip.get("moves", "?")), "types": str(ip.get("types", "?"))}}
 	var ver := str(ProjectSettings.get_setting("application/config/version", "?"))
 	# gh #12: the engine build is part of link identity. The two peers run the SAME sim on
 	# different machines/OSes; Godot's RNG algorithm and float/string behavior are only

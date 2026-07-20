@@ -13,11 +13,27 @@ python -m pip install --user Pillow
 #   macOS:   Godot.app  (the scripts call Godot.app/Contents/MacOS/Godot)
 ```
 
+## Exporting a playable build (Windows)
+
+```powershell
+pwsh tools/export.ps1      # after tools/build.ps1 — writes build/windows/
+```
+
+Produces `build/windows/pokeredpc.exe` (release template, embedded PCK) with the project
+data as a loose **`project/` folder beside the exe** — `res://project` is `.gdignore`'d raw
+data, invisible to Godot's exporter *by design* (md5-stable files, no import artifacts), so
+the runtime falls back to `<exe dir>/project` in exported builds (`--project=<dir>` still
+overrides). The link identity is **derived from the project manifest** in an export (the
+same per-part hashes the extractor writes to `link_manifest.json`), so an exported build
+links cleanly with a source-run peer — verified: identity match + ping round-trip across
+the pair, and the packaged build passes `--selftest` / `--victorytest`. Keep the exe and
+the `project/` folder together when moving the build. **Personal use only — do not
+distribute the export or the extracted assets.**
+
 ## Other platforms (Linux / macOS — gh #12)
 
-The project runs from source on any OS Godot 4.7 ships for; there are no exported builds
-(personal-use project — each player builds their own copy). The whole toolchain is
-cross-platform:
+The project runs from source on any OS Godot 4.7 ships for; exports are personal-use only
+(each player builds their own copy). The whole toolchain is cross-platform:
 
 - `tools/build.ps1` / `tools/run.ps1` run under [pwsh](https://github.com/PowerShell/PowerShell)
   on Linux/macOS and pick the per-OS Godot binary above; set the **`POKEREDPC_GODOT`** env var

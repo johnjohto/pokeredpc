@@ -5210,11 +5210,18 @@ func _validate_dir_arg(args) -> String:
 
 
 ## gh #25: the project directory the runtime loads — res://project (the extractor's
-## emission) unless --project=<dir> points elsewhere.
+## emission) unless --project=<dir> points elsewhere. An EXPORTED build carries no
+## res://project at all (the dir is .gdignore'd raw data — invisible to the exporter by
+## design, keeping the files md5-stable with no import artifacts), so there the default
+## is the loose `project/` folder tools/export.ps1 places beside the executable.
 func _project_dir() -> String:
 	for a in OS.get_cmdline_user_args():
 		if str(a).begins_with("--project="):
 			return str(a).substr(10)
+	if not OS.has_feature("editor"):
+		var side := OS.get_executable_path().get_base_dir().path_join("project")
+		if FileAccess.file_exists(side.path_join("manifest.json")):
+			return side
 	return "res://project"
 
 
