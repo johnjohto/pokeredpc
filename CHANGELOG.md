@@ -9,6 +9,19 @@ milestones, `PATCH` bumps are fixes/polish. See `docs/roadmap.md` for the live p
 ## [Unreleased]
 
 ### Fixed
+- **A stage failure inside Victory Road now walks back out for its retry, and `_pt_warp_out`
+  can no longer teleport out of a cave** (gh #30). Two recovery weaknesses the gh #28 failures
+  exposed: the victoryroad stage's retry loop assumed a whiteout (which lands in a Center) and
+  died with a misleading "after a whiteout" message when a failed climb left the bot standing
+  *inside* the cave; and `_pt_warp_out`'s LAST_MAP forcing — honest for building doors, which
+  physically open onto the town the caller names — would resolve a *cave mouth* to any map the
+  caller claimed, warping the bot across the world. The retry loop now retraces the floors'
+  down-ladders (explicit warps; boulders reset on re-entry, switch events persist) and exits
+  the 1F mouth honestly onto Route 23 before flying home, best-effort — a boulder can genuinely
+  seal a pocket, and then the stage fails where it stands, saying so. In a cavern, a LAST_MAP
+  exit now walks only when it resolves truthfully to where the bot actually entered from
+  (every existing green path already did: Rock Tunnel's mouths really do open onto Route 10).
+
 - **The saffron stage now retries — one transient Celadon walk failure no longer ends the whole
   run** (gh #29). The run's longest unguarded walk (Fuchsia → Lavender → Celadon → the Mart's
   rooftop drink → Route 7's gate → Saffron) was one of two stages the gh #131 hardening pass

@@ -10213,6 +10213,15 @@ func _pt_warp_out(dest_map: String, avoid_warps := false) -> bool:
 		print("[playthrough] warp_out(%s): %s has no warp to it" % [dest_map, center_label])
 		return false
 	if is_last_map:
+		# gh #30: forcing the LAST_MAP resolution is honest for buildings — the door physically opens
+		# onto the town/route the caller names (a Center door, a gate house's street side) — but from
+		# a cave it is a teleport cheat: a cave mouth's LAST_MAP edge warps lead wherever we genuinely
+		# entered from, and naming anywhere else would warp the bot across the world. In a cavern,
+		# only a truthful resolution may walk.
+		if center_tileset == "cavern" and str(last_outside_map) != dest_map:
+			print("[playthrough] warp_out(%s): %s's mouth leads to %s — refusing to force a cave exit" % [
+				dest_map, center_label, str(last_outside_map)])
+			return false
 		last_outside_map = dest_map            # make the LAST_MAP exit resolve to where we came from
 	# A warp only fires on the `moved` that lands on it (`warp_armed` is cleared when we arrive standing
 	# on one), so we cannot exit from under our own feet. That happens after a blackout: pokered's
@@ -12514,9 +12523,23 @@ func _pt_stage_victoryroad() -> bool:
 	# so a retry resumes rather than refights (gh #94).
 	var climbed := false
 	for attempt in 3:
+		# gh #30: a failed climb (unlike a whiteout) leaves us standing INSIDE the cave, where FLY is
+		# refused and no warp names Viridian — the old loop died here blaming "a whiteout" that never
+		# happened. Walk back out the way we came: each floor's down-ladder is an explicit warp, and
+		# the 1F mouth resolves honestly to Route 23. Boulders reset on floor re-entry (switch events
+		# persist), so leaving restarts the puzzle cleanly for the retry. Best effort — a boulder can
+		# genuinely seal a pocket, and then the honest outcome is the stage failing where it stands.
+		var way_out := {"VictoryRoad3F": "VictoryRoad2F", "VictoryRoad2F": "VictoryRoad1F",
+			"VictoryRoad1F": "Route23"}
+		for _floor in 3:
+			if not way_out.has(str(center_label)):
+				break
+			if not await _pt_warp_out(str(way_out[str(center_label)])):
+				break
 		if str(center_label) != "ViridianCity" and not await _pt_fly_to("ViridianCity") \
 				and not await _pt_warp_out("ViridianCity"):
-			return _pt_fail("back to Viridian after a whiteout (on %s)" % center_label)
+			return _pt_fail("back to Viridian for retry %d (on %s @%s)" % [
+				attempt + 1, center_label, str(player.cell)])
 		heal_party()
 		respawn_map = "ViridianPokecenter"
 		# A SUPER POTION restores 50 HP; the lead has ~205 by now, and _pt_should_heal only fires under
