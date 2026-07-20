@@ -24,43 +24,96 @@ const _VANISH_CHARGE := ["DIG", "FLY"]          # ...and these two go out of sig
 const SIDE_STAT := {"SPEED_DOWN_SIDE_EFFECT": "SPEED", "DEFENSE_DOWN_SIDE_EFFECT": "DEFENSE",
 	"ATTACK_DOWN_SIDE_EFFECT": "ATTACK", "SPECIAL_DOWN_SIDE_EFFECT": "SPECIAL"}
 
-var p_stages: Dictionary
-var e_stages: Dictionary
-var p_vol: Dictionary
-var e_vol: Dictionary
-var _eff_re := RegEx.new()
+# gh #33 (ADR-018): the battle STATE lives in the ruleset's battle module (Gen1Battle);
+# these properties forward reads/writes so presentation, the test harness, and the link
+# plumbing keep their surface. Mechanics functions migrate there cluster by cluster.
+var mech                    # the ruleset battle module session (rset.battle, bound in setup)
+var p_stages: Dictionary:
+	get: return mech.p_stages
+	set(v): mech.p_stages = v
+var e_stages: Dictionary:
+	get: return mech.e_stages
+	set(v): mech.e_stages = v
+var p_vol: Dictionary:
+	get: return mech.p_vol
+	set(v): mech.p_vol = v
+var e_vol: Dictionary:
+	get: return mech.e_vol
+	set(v): mech.e_vol = v
+var _eff_re: RegEx:
+	get: return mech._eff_re
+	set(v): mech._eff_re = v
 
 var main                    # Main: make_mon / exp_for_level / recompute_stats / heal_party
 var font_tex: Texture2D
 var font_cols: int
 var charmap: Dictionary
-var base_stats: Dictionary
-var moves_db: Dictionary
+var base_stats: Dictionary:
+	get: return mech.base_stats
+	set(v): mech.base_stats = v
+var moves_db: Dictionary:
+	get: return mech.moves_db
+	set(v): mech.moves_db = v
 var rset: Ruleset               # the seam (gh #31, ADR-018): types resolve through it
 
-var party: Array = []
-var active := 0
-var participants: Array = []   # party indices that fought the current enemy (for EXP split)
-var learn_move := ""           # move pending the "delete a move?" prompt
-var player_mon: Dictionary
-var enemy_mon: Dictionary
-var enemy_party: Array = []   # trainer battles: enemy's whole team
-var enemy_active := 0
-var is_trainer := false
-var is_safari := false         # Safari Zone battle: BALL/BAIT/ROCK/RUN, no fighting, the mon may flee
+var party: Array:
+	get: return mech.party
+	set(v): mech.party = v
+var active: int:
+	get: return mech.active
+	set(v): mech.active = v
+var participants: Array:   # party indices that fought the current enemy (for EXP split)
+	get: return mech.participants
+	set(v): mech.participants = v
+var learn_move: String:    # move pending the "delete a move?" prompt
+	get: return mech.learn_move
+	set(v): mech.learn_move = v
+var player_mon: Dictionary:
+	get: return mech.player_mon
+	set(v): mech.player_mon = v
+var enemy_mon: Dictionary:
+	get: return mech.enemy_mon
+	set(v): mech.enemy_mon = v
+var enemy_party: Array:    # trainer battles: enemy's whole team
+	get: return mech.enemy_party
+	set(v): mech.enemy_party = v
+var enemy_active: int:
+	get: return mech.enemy_active
+	set(v): mech.enemy_active = v
+var is_trainer: bool:
+	get: return mech.is_trainer
+	set(v): mech.is_trainer = v
+var is_safari: bool:       # Safari Zone battle: BALL/BAIT/ROCK/RUN, no fighting, the mon may flee
+	get: return mech.is_safari
+	set(v): mech.is_safari = v
 var demo := false              # BATTLE_TYPE_OLD_MAN: the catching tutorial plays itself (no player mon)
 var _demo_ran := false         # the scripted menu keystrokes have fired
-var run_attempts := 0          # wNumRunAttempts: each failed try adds 30 to the next escape roll
+var run_attempts: int:     # wNumRunAttempts: each failed try adds 30 to the next escape roll
+	get: return mech.run_attempts
+	set(v): mech.run_attempts = v
 var _item_scroll := 0          # the battle bag list's scroll window (4 visible)
-var newly_caught := false      # this catch is a first-time species (dex entry shows after)
-var doll_escape := false       # fled via POKé DOLL: wBattleResult stays 0 (the MAROWAK trick)
-# Gen-1 trainer AI (engine/battle/trainer_ai.asm): the class's move-choice modification
-# layers, its item/switch handler, and how many uses it gets per mon (wAICount).
-var ai_mods: Array = []
-var ai_kind := "Generic"
-var ai_count_max := 3
-var _ai_uses := 0
-var _ai_turn := 0              # enemy moves taken (wAILayer2Encouragement)
+var newly_caught: bool:    # this catch is a first-time species (dex entry shows after)
+	get: return mech.newly_caught
+	set(v): mech.newly_caught = v
+var doll_escape: bool:     # fled via POKé DOLL: wBattleResult stays 0 (the MAROWAK trick)
+	get: return mech.doll_escape
+	set(v): mech.doll_escape = v
+# Gen-1 trainer AI (engine/battle/trainer_ai.asm) state lives on the module too.
+var ai_mods: Array:
+	get: return mech.ai_mods
+	set(v): mech.ai_mods = v
+var ai_kind: String:
+	get: return mech.ai_kind
+	set(v): mech.ai_kind = v
+var ai_count_max: int:
+	get: return mech.ai_count_max
+	set(v): mech.ai_count_max = v
+var _ai_uses: int:
+	get: return mech._ai_uses
+	set(v): mech._ai_uses = v
+var _ai_turn: int:         # enemy moves taken (wAILayer2Encouragement)
+	get: return mech._ai_turn
+	set(v): mech._ai_turn = v
 # AIMoveChoiceModification2's effect ranges: [ATTACK_UP1, BIDE) + [ATTACK_UP2, POISON).
 const MOD2_EFFECTS := ["ATTACK_UP1_EFFECT", "DEFENSE_UP1_EFFECT", "SPEED_UP1_EFFECT",
 	"SPECIAL_UP1_EFFECT", "ACCURACY_UP1_EFFECT", "EVASION_UP1_EFFECT", "PAY_DAY_EFFECT",
@@ -71,22 +124,44 @@ const MOD2_EFFECTS := ["ATTACK_UP1_EFFECT", "DEFENSE_UP1_EFFECT", "SPEED_UP1_EFF
 	"HEAL_EFFECT", "TRANSFORM_EFFECT", "ATTACK_DOWN2_EFFECT", "DEFENSE_DOWN2_EFFECT",
 	"SPEED_DOWN2_EFFECT", "SPECIAL_DOWN2_EFFECT", "ACCURACY_DOWN2_EFFECT",
 	"EVASION_DOWN2_EFFECT", "LIGHT_SCREEN_EFFECT", "REFLECT_EFFECT"]
-var ghost := false             # unidentified GHOST (Pokémon Tower, no SILPH SCOPE): can't be fought
-var unveil := false            # the scripted MAROWAK: appears as GHOST until the SILPH SCOPE reveal
+var ghost: bool:           # unidentified GHOST (Pokémon Tower, no SILPH SCOPE): can't be fought
+	get: return mech.ghost
+	set(v): mech.ghost = v
+var unveil: bool:          # the scripted MAROWAK: appears as GHOST until the SILPH SCOPE reveal
+	get: return mech.unveil
+	set(v): mech.unveil = v
 var _ghost_tex: Texture2D      # the GHOST battle pic (gfx/battle/ghost.png)
 var _oldman_tex: Texture2D     # the OLD MAN's back pic (the catching tutorial)
 var _fbe_tex: Texture2D        # condensed glyphs (font_battle_extra)
 var _icons_tex: Texture2D      # party mini icons
 var _icons_map := {}
-var safari_bait := 0           # "eating" counter (less likely to flee)
-var safari_escape := 0         # "angry" counter (more likely to flee)
-var safari_catch := 0          # current (bait/rock-modified) catch rate
-var trainer_name := ""
-var prize := 0
-var won := false              # true once the battle is won (vs blackout)
-var caught := false           # true once the enemy mon is caught (a ball succeeded)
-var blacked_out := false      # true if the player ran out of usable mons
-var no_blackout := false      # story battles (first rival) that heal + continue instead of whiting out
+var safari_bait: int:      # "eating" counter (less likely to flee)
+	get: return mech.safari_bait
+	set(v): mech.safari_bait = v
+var safari_escape: int:    # "angry" counter (more likely to flee)
+	get: return mech.safari_escape
+	set(v): mech.safari_escape = v
+var safari_catch: int:     # current (bait/rock-modified) catch rate
+	get: return mech.safari_catch
+	set(v): mech.safari_catch = v
+var trainer_name: String:
+	get: return mech.trainer_name
+	set(v): mech.trainer_name = v
+var prize: int:
+	get: return mech.prize
+	set(v): mech.prize = v
+var won: bool:             # true once the battle is won (vs blackout)
+	get: return mech.won
+	set(v): mech.won = v
+var caught: bool:          # true once the enemy mon is caught (a ball succeeded)
+	get: return mech.caught
+	set(v): mech.caught = v
+var blacked_out: bool:     # true if the player ran out of usable mons
+	get: return mech.blacked_out
+	set(v): mech.blacked_out = v
+var no_blackout: bool:     # story battles (first rival) that heal + continue instead of whiting out
+	get: return mech.no_blackout
+	set(v): mech.no_blackout = v
 var _flash_who := ""          # "enemy"/"player" sprite currently blinking from a hit
 var _flash_on := true         # false during the blink's off-phase
 var trainer_pic_tex: Texture2D # the opponent's battle pic (trainer battles), shown at intro + defeat
@@ -139,7 +214,9 @@ var _intro_ball_t := 0.0           # ball-throw + mon-grow progress (0..1)
 var _intro_pokeballs := false      # the player party-pokeball bracket is up
 var _intro_enemy_hud := false      # the enemy HUD has appeared
 var _intro_player_hud := false     # the player HUD has appeared
-var _flee_pending := false    # Teleport/Whirlwind used in a wild battle
+var _flee_pending: bool:   # Teleport/Whirlwind used in a wild battle
+	get: return mech._flee_pending
+	set(v): mech._flee_pending = v
 var front_tex: Texture2D
 var back_tex: Texture2D
 var frame_tex: Texture2D        # fancy Gen-1 textbox border for the message / menu boxes
@@ -151,7 +228,9 @@ var _move_swap := -1         # move row "held" by SELECT for reordering (SwapMov
 var _item_swap := -1         # battle-bag row "held" by SELECT (the bag is ITEMLISTMENU in battle too)
 var _mimic_moves: Array = [] # the target's moves offered by MIMIC's pick menu (gh #65)
 var _mimic_slot := 0         # the battle-move slot the picked move lands in (MIMIC's own)
-var can_evolve: Array = []   # party indices that leveled this battle (wCanEvolveFlags, gh #67)
+var can_evolve: Array:     # party indices that leveled this battle (wCanEvolveFlags, gh #67)
+	get: return mech.can_evolve
+	set(v): mech.can_evolve = v
 var menu_items := ["FIGHT", "PKMN", "ITEM", "RUN"]
 const SAFARI_MENU := ["BALL", "BAIT", "ROCK", "RUN"]
 var cursor := 0
@@ -173,21 +252,35 @@ var queue: Array = []
 var after := ""
 
 # ---- determinism oracle (gh #2, ADR-014) -----------------------------------
-# Link battles run deterministic lockstep: both peers simulate the identical battle from a
-# shared seed and exchange only chosen actions, so every battle-LOGIC random draw must come
-# from this battle-local generator — never the global RNG, which the overworld (NPC wander,
-# encounter rolls) advances at frame rate. Each turn appends a canonical event line (turn,
-# both actions, the RNG cursor, a state digest) to `det_stream`; byte-equality of two peers'
-# streams is the DEFINITION of "in sync" (ADR-014). Verified by --battledettest.
-var rng := RandomNumberGenerator.new()
-var rng_cursor := 0            # logic draws since battle start (the lockstep "RNG cursor")
-var battle_seed := 0           # this battle's seed (a link session fixes it at establishment)
-var next_seed := -1            # set before start*() to force the seed (tests/link); -1 = derive
-var det_stream: Array = []     # canonical event lines (docs/engine/battle.md "Determinism")
-var det_log := false           # echo events to stdout as [battledet] lines (the link soak reads logs)
-var turn_no := 0
-var _det_paction := "-"        # the player action driving the current turn, canonical form
-var _det_eaction := "-"        # the enemy action (in a link battle: the peer's choice)
+# The battle-local RNG + canonical event stream live on the module (gh #33); the full
+# rationale rides with the state in Gen1Battle.gd. Verified by --battledettest.
+var rng: RandomNumberGenerator:
+	get: return mech.rng
+	set(v): mech.rng = v
+var rng_cursor: int:       # logic draws since battle start (the lockstep "RNG cursor")
+	get: return mech.rng_cursor
+	set(v): mech.rng_cursor = v
+var battle_seed: int:      # this battle's seed (a link session fixes it at establishment)
+	get: return mech.battle_seed
+	set(v): mech.battle_seed = v
+var next_seed: int:        # set before start*() to force the seed (tests/link); -1 = derive
+	get: return mech.next_seed
+	set(v): mech.next_seed = v
+var det_stream: Array:     # canonical event lines (docs/engine/battle.md "Determinism")
+	get: return mech.det_stream
+	set(v): mech.det_stream = v
+var det_log: bool:         # echo events to stdout as [battledet] lines (the link soak reads logs)
+	get: return mech.det_log
+	set(v): mech.det_log = v
+var turn_no: int:
+	get: return mech.turn_no
+	set(v): mech.turn_no = v
+var _det_paction: String:  # the player action driving the current turn, canonical form
+	get: return mech._det_paction
+	set(v): mech._det_paction = v
+var _det_eaction: String:  # the enemy action (in a link battle: the peer's choice)
+	get: return mech._det_eaction
+	set(v): mech._det_eaction = v
 
 # ---- link battle (gh #7, ADR-014): deterministic lockstep ------------------
 # Both peers run the FULL simulation, each with itself as the "player" side (mirrored, as
@@ -199,18 +292,42 @@ var _det_eaction := "-"        # the enemy action (in a link battle: the peer's 
 # mirrored sims order the same tie the same way. For the lockstep oracle, event lines are
 # emitted in host/join labels (h[]/j[]) and the digest orders the host's side first on both
 # peers, so byte-equality of the two streams remains the definition of "in sync".
-var link_battle := false
-var link_host := false
-var peer_name := ""            # the partner's player name (their trainer label)
-var link_actions: Array = []   # the peer's col_act actions, in turn order (fed by Cutscene)
-var link_swaps: Array = []     # the peer's col_swap faint replacements, in order
-var _link_wait := ""           # "" | "act" (their turn action) | "swap" (their replacement)
-var _link_pact := {}           # our pending action while waiting for theirs
-var _link_pact_turn := -1      # the turn it was submitted for (gh #13: resume retransmit)
-var _link_lswap := -1          # our last faint replacement sent as col_swap, and its turn
-var _link_lswap_turn := -1
-var _link_elapsed := 0.0
-var link_over := false         # set when the link died mid-battle (stakeless end)
+var link_battle: bool:
+	get: return mech.link_battle
+	set(v): mech.link_battle = v
+var link_host: bool:
+	get: return mech.link_host
+	set(v): mech.link_host = v
+var peer_name: String:     # the partner's player name (their trainer label)
+	get: return mech.peer_name
+	set(v): mech.peer_name = v
+var link_actions: Array:   # the peer's col_act actions, in turn order (fed by Cutscene)
+	get: return mech.link_actions
+	set(v): mech.link_actions = v
+var link_swaps: Array:     # the peer's col_swap faint replacements, in order
+	get: return mech.link_swaps
+	set(v): mech.link_swaps = v
+var _link_wait: String:    # "" | "act" (their turn action) | "swap" (their replacement)
+	get: return mech._link_wait
+	set(v): mech._link_wait = v
+var _link_pact: Dictionary:    # our pending action while waiting for theirs
+	get: return mech._link_pact
+	set(v): mech._link_pact = v
+var _link_pact_turn: int:  # the turn it was submitted for (gh #13: resume retransmit)
+	get: return mech._link_pact_turn
+	set(v): mech._link_pact_turn = v
+var _link_lswap: int:      # our last faint replacement sent as col_swap, and its turn
+	get: return mech._link_lswap
+	set(v): mech._link_lswap = v
+var _link_lswap_turn: int:
+	get: return mech._link_lswap_turn
+	set(v): mech._link_lswap_turn = v
+var _link_elapsed: float:
+	get: return mech._link_elapsed
+	set(v): mech._link_elapsed = v
+var link_over: bool:       # set when the link died mid-battle (stakeless end)
+	get: return mech.link_over
+	set(v): mech.link_over = v
 
 
 ## Battle-logic random draws (the ONLY randomness battle rules may use): each advances the
@@ -311,6 +428,9 @@ func _det_action(action: Dictionary) -> String:
 
 
 func setup(ftex: Texture2D, cols: int, cmap: Dictionary, base: Dictionary, mdb: Dictionary, rs: Ruleset) -> void:
+	rset = rs
+	mech = rset.battle          # gh #33: the battle module owns the state; bind it first
+	mech.bind(self)
 	font_tex = ftex
 	font_cols = cols
 	charmap = cmap
@@ -337,7 +457,6 @@ func setup(ftex: Texture2D, cols: int, cmap: Dictionary, base: Dictionary, mdb: 
 			_manim_tex[str(ts["img"])] = load("res://assets/%s.png" % str(ts["img"]))
 	base_stats = base
 	moves_db = mdb
-	rset = rs
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_eff_re.compile("^([A-Z]+)_(UP|DOWN)([12])_EFFECT$")

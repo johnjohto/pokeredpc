@@ -7,3 +7,9 @@ class_name RulesetBattle
 ## until a second sample demands one. gh #33 migrates turn structure, action order,
 ## status + residuals, forced moves, and the AI behind this interface, pinning the
 ## method signatures as they land (link battles run through the seam on both peers).
+
+
+## Attach the module to its host: the presentation/message-pump object whose event
+## queue the mechanics feed. Called once at engine setup.
+func bind(_host) -> void:
+	push_error("[ruleset] RulesetBattle.bind not implemented")
