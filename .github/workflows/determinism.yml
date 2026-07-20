@@ -52,6 +52,12 @@ jobs:
       - name: Extract assets
         run: python3 tools/extract.py
 
+      - name: Project identity (gh #23 — JSON parts must be byte-equal across OSes)
+        # The `assets` part hashes PIL-encoded PNGs and may vary with the Pillow
+        # version; every JSON part (species/moves/types/... incl. the link-identity
+        # subset) must match the Windows baseline exactly.
+        run: python3 -c "import json; print(json.dumps(json.load(open('game/project/manifest.json'))['identity'], indent=1, sort_keys=True))"
+
       - name: Import pass (headless editor)
         # May exit non-zero on shutdown; harmless as long as the import completes.
         run: '"${{ matrix.godot_bin }}" --headless --editor --quit --path game || true'

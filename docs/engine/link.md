@@ -46,9 +46,16 @@ is a refusal that **names the differing part**: the refuser logs `[link] REFUSED
 ```
 { "version": <application/config/version>,
   "engine":  <Engine.get_version_info().string>,
-  "parts":   { "base_stats": md5, "moves": md5, "types": md5 },
+  "parts":   { "species": md5, "moves": md5, "types": md5 },
   "flags":   { "dupe": bool } }
 ```
+
+Since gh #23 the link manifest is a **derived view of the project identity**
+(`manifest.identity` in the emitted project, gh #24): `build_link_manifest` re-emits the
+lockstep-relevant subset — `species` (the consolidated project record; the pre-v2 part was
+named `base_stats`), `moves`, `types` — from the same per-part hashes, so link refusals and
+project identity can never drift apart. One identity, computed once, over canonical bytes
+(cross-OS by construction).
 
 - **Version** is the exact game version — no cross-version link compatibility (spec).
 - **Engine** is the exact Godot build (gh #12): the two peers run the same sim on different

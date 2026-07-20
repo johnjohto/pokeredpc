@@ -5635,7 +5635,7 @@ func _has_join_arg(args: Array) -> bool:
 ## Link.gd raises the session (link identity handshake: exact version + the extraction
 ## manifest's content hashes), then the host sends a ping, the joiner answers pong, and both
 ## quit — `tools/linktest.py` launches a pair and asserts both logs. `--tamper=version`,
-## `--tamper=engine`, or `--tamper=<part>` (base_stats/moves/types) corrupts this side's
+## `--tamper=engine`, or `--tamper=<part>` (species/moves/types) corrupts this side's
 ## identity so the refusal path can be driven; `--linktimeout=N` shortens the no-partner
 ## timeout for tests.
 func _linktest(hosting: bool) -> void:

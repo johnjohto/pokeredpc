@@ -75,7 +75,7 @@
    "kind": "table"
   },
   {
-   "path": "presentation/*.json",
+   "path": "presentation/**",
    "schema": "blob",
    "kind": "blob"
   },

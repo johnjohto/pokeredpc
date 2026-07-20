@@ -1568,27 +1568,20 @@ def parse_script_text():
     return text_ptrs, resolved, direct
 
 
-def build_link_manifest():
-    """gh #3 (ADR-014 link identity): hash the link-relevant extracted data at extraction
-    time, so two peers can compare identities in one handshake instead of re-deriving (or
-    silently drifting into an undebuggable mid-battle desync). Parts are the tables both
-    engines must agree on to simulate the identical battle / speak the same mon record:
-    species (base stats + growth + evolutions + learnsets), moves, and the type chart.
-    The per-part hashes let a refusal name WHICH part differs; content_hash is the md5 of
-    the part hashes joined in sorted part order."""
+def build_link_manifest(identity_parts):
+    """gh #3 (ADR-014 link identity), rebased on the project identity (gh #23): the link
+    manifest is now a DERIVED VIEW of manifest.identity — the lockstep-relevant subset
+    (species, moves, types: the tables both engines must agree on to simulate the
+    identical battle / speak the same mon record; `species` is the consolidated project
+    record, a superset of the old base_stats part). One identity computed once, so link
+    refusals and project identity can never drift apart. The per-part hashes let a
+    refusal name WHICH part differs; content_hash is the md5 of the part hashes joined
+    in sorted part order (the same rule as the project content_hash). schema 2 = parts
+    renamed base_stats->species; Link.gd compares parts generically, so no engine change."""
     import hashlib
-    part_files = {
-        "base_stats": OUT / "pokemon" / "base_stats.json",
-        "moves": OUT / "moves.json",
-        "types": OUT / "types.json",
-    }
-    parts = {}
-    for name, path in sorted(part_files.items()):
-        # Normalize newlines before hashing: text-mode json.dump writes CRLF on Windows and
-        # LF elsewhere, and a Windows<->Linux pair must not refuse over line endings.
-        parts[name] = hashlib.md5(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
+    parts = {k: identity_parts[k] for k in ("species", "moves", "types")}
     content = hashlib.md5("".join(parts[k] for k in sorted(parts)).encode()).hexdigest()
-    json.dump({"schema": 1, "parts": parts, "content_hash": content},
+    json.dump({"schema": 2, "parts": parts, "content_hash": content},
               open(OUT / "link_manifest.json", "w"), indent=1)
     print(f"link manifest: {len(parts)} parts, content_hash={content}")
 
@@ -2250,9 +2243,6 @@ def build_project():
     trainers, pics = J("trainers.json"), J("trainer_pics.json")
     types = J("types.json")
 
-    version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
-    _pj_write("manifest.json", {"format": 1, "id": "kanto", "name": "Pokémon Red (Kanto)",
-                                "version": version, "ruleset": "gen1"})
     # Keep Godot's importer out of the project tree (the runtime reads it via raw
     # FileAccess/Image.load_from_file, not imported resources); dotfiles are outside
     # the format walk.
@@ -2372,10 +2362,15 @@ def build_project():
     presentation = ["audio.json", "sfx.json", "charmap.json", "credits.json",
                     "dungeon_maps.json", "map_music.json", "move_anims.json",
                     "spinners.json", "title_intro.json", "title_mons.json",
-                    "town_map.json", "trade_gfx.json", "warp_rules.json"]
-    (PROJ / "presentation").mkdir(parents=True, exist_ok=True)
+                    "town_map.json", "trade_gfx.json", "warp_rules.json",
+                    # subdir metadata the runtime also loads (kept at their v1
+                    # relative paths): sprite sheet index, per-tileset collision
+                    "sprites/index.json"] + \
+                   [f"tilesets/{f.name}" for f in sorted((OUT / "tilesets").glob("*.json"))]
     for name in presentation:
-        shutil.copyfile(OUT / name, PROJ / "presentation" / name)
+        dest = PROJ / "presentation" / name
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(OUT / name, dest)
 
     # every binary asset, tree preserved (species sprite paths point in here)
     n_assets = 0
@@ -2387,9 +2382,50 @@ def build_project():
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(f, dest)
         n_assets += 1
+    # --- identity (gh #23, ADR-017): per-part hashes over the emitted canonical bytes,
+    # written into the manifest LAST (the manifest holds the hashes, so it is excluded).
+    # Each part = md5 over (relpath + LF + bytes) of its files in sorted-path order;
+    # content_hash = md5 of the part hashes joined in sorted part order (the
+    # link-manifest rule, generalized). NOTE: the `assets` part hashes PIL-encoded PNG
+    # bytes, which can vary across Pillow versions — the cross-OS equality gate covers
+    # the JSON parts; link identity uses only species/moves/types (all JSON).
+    import hashlib
+    groups = {}
+    for f in sorted(PROJ.rglob("*")):
+        if f.is_dir() or f.name.startswith("."):
+            continue
+        rel = f.relative_to(PROJ).as_posix()
+        if rel == "manifest.json":
+            continue
+        if rel.startswith("data/species/"):
+            g = "species"
+        elif rel.startswith("data/moves/"):
+            g = "moves"
+        elif rel.startswith("data/items/"):
+            g = "items"
+        elif rel.startswith("data/trainers/"):
+            g = "trainers"
+        elif rel.startswith("maps/"):
+            g = "maps"
+        elif rel.startswith("presentation/"):
+            g = "presentation"
+        elif rel.startswith("assets/"):
+            g = "assets"
+        else:
+            g = f.stem                              # data/types.json -> "types", ...
+        h = groups.setdefault(g, hashlib.md5())
+        h.update(rel.encode() + b"\n" + f.read_bytes())
+    parts = {g: h.hexdigest() for g, h in groups.items()}
+    content = hashlib.md5("".join(parts[k] for k in sorted(parts)).encode()).hexdigest()
+    version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
+    _pj_write("manifest.json", {"format": 1, "id": "kanto", "name": "Pokémon Red (Kanto)",
+                                "version": version, "ruleset": "gen1",
+                                "identity": {"parts": parts, "content_hash": content}})
     print(f"project: {len(base)} species, {len(moves)} moves, {len(items)} items, "
           f"{len(trainers)} trainers, {len(list((PROJ / 'maps').glob('*.json')))} maps, "
           f"{n_assets} assets -> {PROJ}")
+    print(f"project identity: {len(parts)} parts, content_hash={content}")
+    return parts
 
 
 def main():
@@ -2411,7 +2447,6 @@ def main():
     build_dex()
     build_marts()
     build_battle()
-    build_link_manifest()
     build_trades()
     extract_trade_gfx()
     build_title()
@@ -2426,7 +2461,8 @@ def main():
     build_audio()
     const_to_label = build_maps(const_to_slug)
     build_hidden_items(const_to_label)
-    build_project()
+    identity_parts = build_project()
+    build_link_manifest(identity_parts)     # the link identity is a view of the project's
     size = render_map_preview("overworld", "PalletTown", PREVIEW / "PalletTown.png")
     print(f"preview PalletTown: {size[0]}x{size[1]}px")
 
