@@ -8,6 +8,24 @@ milestones, `PATCH` bumps are fixes/polish. See `docs/roadmap.md` for the live p
 
 ## [Unreleased]
 
+### Added
+- **Cross-platform link, verified** (gh #12): the **engine build joins link identity** —
+  `Engine.get_version_info().string` travels in the handshake `hello`, and a differing Godot
+  build refuses naming both builds (Godot's RNG and float behavior are only guaranteed
+  identical for the identical release; cross-OS builds of one release share the string —
+  `--tamper=engine` + a new `linktest.py` scenario drive the refusal). The **toolchain runs
+  on Linux/macOS**: `build.ps1`/`run.ps1` and the link test drivers resolve the per-OS Godot
+  4.7 binary (`POKEREDPC_GODOT` overrides) and Godot's per-OS user-data dir, and
+  `docs/guides/build-and-run.md` documents the other-platforms setup (no exported builds by
+  design — each player builds from source). **Cross-OS determinism proven**: the dispatchable
+  `determinism` GitHub workflow builds the project from scratch on Linux + macOS runners, and
+  both produce battle event streams **byte-identical to the Windows baseline** (all four
+  `--battledettest` stream md5s equal), with `linktest.py` (incl. the trade round-trip read
+  back from both saves) and `linksoak.py` (8/8 in sync) ALL GREEN on each. The save/journal
+  code was audited for platform-dependent path/newline handling: none exists (`user://` +
+  single-line JSON throughout). Remaining on gh #12: one live two-machine Windows↔Linux
+  session — the cross-OS analogue of the v1.1 Stage-2 human session.
+
 ## [1.1.0] - 2026-07-20
 
 **Multiplayer.** The faithful Cable Club — link trades and link battles between two

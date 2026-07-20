@@ -26,8 +26,15 @@ at zero open bugs. **v1.1.0 — SHIPPED 2026-07-20**: the faithful Cable Club (l
 lockstep link battles) built and gated in two days — Stage 1 (the automated `linktest` /
 `linksoak` / `linkdrop` suites, byte-identical lockstep streams across real instances) and
 Stage 2 (a real remote human session, 2026-07-19: trades incl. trade evolutions, battles
-both directions, genuine disconnects) both closed. Remaining multiplayer follow-ups: gh #12
-(cross-platform), gh #13 (session resume). **Next: v2** (the fan-game toolkit, ADR-013). The work is
+both directions, genuine disconnects) both closed. Remaining multiplayer follow-ups: gh #13
+(session resume), and the last mile of gh #12 (cross-platform), whose automatable half closed
+2026-07-20: the engine build joined link identity (a differing Godot build refuses naming both
+builds), the toolchain runs per-OS (`POKEREDPC_GODOT`, per-OS user dirs, Linux/macOS setup in
+build-and-run.md), and the dispatchable **`determinism` workflow** built the project from
+scratch on Linux + macOS GitHub runners — both produced battle streams **byte-identical to the
+Windows baseline** (all four `--battledettest` md5s equal) with `linktest.py` + `linksoak.py`
+ALL GREEN on each; what remains is one live two-machine Windows↔Linux session
+(ready-for-human). **Next: v2** (the fan-game toolkit, ADR-013). The work is
 broken down as gh #1 (spec) with sub-issues #2–#10. **Landed: gh #2 — the battle determinism
 oracle** (2026-07-19): every battle-logic random draw now comes from a battle-local seeded RNG
 (never the frame-paced global RNG), each battle emits a canonical per-turn event stream (turn,
