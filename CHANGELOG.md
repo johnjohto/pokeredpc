@@ -9,9 +9,16 @@ milestones, `PATCH` bumps are fixes/polish. See `docs/roadmap.md` for the live p
 ## [Unreleased]
 
 ### Fixed
-- **Two latent navigator traps on the road to Blaine** (gh #27), surfaced by the v2 Phase-1
-  gate — the first full seeded bot run since v1.1 shipped, and neither is project fallout
-  (both reproduce on the pre-flip build). **Route 7:** gh #149 made a warp set into a solid
+- **Three latent navigator traps on the road to the Champion** (gh #27), surfaced by the v2
+  Phase-1 gate — the first full seeded bot run since v1.1 shipped, and none is project
+  fallout (all reproduce on the pre-flip build). **FLY:** the bot pressed a key *and* called
+  the modal's `handle_input()` itself, but `Player._process` already dispatches there every
+  frame — so the Town Map cursor advanced twice per press, the FLY cycle only visited
+  same-parity entries, and a town on the other parity (Viridian, from Cinnabar) was
+  unreachable forever inside an unbounded loop: 54 CPU-minutes of silence. Flying home to
+  Pallet hid it completely, because Pallet is the cursor's own starting entry. Modals are
+  now driven through the real input path (`_pt_press_modal`), and the loop is bounded and
+  fails loudly. **Route 7:** gh #149 made a warp set into a solid
   tile (a gate door in a wall) enterable only from the side that fires it, enforced in the
   step but never modeled by the planner, so every plan west routed through the door and
   every step bumped. **Cinnabar:** the locked Gym door answers a step with a face-up, "The

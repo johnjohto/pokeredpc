@@ -69,10 +69,18 @@ boot (`--project=<dir>`; refuse-newer manifest gate) and rebuilds every v1-shape
 `res://assets`. Proven by the new **`--projparitytest`** (every table + all 223 maps deep-equal
 vs the legacy files) *and* by `--battledettest`, which caught what parity structurally cannot:
 **dict iteration order is behavior** (Metronome/Mimic pick over the move table's order), so
-move/item/trainer records carry **`num`**, the canonical Gen-1 table index. The phase gate's
-full bot run also surfaced **gh #27** — two latent navigator traps (Route 7's solid gate door
-unmodeled by the planner; Cinnabar's locked-Gym push-back reading as *progress*, burning a whole
-walk budget in silence), both latent since v1.1, both fixed. (The *v1.1* work had been broken down as
+move/item/trainer records carry **`num`**, the canonical Gen-1 table index. **Phase 1 closed on component
+evidence, not the end-to-end run** — see below. The gate run surfaced **gh #27**, three latent
+navigator traps, all pre-existing since v1.1 and all fixed: Route 7's solid gate door unmodeled
+by the planner; Cinnabar's locked-Gym push-back reading as *progress* (burning a whole walk
+budget in silence); and the FLY cursor **double-stepping** — `Player._process` already dispatches
+to `modal.handle_input()`, so the bot's own extra call advanced the Town Map cursor twice per
+press, making a town on the other parity unreachable forever inside an unbounded loop (54 CPU
+minutes, zero output; flying home to Pallet hid it because Pallet is the cursor's own start).
+The bot now reaches **all eight badges** and Victory Road's door, where it fails on the 1F
+boulder shove — **gh #28**, filed, also pre-existing (`--victorytest` passes standalone). So the
+**ADR-011 Stage-1 artifact (NEW GAME → HALL OF FAME) is currently RED for v1-side reasons**;
+gh #28 is what re-earns it. (The *v1.1* work had been broken down as
 gh #1 (spec) with sub-issues #2–#10.) **Landed: gh #2 — the battle determinism
 oracle** (2026-07-19): every battle-logic random draw now comes from a battle-local seeded RNG
 (never the frame-paced global RNG), each battle emits a canonical per-turn event stream (turn,
