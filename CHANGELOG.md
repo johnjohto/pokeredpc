@@ -8,6 +8,16 @@ milestones, `PATCH` bumps are fixes/polish. See `docs/roadmap.md` for the live p
 
 ## [Unreleased]
 
+### Fixed
+- **The link-battle item refusal is faithful, not a divergence** (correction to the 1.1.0
+  notes + ADR-015). Those docs claimed the cartridge allows items in link battles and framed
+  the port's refusal as a documented divergence — but `core.asm`'s BagWasSelected guard
+  (`LINK_STATE_BATTLING` → `ItemsCantBeUsedHereText`) refuses them on cartridge too. The port
+  now mirrors the asm exactly: selecting ITEM in a link battle prints "Items can't be used
+  here." and returns to the battle menu without opening the bag (previously it opened the bag
+  and refused on use, with invented text). Only link MIMIC's deterministic pick remains a
+  documented divergence.
+
 ### Added
 - **Cross-platform link, verified** (gh #12): the **engine build joins link identity** —
   `Engine.get_version_info().string` travels in the handshake `hello`, and a differing Godot

@@ -1164,6 +1164,12 @@ func _choose_action() -> void:
 		"PKMN":
 			state = "party"; cursor = active; queue_redraw()
 		"ITEM":
+			if link_battle:
+				# Faithful: the cartridge refuses items in link battles at menu selection —
+				# the bag never opens (core.asm BagWasSelected's LINK_STATE_BATTLING guard,
+				# ItemsCantBeUsedHereText) — and so does every Gen-1 link battle ever fought.
+				_say(["Items can't be\nused here."], "menu")
+				return
 			bag_keys = main.player_bag.keys()
 			if bag_keys.is_empty():
 				_say(["You have no\nitems!"], "menu")
@@ -1315,10 +1321,9 @@ func _consume(item: String) -> void:
 
 func _use_item(item: String) -> void:
 	if link_battle:
-		# v1.1 divergence, documented: the cartridge allows items in link battles; the
-		# lockstep port refuses them for now (the enemy-side application of every bag item
-		# is a later faithfulness pass). Both sims refuse identically — no desync surface.
-		_say(["Items can't be\nused in a link\nbattle!"], "menu")
+		# Unreachable via the UI (the ITEM menu entry refuses first, as the asm does);
+		# kept so a scripted driver calling _use_item directly can't open a desync surface.
+		_say(["Items can't be\nused here."], "menu")
 		return
 	if not demo and int(main.player_bag.get(item, 0)) <= 0:
 		return                                    # (the old man throws his own ball)

@@ -29,8 +29,9 @@ journal phases: `acked`+`acked` → both apply, `acked`+`ready` → roll the rea
 relaunch-only:** resume reconciles honestly even for opted-in sessions — the glitch keeps its
 faithful power-cut ritual (kill the game in the ack window and relaunch), and a lag spike can
 never fork a mon. (6) **Ships as v1.2.0** (a player-visible capability + a new protocol surface
-= a feature milestone), with the milestone kept pure: ADR-015's parked faithfulness pair
-(items in link battles, link MIMIC's real pick menu) stays parked. **The gate is the house
+= a feature milestone), with the milestone kept pure: ADR-015's parked faithfulness item
+(link MIMIC's real pick menu; the items half of the pair turned out to be faithful already —
+see the ADR-015 correction) stays parked. **The gate is the house
 two-stage:** Stage 1 — a `--blipat` injection mode that resets the ENet connection *without*
 killing the process, scripted across mid-battle turns, every trade phase, and the ack window,
 plus a blip-soak, asserting resume + byte-identical streams and every commit-phase case ending
@@ -61,7 +62,10 @@ implemented as a deliberate `acked`-rollback under mutual opt-in; an asymmetric 
 session. (4) **Two documented divergences** keep both sims trivially identical until a later faithfulness
 pass: items are refused in link battles (the cartridge allows them; enemy-side application of every bag
 item is deferred), and link MIMIC copies a deterministic random technique (a mid-turn menu pick can't
-cross the wire mid-resolution). (5) **Human-paced waits are liveness-bound** — only machine-paced protocol
+cross the wire mid-resolution). *[Correction 2026-07-20: the items half was wrong — the cartridge
+refuses items in link battles too (`core.asm` BagWasSelected's `LINK_STATE_BATTLING` guard,
+`ItemsCantBeUsedHereText`), so the refusal is faithful, not a divergence; the port now refuses at
+menu selection with the faithful text. Only the MIMIC pick remains a documented divergence.]* (5) **Human-paced waits are liveness-bound** — only machine-paced protocol
 replies keep timers, and a machine timeout actively closes the link; a friend thinking for a minute is the
 game working, not a drop (the first playtest's "frequent disconnects" were a 30 s timer).
 **Consequences:** the desync soak (gh #8) validates the whole construction at volume (its first battery

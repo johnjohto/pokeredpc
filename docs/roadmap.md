@@ -85,7 +85,9 @@ canonically ("heads = host first"), and the event stream is role-canonical — t
 `linktest.py` colosseum scenario asserts **byte-identical `[battledet]` streams across two
 real networked instances** (ADR-014's definition of "in sync"), agreeing winners, and
 restored parties. Non-link battles untouched (`--battledettest` md5s unchanged).
-Documented divergences: no items in link battles, link MIMIC picks deterministically.
+Documented divergence: link MIMIC picks deterministically (the item refusal in link battles
+turned out to be the cartridge's own rule — core.asm's BagWasSelected guard — so it is
+faithful, not a divergence; corrected 2026-07-20).
 **Landed: gh #8 — the desync soak** (2026-07-19): `python tools/linksoak.py` runs a
 configurable battery of seeded two-instance link battles over the `--colsoak` fast path —
 six varied parties (status/locks/multi-hit/crit/confusion/Transform/Mimic/Metronome/REST,

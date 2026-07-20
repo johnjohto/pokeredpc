@@ -169,11 +169,13 @@ special cases):
   signal usually lands mid-flow, where only the message shows). Session **resume** into an
   interrupted trade/battle is gh #13.
 
-**Documented v1.1 divergences** (each refused/handled identically on both sims, so no
-desync surface): items can't be used in a link battle (the cartridge allows them; the
-enemy-side application of every bag item is a later faithfulness pass), and a link-battle
-MIMIC copies a deterministic random technique on both sims instead of opening the mid-turn
-pick menu (a menu choice can't cross the wire mid-resolution).
+**Documented v1.1 divergence** (handled identically on both sims, so no desync surface): a
+link-battle MIMIC copies a deterministic random technique on both sims instead of opening
+the mid-turn pick menu (a menu choice can't cross the wire mid-resolution). Not a
+divergence — despite what this doc claimed before 2026-07-20 — is the item refusal: the
+cartridge itself refuses items in link battles at menu selection (`core.asm`
+BagWasSelected's `LINK_STATE_BATTLING` guard → "Items can't be used here.", the bag never
+opens), and the port now mirrors that exactly.
 
 ## The desync soak (gh #8) — Stage 1 of the 1.1 gate
 
