@@ -38,7 +38,7 @@ var font_cols: int
 var charmap: Dictionary
 var base_stats: Dictionary
 var moves_db: Dictionary
-var type_chart: Dictionary
+var rset: Ruleset               # the seam (gh #31, ADR-018): types resolve through it
 
 var party: Array = []
 var active := 0
@@ -312,7 +312,7 @@ func _det_action(action: Dictionary) -> String:
 	return "m:" + str(player_mon["moves"][int(action["idx"])]["move"])
 
 
-func setup(ftex: Texture2D, cols: int, cmap: Dictionary, base: Dictionary, mdb: Dictionary, tchart: Dictionary) -> void:
+func setup(ftex: Texture2D, cols: int, cmap: Dictionary, base: Dictionary, mdb: Dictionary, rs: Ruleset) -> void:
 	font_tex = ftex
 	font_cols = cols
 	charmap = cmap
@@ -339,7 +339,7 @@ func setup(ftex: Texture2D, cols: int, cmap: Dictionary, base: Dictionary, mdb: 
 			_manim_tex[str(ts["img"])] = load("res://assets/%s.png" % str(ts["img"]))
 	base_stats = base
 	moves_db = mdb
-	type_chart = tchart
+	rset = rs
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_eff_re.compile("^([A-Z]+)_(UP|DOWN)([12])_EFFECT$")
@@ -1941,7 +1941,7 @@ func _enemy_choose() -> String:
 ## A dual-type pairing reads as whichever entry comes first in table order (ELECTRIC into
 ## WATER/FLYING reads 2x, not the real 4x), and no match reads neutral.
 func _ai_eff(move: String) -> float:
-	var row: Dictionary = type_chart.get(str(moves_db.get(move, {}).get("type", "")), {})
+	var row: Dictionary = rset.types.row(str(moves_db.get(move, {}).get("type", "")))
 	for dt in row:
 		if str(player_mon["types"][0]) == dt or str(player_mon["types"][1]) == dt:
 			return float(row[dt])
@@ -2604,7 +2604,7 @@ func _calc_hit(att: Dictionary, defn: Dictionary, md: Dictionary, att_st: Dictio
 	if str(md["type"]) in att["types"]:
 		dmg += int(dmg / 2)
 	var eff := 1.0
-	var row: Dictionary = type_chart.get(str(md["type"]), {})
+	var row: Dictionary = rset.types.row(str(md["type"]))
 	for dt in row:
 		if str(defn["types"][0]) == dt or str(defn["types"][1]) == dt:
 			var mult := float(row[dt])
@@ -2627,16 +2627,10 @@ func _stage_apply(base: int, stage: int) -> int:
 	return clampi(int(base * _STAGE_NUM[clampi(stage, -6, 6)] / 100), 1, 999)
 
 
-## The type multiplier exactly as AdjustDamageForMoveType composes it: each TypeEffects table
-## entry for the move's type fires ONCE if it matches either defender type — a pure-type mon
-## (stored TYPE,TYPE) is not double-counted (gh #176 phase 2).
+## The composed type multiplier, through the ruleset seam (gh #31) — the Gen-1 algorithm
+## (AdjustDamageForMoveType's single-fire per table entry) lives in Gen1Types now.
 func _type_eff(move_type: String, def_types: Array) -> float:
-	var e := 1.0
-	var row: Dictionary = type_chart.get(move_type, {})
-	for dt in row:
-		if str(def_types[0]) == dt or str(def_types[1]) == dt:
-			e *= float(row[dt])
-	return e
+	return rset.types.eff(move_type, def_types)
 
 
 ## Apply damage to a mon, routed to its SUBSTITUTE first if one is up.
@@ -2932,7 +2926,7 @@ func _has_usable_move(mon: Dictionary, vol: Dictionary) -> bool:
 
 
 func _type_mult(atk_type: String, def_type: String) -> float:
-	return float(type_chart.get(atk_type, {}).get(def_type, 1.0))
+	return rset.types.mult(atk_type, def_type)
 
 
 # ---- status conditions -----------------------------------------------------

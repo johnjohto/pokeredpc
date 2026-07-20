@@ -63,6 +63,15 @@ equivalence sweep; config-first knobs are **only what is already data** (`data/r
 additive under `format: 1`); extraction is strangler-fig with `--battledettest` between every
 move. Sub-issues **gh #31–#35** (interfaces+registry → types+formulas → battle+link →
 catch/progression/config → expression evaluator, which carries the phase gate).
+**Landed: gh #31** (2026-07-20): the seam exists — `game/core/ruleset/` (the five interface
+classes + `RulesetRegistry`, which now actually consumes the manifest's `ruleset` field: boot
+refuses an unknown name naming both sides) and `game/rulesets/gen1/`, with **Types routed
+through the seam as the tracer bullet** (`Gen1Types` owns the chart verbatim — `eff`/`mult`/
+`row`, the table-ordered row accessor the damage loop's per-entry floors need; `type_chart`
+left `Battle.gd` entirely). Verified by the new `--rulesettest` (registry + refusal + a
+3375-combo cross-product equivalence vs the raw chart) with the oracle clean: all four
+`--battledettest` md5s byte-identical to the pre-phase baseline, `--selftest` /
+`--projparitytest` green, `linktest.py` ALL GREEN (lockstep still byte-identical).
 **Landed: gh #22**
 (2026-07-20): `core/schemas/` (JSON Schema per content type + the `format.json` layout
 contract), `CoreSchema` (a subset validator that errors on unknown keywords) and

@@ -127,6 +127,7 @@ var townmap                                 # TOWN MAP viewer modal
 var townmap_start: Dictionary = {}          # map label -> town-map cycle index
 var mon_base: Dictionary = {}
 var mon_moves: Dictionary = {}
+var ruleset: Ruleset = null          # resolved from the manifest at boot (gh #31, ADR-018)
 var move_sfx: Dictionary = {}        # MOVE_CONST -> [sfx_key, pitch] (MoveSoundTable)
 var credits_pages: Array = []        # end-credits pages (lists of staff text lines)
 var audio
@@ -323,6 +324,18 @@ func _ready() -> void:
 		print("[project] FATAL: " + perr)
 		get_tree().quit(1)
 		return
+	# gh #31 (ADR-018): resolve the project's ruleset through the registry — an unknown
+	# name refuses at boot naming both sides (the refuse-newer pattern for mechanics).
+	var rs_id := str(ProjectData.manifest.get("ruleset", ""))
+	ruleset = RulesetRegistry.resolve(rs_id)
+	if ruleset == null:
+		var rerr := "project asks for ruleset '%s'; this build knows: %s" % [
+			rs_id, RulesetRegistry.known()]
+		push_error("[ruleset] " + rerr)
+		print("[ruleset] FATAL: " + rerr)
+		get_tree().quit(1)
+		return
+	ruleset.configure()
 	sprite_index = ProjectData.legacy("sprites/index.json")
 	text_data = ProjectData.legacy("text.json")
 	var ui := CanvasLayer.new()
@@ -393,7 +406,7 @@ func _ready() -> void:
 	move_sfx = ProjectData.legacy("move_sfx.json")
 	battle = preload("res://scripts/Battle.gd").new()
 	ui.add_child(battle)
-	battle.setup(ft, fcols, cmap, mon_base, mon_moves, ProjectData.legacy("types.json"))
+	battle.setup(ft, fcols, cmap, mon_base, mon_moves, ruleset)
 	battle.main = self
 	battle.finished.connect(_on_battle_finished)
 	link = preload("res://scripts/Link.gd").new()
@@ -602,6 +615,8 @@ func _ready() -> void:
 		_schematest()
 	elif "--projparitytest" in args:
 		_projparitytest()
+	elif "--rulesettest" in args:
+		_rulesettest()
 	elif _validate_dir_arg(args) != "":
 		_validateproject(_validate_dir_arg(args))
 	elif "--recovertest" in args:
@@ -5091,6 +5106,63 @@ func _schematest() -> void:
 
 func _schema_check(name: String, good: bool, detail: String) -> bool:
 	print("[schema] %s: %s%s" % [name, "PASS" if good else "FAIL",
+		"" if good or detail == "" else " — " + detail])
+	return good
+
+
+## gh #31 (ADR-018): the ruleset seam's registry + the Types tracer bullet. The boot
+## ruleset must be the manifest's (gen1), an unknown name must refuse (null), and the
+## seam's type resolver must answer exactly as the raw project chart over the full type
+## cross-product — a PLUMBING proof (the chart reached Gen1Types, delegation works);
+## the algorithm itself is held by --battledettest's md5s.
+## Run: `pwsh tools/run.ps1 -- --rulesettest`. Headless.
+func _rulesettest() -> void:
+	await get_tree().process_frame
+	var ok := true
+	ok = _rs_check("boot resolved the manifest ruleset",
+		ruleset != null and ruleset.id() == str(ProjectData.manifest.get("ruleset", "")),
+		"got '%s'" % (ruleset.id() if ruleset != null else "<null>")) and ok
+	ok = _rs_check("gen1 carries a Types module", ruleset != null and ruleset.types != null,
+		"") and ok
+	ok = _rs_check("unknown ruleset refuses (null)",
+		RulesetRegistry.resolve("gen9") == null, "") and ok
+	ok = _rs_check("battle resolves types through the seam", battle.rset == ruleset, "") and ok
+	# ground truth through the seam (mono-type stored doubled; single-fire per entry)
+	ok = _rs_check("WATER vs FIRE,FIRE is 2x (not squared)",
+		battle._type_eff("WATER", ["FIRE", "FIRE"]) == 2.0, "") and ok
+	ok = _rs_check("ELECTRIC vs GROUND is immune",
+		battle._type_eff("ELECTRIC", ["GROUND", "GROUND"]) == 0.0, "") and ok
+	# full cross-product equivalence vs the raw project chart
+	var chart: Dictionary = ProjectData.legacy("types.json")
+	var all := {}
+	for a in chart:
+		all[a] = true
+		for d in chart[a]:
+			all[d] = true
+	var tnames := all.keys()
+	var checked := 0
+	var mism := 0
+	for a in tnames:
+		for d1 in tnames:
+			if ruleset.types.mult(a, d1) != float(chart.get(a, {}).get(d1, 1.0)):
+				mism += 1
+			for d2 in tnames:
+				var want := 1.0
+				var row: Dictionary = chart.get(a, {})
+				for dt in row:
+					if str(d1) == dt or str(d2) == dt:
+						want *= float(row[dt])
+				checked += 1
+				if battle._type_eff(a, [d1, d2]) != want:
+					mism += 1
+	ok = _rs_check("type resolver matches the chart over %d combos" % checked, mism == 0,
+		"%d mismatches" % mism) and ok
+	print("[ruleset] %s" % ("ALL GREEN" if ok else "FAIL"))
+	get_tree().quit(0 if ok else 1)
+
+
+func _rs_check(name: String, good: bool, detail: String) -> bool:
+	print("[ruleset] %s: %s%s" % [name, "PASS" if good else "FAIL",
 		"" if good or detail == "" else " — " + detail])
 	return good
 

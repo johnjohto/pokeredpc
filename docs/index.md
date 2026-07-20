@@ -11,6 +11,10 @@ as development proceeds — when a format, rule, or decision is discovered, reco
 - **[v2/plan.md](v2/plan.md)** — north-star plan for **v2**: turning the port into a standalone
   monster-RPG creation toolkit (Studio editor + generic engine + shareable projects). Starts after 1.0;
   see ADR-013.
+- **[v2/project-format.md](v2/project-format.md)** — the v2 project format (Phase 1, ADR-017):
+  layout, schemas, manifest + identity, versioning.
+- **[v2/ruleset-seam.md](v2/ruleset-seam.md)** — the ruleset seam (Phase 2, ADR-018): the five
+  Core interfaces, the registry, `gen1`, and the strangler-fig migration protocol.
 
 ### Data formats (`pokered/` → `game/assets/`)
 - **[data-formats/maps.md](data-formats/maps.md)** — `.blk`, headers, objects, warps, connections.
