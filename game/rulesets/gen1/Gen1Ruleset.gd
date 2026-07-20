@@ -14,3 +14,4 @@ func configure() -> void:
 	types = Gen1Types.new(ProjectData.legacy("types.json"))
 	formulas = Gen1Formulas.new()
 	battle = Gen1Battle.new()
+	battle.rset = self
