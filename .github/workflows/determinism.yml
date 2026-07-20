@@ -1,0 +1,70 @@
+# gh #12 — cross-platform verification: build from scratch on each OS GitHub hosts a
+# runner for (Linux, macOS) and run the three determinism suites, so their output can be
+# compared byte-for-byte against the Windows baseline (run locally — see
+# docs/guides/build-and-run.md). Assets are extracted on the runner and never uploaded
+# (personal-use project: extracted assets are not distributed — logs carry only hashes
+# and PASS/FAIL lines).
+#
+# Manual-dispatch only: this is a per-release cross-OS gate, not per-push CI.
+#   gh workflow run determinism.yml
+name: determinism
+on:
+  workflow_dispatch:
+
+jobs:
+  suites:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            godot_zip: Godot_v4.7-stable_linux.x86_64.zip
+            godot_bin: tools/godot/Godot_v4.7-stable_linux.x86_64
+          - os: macos-latest
+            godot_zip: Godot_v4.7-stable_macos.universal.zip
+            godot_bin: tools/godot/Godot.app/Contents/MacOS/Godot
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Environment info
+        run: |
+          uname -a
+          python3 --version
+
+      - name: Clone pret/pokered (source data)
+        run: git clone --depth 1 https://github.com/pret/pokered.git pokered
+
+      - name: Install Pillow
+        run: |
+          python3 -m pip install --user Pillow \
+            || python3 -m pip install --user --break-system-packages Pillow
+
+      - name: Download Godot 4.7-stable
+        run: |
+          curl -fL -o /tmp/godot.zip \
+            "https://github.com/godotengine/godot/releases/download/4.7-stable/${{ matrix.godot_zip }}"
+          unzip -o /tmp/godot.zip -d tools/godot
+          chmod +x "${{ matrix.godot_bin }}"
+          shasum -a 256 "${{ matrix.godot_bin }}"
+
+      - name: Extract assets
+        run: python3 tools/extract.py
+
+      - name: Import pass (headless editor)
+        # May exit non-zero on shutdown; harmless as long as the import completes.
+        run: '"${{ matrix.godot_bin }}" --headless --editor --quit --path game || true'
+
+      - name: "Suite A: battle determinism oracle (--battledettest)"
+        # Judged by the [battledet] stream_md5 lines, not the exit code (headless
+        # shutdown quirk) — they must equal the Windows baseline byte-for-byte.
+        run: '"${{ matrix.godot_bin }}" --headless --path game -- --battledettest || true'
+
+      - name: "Suite B: two-instance link suite (linktest.py)"
+        continue-on-error: true
+        run: python3 tools/linktest.py
+
+      - name: "Suite C: desync soak (linksoak.py)"
+        continue-on-error: true
+        run: python3 tools/linksoak.py
