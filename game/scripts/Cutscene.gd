@@ -1348,7 +1348,10 @@ var _tc_q_pick: Array = []          # their picks (-1 = canceled), in round orde
 var _tc_q_confirm: Array = []       # their confirms (bool), in round order
 var _tc_q_record: Array = []        # their tc_commit records
 var _tc_q_ack := 0                  # their acks (a counter)
-var _tc_result := ""                # "" while running; "done"/"canceled"/"aborted" after
+var _tc_q_resume: Array = []        # their tc_resume phase reports (gh #13)
+var _tc_resumed := false            # gh #13: the session dropped and came back mid-flow
+var _tc_in_commit := false          # gh #13: inside _tc_commit/_tc_commit_reconcile (routes tc_resume)
+var _tc_result := ""                # "" while running; "done"/"canceled"/"aborted"/"resumed" after
 
 
 func _tc_on_message(msg: Dictionary) -> void:
@@ -1365,6 +1368,17 @@ func _tc_on_message(msg: Dictionary) -> void:
 			_tc_q_record.append(msg.get("record", {}))
 		"tc_ack":
 			_tc_q_ack += 1
+		"tc_resume":
+			# gh #13: only a flow inside the COMMIT section consumes reports from the queue.
+			# Anyone else must still ANSWER — a committed partner starves without one — with
+			# the truth about this side: "done" (we applied; their acked side rolls forward)
+			# or "" (we never reached commit; both restart at the picks).
+			if _tc_in_commit:
+				_tc_q_resume.append(msg)
+			elif _tc_result == "done":
+				main.link.send_message({"t": "tc_resume", "phase": "done"})
+			else:
+				main.link.send_message({"t": "tc_resume", "phase": ""})
 		# ---- Colosseum (gh #7) ----
 		"col_party":
 			_col_peer = msg
@@ -1374,6 +1388,9 @@ func _tc_on_message(msg: Dictionary) -> void:
 		"col_swap":
 			if main.battle.link_battle:
 				main.battle.link_swaps.append(int(msg.get("idx", 0)))
+		"col_resume":
+			if main.battle.link_battle:
+				main.battle.link_reconcile(msg)
 
 
 ## Wait for `cond` while the link lives. Machine-paced protocol replies (records, acks)
@@ -1381,9 +1398,33 @@ func _tc_on_message(msg: Dictionary) -> void:
 ## `patient = true` and are bounded by link liveness alone — a friend who thinks for a
 ## minute is the game working, not a dead link (the "frequent drops" were this timer).
 ## Returns 1 ok, 0 link dead/timed out, -1 the player pressed B to give up (patient only).
+## Returns 1 ok, 0 link dead/timed out, -1 the player pressed B to give up (patient only),
+## 2 the session dropped and RESUMED (gh #13) — the caller reconciles per ADR-016.
 func _tc_wait(cond: Callable, patient := false) -> int:
 	var waited := 0.0
+	var lost_box := false
 	while not cond.call():
+		if _tc_resumed:
+			_tc_resumed = false
+			return 2
+		if main.link.holding():
+			# gh #13: an outage (incl. the resume handshake's transient frames), not a death.
+			# Show the survivor's box and hold — the grace clock (or B, polled by Main straight
+			# into cancel_wait) decides. The protocol timer freezes: the outage must not count
+			# toward a machine-paced timeout.
+			if not lost_box:
+				lost_box = true
+				main.modal = main.textbox
+				main.textbox.show_ask("Link lost -\nwaiting for your\npartner...")
+			await main.get_tree().process_frame
+			continue
+		if lost_box:
+			lost_box = false                    # resumed (or closed): drop the box, re-evaluate
+			main.textbox.visible = false
+			main.textbox.active = false
+			main.textbox.held = false
+			main.modal = null
+			continue
 		if main.link.state != "linked":
 			return 0
 		if patient:
@@ -1393,6 +1434,11 @@ func _tc_wait(cond: Callable, patient := false) -> int:
 			return 0
 		await main.get_tree().process_frame
 		waited += main.get_process_delta_time()
+	if lost_box:
+		main.textbox.visible = false
+		main.textbox.active = false
+		main.textbox.held = false
+		main.modal = null
 	return 1
 
 
@@ -1406,8 +1452,13 @@ func tc_room_arm() -> void:
 	_tc_q_confirm = []
 	_tc_q_record = []
 	_tc_q_ack = 0
+	_tc_q_resume = []
+	_tc_resumed = false
+	_tc_in_commit = false
 	if not main.link.message.is_connected(_tc_on_message):
 		main.link.message.connect(_tc_on_message)
+	if not main.link.resumed.is_connected(_tc_on_resumed):
+		main.link.resumed.connect(_tc_on_resumed)
 	for m in main.link.take_inbox():       # the partner may have sat down before we loaded in
 		_tc_on_message(m)
 
@@ -1415,6 +1466,30 @@ func tc_room_arm() -> void:
 func tc_room_disarm() -> void:
 	if main.link.message.is_connected(_tc_on_message):
 		main.link.message.disconnect(_tc_on_message)
+	if main.link.resumed.is_connected(_tc_on_resumed):
+		main.link.resumed.disconnect(_tc_on_resumed)
+
+
+## gh #13: the session came back. Everything still queued predates the blip — an in-flight
+## message died with the old connection, so post-resume arrivals are always fresh — and the
+## voided round's leftovers must not satisfy the restarted round's waits. The resume reports
+## themselves (tc_resume/col_resume) arrive only after this fires, so they are never stale
+## here. A running link battle answers with its own state report (both sides do).
+func _tc_on_resumed(_s: Dictionary) -> void:
+	_tc_resumed = true
+	_tc_q_pick = []
+	_tc_q_confirm = []
+	_tc_q_record = []
+	_tc_q_resume = []
+	# The parties too — the restart re-exchanges them, and clearing HERE (not in the restart
+	# loop) is what makes it race-free: a faster partner's fresh tc_party/col_party can land
+	# before our flow reaches its restart, and a later clear would wipe it (both sides then
+	# wait each other out forever).
+	_tc_peer_party = []
+	_col_peer = {}
+	if main.battle.link_battle and main.modal == main.battle:
+		_tc_resumed = false                # the battle reconciles; no table flow is waiting
+		main.battle.link_send_resume()
 
 
 func trade_center_table() -> void:
@@ -1422,10 +1497,21 @@ func trade_center_table() -> void:
 		await say("The link has been\nclosed.")
 		return
 	main.cutscene_active = true
-	_tc_result = ""
+	main.link.resume_armed = true          # gh #13: at the table, an outage holds for a reconnect
+	_tc_resumed = false
 	print("[tc] table: sitting (link=%s, peer_party=%d)" % [main.link.state, _tc_peer_party.size()])
-	await _tc_flow()
+	while true:
+		_tc_result = ""
+		await _tc_flow()
+		_tc_in_commit = false
+		if _tc_result != "resumed":
+			break
+		# gh #13 (ADR-016): the session dropped and came back mid-round — the round is void on
+		# both sides, so both restart from the party exchange, exactly like sitting down again.
+		# (_tc_on_resumed already cleared the exchanged parties, race-free.)
+		print("[tc] table: session resumed — restarting at the pick screens")
 	print("[tc] table: done (%s, link=%s)" % [_tc_result, main.link.state])
+	main.link.resume_armed = false
 	main.cutscene_active = false
 
 
@@ -1441,7 +1527,24 @@ func _tc_flow() -> void:
 	# as the partner's attendant dialogue takes, so this wait is bounded by the LINK's
 	# liveness (and B to stand up), not by the turn timer.
 	var stood_up := false
-	while _tc_peer_party.is_empty() and main.link.state == "linked":
+	var lost_box := false
+	while _tc_peer_party.is_empty():
+		if _tc_resumed:
+			# gh #13: our tc_party may have died in flight — restart re-sends it.
+			_tc_resumed = false
+			break
+		if main.link.holding():
+			if not lost_box:
+				lost_box = true
+				main.textbox.show_ask("Link lost -\nwaiting for your\npartner...")
+			await main.get_tree().process_frame
+			continue
+		if lost_box:
+			lost_box = false
+			main.textbox.show_ask("Waiting for your\nfriend...")
+			continue
+		if main.link.state != "linked":
+			break
 		if Input.is_action_just_pressed("ui_cancel"):
 			stood_up = true
 			break
@@ -1454,6 +1557,9 @@ func _tc_flow() -> void:
 		_tc_result = "canceled"
 		return
 	if _tc_peer_party.is_empty():
+		if main.link.state == "linked":
+			_tc_result = "resumed"         # gh #13: dropped + reconnected before the partner sat
+			return
 		_tc_result = "aborted"
 		print("[tc] abort: link died before the partner sat down")
 		await say("The link has been\nclosed.")
@@ -1495,6 +1601,9 @@ func _tc_flow() -> void:
 			_tc_result = "canceled"
 			await say("The trade was\ncanceled.")
 			return
+		if got == 2:
+			_tc_result = "resumed"         # gh #13: pre-commit — the round restarts at the picks
+			return
 		if got == 0:
 			_tc_result = "aborted"
 			print("[tc] abort: no partner pick (link=%s)" % main.link.state)
@@ -1515,6 +1624,9 @@ func _tc_flow() -> void:
 			got = await _tc_wait(func() -> bool: return not _tc_q_confirm.is_empty(), true)
 			if got != -1:                                  # (B does nothing here — answers are quick,
 				break                                      #  and a second cancel would desync rounds)
+		if got == 2:
+			_tc_result = "resumed"         # gh #13: pre-commit — the round restarts at the picks
+			return
 		if got == 0:
 			_tc_result = "aborted"
 			print("[tc] abort: no partner confirm (link=%s)" % main.link.state)
@@ -1533,9 +1645,14 @@ func _tc_flow() -> void:
 ## both are in does either side apply + save. Returns true when the flow is over.
 func _tc_commit(idx: int) -> bool:
 	var give: Dictionary = main.player_party[idx]
+	_tc_in_commit = true
+	_tc_q_ack = 0    # gh #13: a partner ack can never precede our tc_commit — anything counted
+	                 # here is a stale leftover (a resumed round) and must not satisfy this wait
 	main.link.send_message({"t": "tc_commit", "record": main.monrecord.encode(give)})
 	main._maybe_kill("commit")
 	var got := await _tc_wait(func() -> bool: return not _tc_q_record.is_empty())
+	if got == 2:
+		return await _tc_commit_reconcile(idx, give, "")   # resumed pre-journal
 	if got != 1:
 		_tc_result = "aborted"
 		print("[tc] abort: no partner record (link=%s)" % main.link.state)
@@ -1551,7 +1668,6 @@ func _tc_commit(idx: int) -> bool:
 		_tc_result = "aborted"
 		await say("The trade data\nwas invalid!\f(%s)\fThe trade did not\nhappen." % decoded["error"])
 		return true
-	var received: Dictionary = decoded["mon"]
 	var dupe := bool(main.link.session.get("dupe", false))
 	main._tc_journal_write("ready", give, peer_record, dupe)   # pre-ack: recovery rolls back
 	# The point of no return: from the instant our ack CAN reach them, they may complete —
@@ -1560,6 +1676,8 @@ func _tc_commit(idx: int) -> bool:
 	main.link.send_message({"t": "tc_ack"})
 	main._maybe_kill("ack")
 	got = await _tc_wait(func() -> bool: return _tc_q_ack > 0)
+	if got == 2:
+		return await _tc_commit_reconcile(idx, give, "acked", peer_record)
 	if got != 1:
 		main._tc_journal_clear()                           # never acknowledged: nothing applied
 		_tc_result = "aborted"
@@ -1569,7 +1687,69 @@ func _tc_commit(idx: int) -> bool:
 		await say("The link has been\nclosed.\fThe trade did not\nhappen.")
 		return true
 	_tc_q_ack -= 1
-	# --- both acknowledged: apply, ceremony, save ---
+	return await _tc_apply(idx, give, decoded["mon"])
+
+
+## gh #13 (ADR-016): the session dropped and came back MID-COMMIT. Exchange journal phases;
+## the MAX phase wins — "acked" is the point of no return, so if EITHER side reached it the
+## trade completes on both (the phase report itself proves the partner's commit; it carries
+## the acked side's record so a pre-journal partner can complete without another round-trip),
+## and if neither did, both roll back to the pick screens. A grace expiry mid-reconcile falls
+## back to today's teardown: the journal decides at next boot, exactly like a drop.
+func _tc_commit_reconcile(idx: int, give: Dictionary, my_phase: String, peer_record := {}) -> bool:
+	print("[tc] resume reconcile: our commit phase '%s'" % my_phase)
+	var report := {"t": "tc_resume", "phase": my_phase}
+	if my_phase == "acked":
+		report["record"] = main.monrecord.encode(give)
+	main.link.send_message(report)
+	var got := await _tc_wait(func() -> bool: return not _tc_q_resume.is_empty())
+	if got == 2:
+		return await _tc_commit_reconcile(idx, give, my_phase, peer_record)   # a second blip
+	if got != 1:
+		_tc_result = "aborted"
+		print("[tc] abort: reconcile got no phase report (link=%s)" % main.link.state)
+		await say("The link has been\nclosed.")
+		return true
+	var theirs: Dictionary = _tc_q_resume.pop_front()
+	var their_phase := str(theirs.get("phase", ""))
+	print("[tc] resume reconcile: phases '%s' + '%s'" % [my_phase, their_phase])
+	# "done" = the partner already applied (their side had both acks) — committed by definition.
+	# ""+"done" cannot occur: their completion needed OUR ack, which "" never sent.
+	var they_committed := their_phase == "acked" or their_phase == "done"
+	if my_phase != "acked" and not they_committed:
+		main._tc_journal_clear()               # neither committed: the round is void
+		_tc_result = "resumed"                 # -> restart at the pick screens
+		return true
+	if my_phase != "acked":
+		# The partner is past the point of no return and we never journaled: roll forward on
+		# the record their report carries (the two-generals closure, ADR-016).
+		var rec: Dictionary = theirs.get("record", {})
+		if not _tc_q_record.is_empty():        # rare: their tc_commit landed just before the blip
+			rec = _tc_q_record.pop_front()
+		var decoded: Dictionary = main.monrecord.decode(rec)
+		if not bool(decoded["ok"]):
+			print("[tc] abort: reconcile record refused — %s" % decoded["error"])
+			main.link.close("bad-record")
+			_tc_result = "aborted"
+			await say("The trade data\nwas invalid!\f(%s)\fThe trade did not\nhappen." % decoded["error"])
+			return true
+		peer_record = rec
+		var dupe := bool(main.link.session.get("dupe", false))
+		main._tc_journal_write("ready", give, peer_record, dupe)
+		main._tc_journal_write("acked", give, peer_record, dupe)
+	var decoded2: Dictionary = main.monrecord.decode(peer_record)
+	if not bool(decoded2["ok"]):
+		print("[tc] abort: reconcile journal record refused — %s" % decoded2["error"])
+		main.link.close("bad-record")
+		_tc_result = "aborted"
+		await say("The trade data\nwas invalid!\fThe trade did not\nhappen.")
+		return true
+	return await _tc_apply(idx, give, decoded2["mon"])
+
+
+## Both sides committed: apply, ceremony, save — the shared tail of the normal commit and the
+## resume reconcile (gh #13).
+func _tc_apply(idx: int, give: Dictionary, received: Dictionary) -> bool:
 	var give_sp := str(give["species"])
 	var give_ot := str(give.get("ot", main.player_name))
 	var give_otid := int(give.get("otid", main.player_id))
@@ -1593,6 +1773,15 @@ func _tc_commit(idx: int) -> bool:
 			break
 	main.save_game()                                       # finalize
 	main._tc_journal_clear()
+	# gh #13: a partner's tc_resume report may have landed while we were applying (we were
+	# still in the commit section, so it queued rather than auto-answering). Answer it NOW —
+	# "done" rolls their acked side forward — and flush, so even an immediately-ending
+	# process can't swallow the answer. Without this the partner starves to grace expiry.
+	while not _tc_q_resume.is_empty():
+		_tc_q_resume.pop_front()
+		main.link.send_message({"t": "tc_resume", "phase": "done"})
+		if main.link._enet != null:
+			main.link._enet.flush()
 	_tc_peer_party = []           # a second trade re-exchanges the (changed) parties
 	_tc_result = "done"
 	return true
@@ -1616,37 +1805,67 @@ func colosseum_table() -> void:
 		await say("The link has been\nclosed.")
 		return
 	main.cutscene_active = true
-	var mine: Array = []
-	for m in main.player_party:
-		mine.append(main.monrecord.encode(m))
-	var my_seed := int(randi() & 0x7fffffff)             # only the host's is used
-	main.link.send_message({"t": "col_party", "mons": mine,
-		"name": main.player_name, "seed": my_seed})
-	main.modal = main.textbox
-	main.textbox.show_ask("Waiting for your\nfriend...")
-	var stood_up := false
-	while _col_peer.is_empty() and main.link.state == "linked":
-		if Input.is_action_just_pressed("ui_cancel"):
-			stood_up = true
-			break
-		await main.get_tree().process_frame
-	main.textbox.visible = false
-	main.textbox.active = false
-	main.textbox.held = false
-	main.modal = null
-	if stood_up:
-		main.cutscene_active = false
-		return
-	if _col_peer.is_empty():
-		await say("The link has been\nclosed.")
-		main.cutscene_active = false
-		return
+	main.link.resume_armed = true          # gh #13: stays armed through the battle itself;
+	_tc_resumed = false                    # cleared by _on_battle_finished / the exits below
+	var my_seed := 0
+	while true:
+		var mine: Array = []
+		for m in main.player_party:
+			mine.append(main.monrecord.encode(m))
+		my_seed = int(randi() & 0x7fffffff)              # only the host's is used
+		main.link.send_message({"t": "col_party", "mons": mine,
+			"name": main.player_name, "seed": my_seed})
+		main.modal = main.textbox
+		main.textbox.show_ask("Waiting for your\nfriend...")
+		var stood_up := false
+		var lost_box := false
+		var restart := false
+		while _col_peer.is_empty():
+			if _tc_resumed:
+				_tc_resumed = false
+				restart = true             # our col_party may have died in flight — resend
+				break
+			if main.link.holding():
+				if not lost_box:
+					lost_box = true
+					main.textbox.show_ask("Link lost -\nwaiting for your\npartner...")
+				await main.get_tree().process_frame
+				continue
+			if lost_box:
+				lost_box = false
+				main.textbox.show_ask("Waiting for your\nfriend...")
+				continue
+			if main.link.state != "linked":
+				break
+			if Input.is_action_just_pressed("ui_cancel"):
+				stood_up = true
+				break
+			await main.get_tree().process_frame
+		main.textbox.visible = false
+		main.textbox.active = false
+		main.textbox.held = false
+		main.modal = null
+		if restart:
+			# (_tc_on_resumed already cleared _col_peer, race-free.)
+			print("[col] table: session resumed — re-exchanging parties")
+			continue
+		if stood_up:
+			main.link.resume_armed = false
+			main.cutscene_active = false
+			return
+		if _col_peer.is_empty():
+			main.link.resume_armed = false
+			await say("The link has been\nclosed.")
+			main.cutscene_active = false
+			return
+		break
 	var seed_v := my_seed if main.link.is_host else int(_col_peer.get("seed", 0))
 	var pname := str(_col_peer.get("name", "FRIEND"))
 	var records: Array = _col_peer.get("mons", [])
 	_col_peer = {}                                       # a rematch re-exchanges
 	main.cutscene_active = false
 	if not main.start_colosseum_battle(records, seed_v, pname):
+		main.link.resume_armed = false
 		main.link.close("bad-party")
 		await say("The battle data\nwas invalid!")
 

@@ -208,6 +208,9 @@ var link_actions: Array = []   # the peer's col_act actions, in turn order (fed 
 var link_swaps: Array = []     # the peer's col_swap faint replacements, in order
 var _link_wait := ""           # "" | "act" (their turn action) | "swap" (their replacement)
 var _link_pact := {}           # our pending action while waiting for theirs
+var _link_pact_turn := -1      # the turn it was submitted for (gh #13: resume retransmit)
+var _link_lswap := -1          # our last faint replacement sent as col_swap, and its turn
+var _link_lswap_turn := -1
 var _link_elapsed := 0.0
 var link_over := false         # set when the link died mid-battle (stakeless end)
 
@@ -476,6 +479,10 @@ func start_link(p_party: Array, e_party: Array, host: bool, seed_v: int, pname: 
 	link_actions = []
 	link_swaps = []
 	_link_wait = ""
+	_link_pact = {}
+	_link_pact_turn = -1
+	_link_lswap = -1
+	_link_lswap_turn = -1
 	link_over = false
 	_set_enemy(0)
 	# cable_club.asm sets wCurOpponent = OPP_RIVAL1 for a link battle: the partner appears
@@ -944,7 +951,9 @@ func _process(delta: float) -> void:
 			var si2 := int(link_swaps.pop_front())
 			_link_wait = ""
 			_link_enemy_swap_in(si2)
-		elif main == null or main.link.state != "linked":
+		elif main == null or (main.link.state != "linked" and not main.link.holding()):
+			# gh #13: an outage (lost, or the resume handshake's transient states) is not a
+			# death — the linkwait holds with it; only a truly closed link voids the battle.
 			_link_wait = ""
 			_link_dead()
 	if state == "msg" and revealed < _msg_glyphs():
@@ -1277,6 +1286,8 @@ func _choose_party() -> void:
 		# peer's matching event (emitted at swap arrival) is byte-identical.
 		if link_battle:
 			_det_event("X", "%s:w:%d" % ["h" if link_host else "j", active])
+			_link_lswap = active
+			_link_lswap_turn = turn_no
 			main.link.send_message({"t": "col_swap", "idx": active})
 		else:
 			_det_event("X", "w:%d" % active)
@@ -1639,6 +1650,7 @@ func _submit_action(action: Dictionary) -> void:
 		_resolve(action)
 		return
 	_link_pact = action
+	_link_pact_turn = turn_no
 	main.link.send_message({"t": "col_act", "action": _det_action(action)})
 	main._maybe_kill("act%d" % (turn_no + 1))    # gh #9: cable pull after our turn-N action
 	_link_wait = "act"
@@ -1647,6 +1659,46 @@ func _submit_action(action: Dictionary) -> void:
 	revealed = 999
 	state = "linkwait"                 # ignores input; _process watches the queues
 	queue_redraw()
+
+
+## gh #13 (ADR-016): after a transport resume both peers exchange where their sims stand —
+## turn, RNG cursor, state digest, what they wait on, and their last-sent action/replacement
+## (with its turn) so anything that died in flight rides along. Equal points continue; a
+## missing in-flight action is fed from the peer's report (each side feeds ITSELF from the
+## other's col_resume — both always send one); equal turn+cursor with differing digests is a
+## determinism bug by definition — void, stakeless, loud. Mid-resolution skew (same turn,
+## different cursor) is NOT comparable and not a desync: the retransmit rules cover it.
+func link_send_resume() -> void:
+	main.link.send_message({"t": "col_resume", "turn": turn_no, "cursor": rng_cursor,
+		"digest": _det_digest(), "wait": _link_wait,
+		"act": _det_action(_link_pact) if _link_pact_turn >= 0 else "", "act_turn": _link_pact_turn,
+		"swap": _link_lswap, "swap_turn": _link_lswap_turn})
+
+
+func link_reconcile(peer: Dictionary) -> void:
+	if not link_battle or link_over:
+		return
+	var pturn := int(peer.get("turn", -1))
+	print("[col] resume reconcile: ours t=%d c=%d wait='%s' | peer t=%d c=%d wait='%s'" % [
+		turn_no, rng_cursor, _link_wait, pturn, int(peer.get("cursor", -1)), str(peer.get("wait", ""))])
+	if absi(pturn - turn_no) > 1:
+		print("[col] reconcile: impossible turn gap under lockstep — determinism bug; voiding stakeless")
+		_link_dead()
+		return
+	if pturn == turn_no and int(peer.get("cursor", -1)) == rng_cursor \
+			and str(peer.get("digest", "")) != _det_digest():
+		print("[col] reconcile: DIGEST MISMATCH at t=%d c=%d — determinism bug; voiding stakeless" % [
+			turn_no, rng_cursor])
+		_link_dead()
+		return
+	if _link_wait == "act" and link_actions.is_empty() \
+			and int(peer.get("act_turn", -2)) == turn_no and str(peer.get("act", "")) != "":
+		link_actions.append(str(peer["act"]))
+		print("[col] reconcile: recovered the peer's turn-%d action from the resume report" % turn_no)
+	if _link_wait == "swap" and link_swaps.is_empty() \
+			and int(peer.get("swap_turn", -2)) == turn_no and int(peer.get("swap", -1)) >= 0:
+		link_swaps.append(int(peer["swap"]))
+		print("[col] reconcile: recovered the peer's turn-%d replacement from the resume report" % turn_no)
 
 
 ## The peer's canonical action string back into an enemy action. The forced tag matters:

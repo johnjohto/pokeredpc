@@ -236,6 +236,60 @@ the received copy, and the puller's relaunch **keeps the original** (the acked j
 rolls *back* on purpose) — the mon lives in both saves, exactly the Gen-1 lore, by mutual
 consent only.
 
+## Session resume (gh #13, ADR-016) — transport blips reconnect + reconcile
+
+**Scope: transport blips only** — both game processes alive, the socket died (Wi-Fi drop,
+cable pull). A process death keeps the teardown + journal-recovery story above. Consumers
+**arm** resume at the tables (`Link.resume_armed`; the trade flow and `start_colosseum_battle`
+set it, battle-finish/flow-end clear it), so the pre-table states (attendant flow, save beat,
+LinkMenu) keep teardown-as-today.
+
+- **The `lost` state**: an armed linked session that drops enters `lost` instead of closing.
+  The host's bound socket keeps listening; the joiner auto-redials the original address with
+  backoff (0.5 s, then 2/4/8/10 s). **One grace clock** (`resume_grace_s`, ~120 s) bounds the
+  whole outage across every redial and failed handshake; B anywhere gives up
+  (`cancel_wait()` → today's teardown). The survivor shows "Link lost — waiting for your
+  partner…" (the battle case seizes the modal — linkwait ignores input anyway; the trade
+  waits show the box themselves, since seizing an open pick menu's modal would strand it).
+- **The session token**: minted by the host at link-up (`Crypto` random, shared in its
+  `accept`), it rides the reconnect `hello`. A wrong or absent token — a stranger, or a
+  relaunched process — is refused ("this session is waiting for its original partner") and
+  the wait continues; a stranger can never join a half-open session.
+- **Reconcile, mid-battle**: on `resumed`, both peers send `col_resume` — turn, RNG cursor,
+  state digest, what they wait on, and their last-sent action/replacement with its turn.
+  Each side feeds ITSELF from the other's report: an in-flight `col_act`/`col_swap` that died
+  with the connection rides the report and the linkwait completes. Equal turn+cursor with
+  differing digests is a determinism bug by definition — void, stakeless, loud. Mid-resolution
+  skew (same turn, different cursor) is not comparable and not a desync. The `linkwait` holds
+  through `lost` (only a truly closed link voids). *Known residual:* a blip in the final
+  turn's delivery race can end one sim before the other's report reaches it — that side's
+  session voids stakeless, exactly today's story; battle saves can never diverge.
+- **Reconcile, trade**: *pre-commit* (party/pick/confirm) — the round is void on both sides;
+  both restart at the party exchange (post-resume queues hold only pre-blip leftovers — an
+  in-flight message died with the old connection — so both clear them on `resumed`).
+  *Commit* — both sides exchange `tc_resume` journal-phase reports and **the max phase
+  wins**: if either side reached `acked` (or already applied — it answers `done`), the trade
+  completes on both (the report carries the acked side's record, so a pre-journal partner
+  rolls forward without another round-trip — **the two-generals closure**); if neither did,
+  both roll back to the picks. A side not in the commit section always *answers* a report
+  (`done` after applying, else `""`) so a committed partner can never starve. A grace expiry
+  mid-reconcile falls back to teardown: the journal decides at next boot, exactly like a
+  drop.
+- **The dupe easter egg stays relaunch-only** (ADR-016 decision 5): resume reconciles
+  honestly even for opted-in sessions — a lag spike can never fork a mon; the glitch keeps
+  its faithful power-cut ritual.
+
+**Verified by `python tools/linkblip.py`** (the Stage-1 resume gate): `--blipat=<point>`
+resets the ENet connection at the gh #9 injection points *without* killing the process
+(`Link.blip()` — a silent `peer_reset`, exactly a cable pull; the remote side notices via
+its dead-peer timeout, `--linkpeertimeout` shrinks it for tests), and `--blipevery=N` blips
+every N battle turns (the blip-soak). The matrix: battle blips host-side and joiner-side
+(session RESUMED on both, battle completes never-void, `[battledet]` streams byte-identical
+across the outage), the blip-soak, trades blipped at pick/confirm/commit/ack (both complete,
+both saves traded, journals cleared — vs. the kill matrix where pick/confirm/commit stay
+untraded), and dupe@ack under a blip (NO duplication). Stage 2 of the gate is a real remote
+human session with genuine Wi-Fi drops.
+
 ## Debug flags (the tracer bullet)
 
 | Flag | What it does |
@@ -245,6 +299,10 @@ consent only.
 | `--tamper=version` / `--tamper=engine` / `--tamper=<part>` | Corrupt this side's identity → drives the refusal path. |
 | `--linktimeout=N` | Shorten the no-partner timeout (tests). |
 | `--dupe` | Set this side's easter-egg opt-in flag. |
+| `--blipat=<point>` | gh #13: reset the transport at a gh #9 injection point (process stays alive) → drives the resume path. |
+| `--blipevery=N` | gh #13: reset the transport every N battle turns (the blip-soak). |
+| `--linkpeertimeout=N` | ENet dead-peer bound in ms (default 60000); tests shrink it so the un-blipped side notices fast. |
+| `--linkgrace=N` | The resume grace window in seconds (default 120). |
 
 **`python tools/linktest.py`** launches host+join pairs headlessly over localhost and
 asserts both logs across five scenarios: clean link (established both sides + the ping/pong

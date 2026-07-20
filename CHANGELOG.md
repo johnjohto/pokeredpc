@@ -8,6 +8,29 @@ milestones, `PATCH` bumps are fixes/polish. See `docs/roadmap.md` for the live p
 
 ## [Unreleased]
 
+### Added
+- **Link session resume — a Wi-Fi blip no longer ends the trade or battle** (gh #13,
+  ADR-016; the headline of the next feature milestone, v1.2.0). Scope: transport blips —
+  both games alive, the socket died. An armed table session now enters a `lost` state
+  instead of tearing down: the host keeps listening, the joiner auto-redials with backoff,
+  one ~120 s player-cancellable grace clock bounds the outage, and a host-minted session
+  token gates re-admission (a stranger or a relaunched process is turned away; relaunches
+  keep the teardown + journal story). On resume the peers reconcile per state: a mid-battle
+  outage exchanges turn + RNG cursor + digest reports that carry the in-flight action (equal
+  points continue, a differing digest at the same point voids stakeless as a determinism
+  bug), a pre-commit trade restarts at the pick screens, and a mid-commit trade exchanges
+  journal phases where **the max phase wins** — closing ADR-015's documented two-generals
+  residue: an ack lost in transit now rolls the behind side forward on reconnection instead
+  of stranding the peers on opposite sides of the trade. The dupe easter egg stays
+  relaunch-only: resume reconciles honestly even when both peers opted in, so a lag spike
+  can never fork a mon. Gated by `tools/linkblip.py` (`--blipat`/`--blipevery` reset the
+  ENet transport without killing the process): battle blips on either side and a
+  blip-every-2-turns soak end never-void with byte-identical `[battledet]` streams, trades
+  blipped at pick/confirm/commit/ack all complete with both saves traded and journals
+  cleared, and dupe@ack under a blip does not duplicate. The kill-injection
+  (`linkdrop.py`), lockstep (`linktest.py`), and desync-soak suites stay green — the
+  lockstep and journal semantics are unchanged; reconcile only reads them.
+
 ### Fixed
 - **A stage failure inside Victory Road now walks back out for its retry, and `_pt_warp_out`
   can no longer teleport out of a cave** (gh #30). Two recovery weaknesses the gh #28 failures

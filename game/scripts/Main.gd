@@ -140,8 +140,12 @@ var link_wait_s := 30.0          # Cable Club wait/connect/sync timeout (tests s
 var link_port := 0               # Cable Club port override (0 = Link.DEFAULT_PORT; tests set it)
 var link_return_map := ""        # gh #6: where the club room's exit leads back to
 var link_return_cell := Vector2i.ZERO
+var _link_lost_seized := false   # gh #13: the lost box took the battle's modal (restored on resume/close)
 var _col_snapshot: Array = []    # gh #7: the party before a link battle — restored after (stakeless)
 var kill_at := ""                # gh #9 drop injection: --killat=<point> pulls the cable there
+var blip_at := ""                # gh #13 blip injection: --blipat=<point> resets the transport there
+var blip_every := 0              # gh #13 blip-soak: reset the transport every N battle turns
+var _blip_last := ""             # the last point blipped (one blip per point, or per turn in a soak)
 var _club_leaving := false       # guards the room's link-closed watcher during our own exit
 var play_seconds := 0.0          # total play time in seconds (shown on the save screen)
 var player_coins := 0                       # Game Corner coins (BCD 0..9999 in wPlayerCoins)
@@ -400,8 +404,31 @@ func _ready() -> void:
 	# gh #6: a link that dies while standing in a Cable Club room walks you back out
 	# (during a table flow the flow's own waits handle it — cutscene_active is true there).
 	link.closed.connect(func(_r: String) -> void:
+		if _link_lost_seized:              # gh #13: the grace expired mid-battle — drop the box,
+			_link_lost_seized = false      # give the battle its modal back so it voids visibly
+			textbox.visible = false
+			textbox.active = false
+			textbox.held = false
+			modal = battle
 		if center_label in ["TradeCenter", "Colosseum"] and not cutscene_active and not _club_leaving:
 			_club_room_kicked())
+	# gh #13 (ADR-016): an armed table session dropped. During a BATTLE the linkwait ignores
+	# input and draws its own screen, so the lost box takes the modal; the trade flow's own
+	# waits show the box themselves (a pick menu may be open — seizing its modal would strand
+	# the flow's await on menu.chosen). On resume the battle exchanges state reports
+	# (Cutscene._tc_on_resumed routes them) and the box comes down here.
+	link.lost.connect(func() -> void:
+		if modal == battle:
+			_link_lost_seized = true
+			modal = textbox
+			textbox.show_ask("Link lost -\nwaiting for your\npartner..."))
+	link.resumed.connect(func(_s: Dictionary) -> void:
+		if _link_lost_seized:
+			_link_lost_seized = false
+			textbox.visible = false
+			textbox.active = false
+			textbox.held = false
+			modal = battle)
 	slots = preload("res://scripts/SlotMachine.gd").new()
 	ui.add_child(slots)
 	slots.setup(ft, fcols, cmap, self)
@@ -3862,6 +3889,8 @@ func _on_battle_finished() -> void:
 	if battle.link_battle and not _col_snapshot.is_empty():
 		player_party = _col_snapshot
 		_col_snapshot = []
+	if battle.link_battle:
+		link.resume_armed = false          # gh #13: the table beat is over — a later drop tears down
 	# EndOfBattle sets BIT_WILD_ENCOUNTER_COOLDOWN and the post-battle map reload arms
 	# wNumberOfNoRandomBattleStepsLeft = 3: three battle-free steps after EVERY battle.
 	wild_cooldown_steps = 3
@@ -4217,10 +4246,14 @@ func _process(delta: float) -> void:
 	# the closed signal usually fires mid-flow (cutscene_active), whose own abort message
 	# handles that moment but leaves the player standing in the room; this catches them the
 	# moment they're free and returns them to the attendant (the reported stuck-in-room bug).
-	if link != null and link.state != "linked" and link.state != "idle" \
+	if link != null and link.state != "linked" and link.state != "idle" and not link.holding() \
 			and center_label in ["TradeCenter", "Colosseum"] \
 			and modal == null and not cutscene_active and not _club_leaving:
 		_club_room_kicked()
+	# gh #13: while the session is held for a reconnect, B anywhere gives up the wait —
+	# into today's teardown. Polled here because the lost box may sit over any modal.
+	if link != null and link.holding() and Input.is_action_just_pressed("ui_cancel"):
+		link.cancel_wait()
 	# Clock. When a --playthrough / --<flag>test driver owns it (pt_time_scale > 0, gh #98) it applies
 	# everywhere: the bot's nav budgets already scale by Engine.time_scale (_pt_frames, gh #99), battles
 	# survive it, and the bot drives input from state rather than human pacing, so the gh #111 race can't
@@ -5305,8 +5338,9 @@ func start_colosseum_battle(peer_records: Array, seed_v: int, pname: String) -> 
 	if audio:
 		audio.play_song("trainerbattle")
 	battle.det_log = true
-	modal = battle
-	battle.start_link(player_party, eparty, link.is_host, seed_v, pname)
+	link.resume_armed = true               # gh #13: a mid-battle outage holds for a reconnect
+	modal = battle                         # (covers the club flow AND the headless --colsoak path;
+	battle.start_link(player_party, eparty, link.is_host, seed_v, pname)   # cleared on finish)
 	return true
 
 
@@ -5428,6 +5462,17 @@ func _tc_journal_recover() -> void:
 ## datagram just sent DID get out (the scripted points test protocol windows, not packet
 ## loss); then the process dies with no goodbye.
 func _maybe_kill(point: String) -> void:
+	# gh #13: the blip injection rides the same scripted points as the kill injection — the
+	# transport resets (no process death) and the ADR-016 resume machinery takes over. One
+	# blip per point (a resumed flow re-crosses the same point and must not re-blip), or one
+	# per qualifying turn under --blipevery=N (the blip-soak).
+	if _blip_last != point:
+		if blip_at == point:
+			_blip_last = point
+			link.blip()
+		elif blip_every > 0 and point.begins_with("act") and int(point.substr(3)) % blip_every == 0:
+			_blip_last = point
+			link.blip()
 	if kill_at != point:
 		return
 	if link._enet != null:
@@ -5476,6 +5521,14 @@ func _colsoaktest() -> void:
 			seed_v = int(str(a).substr(10))
 		elif str(a).begins_with("--killat="):
 			kill_at = str(a).substr(9)          # gh #9: mid-battle cable pull
+		elif str(a).begins_with("--blipat="):
+			blip_at = str(a).substr(9)          # gh #13: transport reset, process alive
+		elif str(a).begins_with("--blipevery="):
+			blip_every = int(str(a).substr(12))
+		elif str(a).begins_with("--linkpeertimeout="):
+			link.peer_timeout_max_ms = int(str(a).substr(18))
+		elif str(a).begins_with("--linkgrace="):
+			link.resume_grace_s = float(str(a).substr(12))
 	player_name = "HOSTA" if hosting else "JOINB"
 	player_id = 111 if hosting else 222
 	# Fixed DVs so mirror matches really tie — and LEGAL ones: Gen 1 derives the hp DV from
@@ -5520,7 +5573,10 @@ func _colsoaktest() -> void:
 		get_tree().quit()
 		return
 	g = 0
-	while modal == battle and g < 60000:
+	while (modal == battle or _link_lost_seized) and g < 60000:   # gh #13: hold through an outage
+		if link.holding():
+			await get_tree().process_frame             # gh #13: an outage must not eat the budget
+			continue
 		if battle.state == "menu":
 			battle.cursor = 0
 			await _press("ui_accept")                  # FIGHT
@@ -5595,6 +5651,12 @@ func _clubtest() -> void:
 			link.tamper = str(a).substr(9)      # drive the in-dialogue refusal path
 		elif str(a).begins_with("--killat="):
 			kill_at = str(a).substr(9)          # gh #9: pull the cable at a scripted point
+		elif str(a).begins_with("--blipat="):
+			blip_at = str(a).substr(9)          # gh #13: transport reset, process alive
+		elif str(a).begins_with("--linkpeertimeout="):
+			link.peer_timeout_max_ms = int(str(a).substr(18))
+		elif str(a).begins_with("--linkgrace="):
+			link.resume_grace_s = float(str(a).substr(12))
 		elif str(a) == "--dupe":
 			link.dupe_opt_in = true             # gh #9: the easter-egg opt-in
 	player_name = "RED"
@@ -5688,7 +5750,8 @@ func _clubtest() -> void:
 						await _press("ui_accept")
 					else:
 						await get_tree().process_frame
-					g += 1
+					if not link.holding():             # gh #13: an outage must not eat the budget
+						g += 1
 				var names: Array = []
 				for m in player_party:
 					names.append("%s(%s/%d)" % [m["name"], str(m.get("ot", "?")), int(m.get("otid", -1))])

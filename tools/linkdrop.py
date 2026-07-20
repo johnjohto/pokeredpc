@@ -22,6 +22,11 @@ from linktest import launch, collect, godot_user_dir
 
 BASE_PORT = 17701
 UDIR = godot_user_dir()
+# gh #13: resume is armed at the tables, so a process death costs the survivor the dead-peer
+# detection PLUS the resume grace before today's teardown runs (the relaunched partner has no
+# session token, so it can never resume — ADR-016 keeps the kill story on the journal path).
+# Same semantics, slower clocks; shrink both so the matrix stays fast.
+FAST = ["--linkpeertimeout=4000", "--linkgrace=8"]
 
 
 def check(name, ok, detail=""):
@@ -39,10 +44,10 @@ def party_of(slot):
 
 def trade_pair(port, hslot, jslot, join_extra, host_extra=()):
     h = launch(["--clubtest", "--clubhost", "--trade", f"--port={port}",
-                f"--saveslot={hslot}", *host_extra])
+                f"--saveslot={hslot}", *FAST, *host_extra])
     time.sleep(6)
     j = launch(["--clubtest", "--clubjoin", "--trade", f"--port={port}",
-                f"--saveslot={jslot}", *join_extra])
+                f"--saveslot={jslot}", *FAST, *join_extra])
     return collect(h, 240), collect(j, 180)
 
 
@@ -68,10 +73,10 @@ def main():
 
     # 2 — a mid-battle cable pull is stakeless for the survivor
     h = launch(["--colsoak", "--clubhost", f"--port={BASE_PORT + 1}",
-                "--colparty=0", "--colseed=31000", "--killat=act2"])
+                "--colparty=0", "--colseed=31000", "--killat=act2", *FAST])
     time.sleep(4)
     j = launch(["--colsoak", "--clubjoin", f"--port={BASE_PORT + 1}",
-                "--colparty=1", "--colseed=31000"])
+                "--colparty=1", "--colseed=31000", *FAST])
     hout = collect(h, 240)
     jout = collect(j, 300)
     ok &= check("battle-drop: host pulled the cable", "[kill]" in hout and "act2" in hout)

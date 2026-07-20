@@ -22,6 +22,8 @@ signal established(session: Dictionary)
 signal refused(reason: String, by_peer: bool)
 signal closed(reason: String)
 signal message(msg: Dictionary)      # post-handshake session traffic (later tickets)
+signal lost()                        # gh #13: an ARMED linked session dropped; the grace window opened
+signal resumed(session: Dictionary)  # gh #13: the SAME session re-established via the resume token
 
 const DEFAULT_PORT := 17225
 const CH_CONTROL := 0                # handshake + session control
@@ -30,8 +32,26 @@ const CH_DATA := 1                   # mon records / battle actions (later ticke
 var main                             # Main (for _load_json)
 var timeout_s := 30.0                # applies to waiting/connecting/handshake, not linked
 var dupe_opt_in := false             # the easter-egg flag: sent in hello; mutual AND recorded
-var state := "idle"                  # idle | waiting | connecting | handshake | linked | closing | closed
+var state := "idle"                  # idle | waiting | connecting | handshake | linked | lost | closing | closed
 var is_host := false
+# --- session resume (gh #13, ADR-016): transport blips only — both processes alive, the socket
+# died. Consumers ARM resume at the table (trade/colosseum); an unarmed drop tears down exactly
+# as before, which keeps the pre-table states (attendant flow, save beat, LinkMenu) on today's
+# story. While "lost", the host keeps listening on the session port and the joiner auto-redials
+# with backoff; ONE grace clock bounds the whole outage (the player can give up via cancel_wait).
+# The session token, minted by the host at link-up and shared in its `accept`, rides the
+# reconnect `hello` — a wrong or absent token (a stranger, or a relaunched process, which by
+# scope keeps the teardown + journal story) is refused and the wait continues.
+var resume_armed := false            # set by the table flows; cleared on teardown
+var resume_grace_s := 120.0          # the outage bound (player-cancellable)
+var peer_timeout_max_ms := 60000     # ENet dead-peer bound; tests shrink it (--linkpeertimeout)
+var _session_token := ""             # minted host-side at establish; both sides hold it once linked
+var _join_ip := ""                   # the joiner's redial target
+var _join_port := 0
+var _was_lost := false               # the current handshake is a resume attempt
+var _lost_elapsed := 0.0             # accumulates across lost + resume-handshake states
+var _redial_in := 0.0                # seconds until the joiner's next redial
+var _redial_backoff := 2.0
 var session := {}                    # once linked: {"remote": identity, "dupe": bool}
 var tamper := ""                     # debug (--tamper=X): corrupt OUR version/engine/part before send
 
@@ -88,6 +108,10 @@ func _reset_session() -> void:
 	session = {}
 	inbox = []
 	_elapsed = 0.0
+	_session_token = ""
+	_was_lost = false
+	_lost_elapsed = 0.0
+	resume_armed = false
 
 
 func host(port := DEFAULT_PORT) -> void:
@@ -107,6 +131,8 @@ func host(port := DEFAULT_PORT) -> void:
 func join(ip: String, port := DEFAULT_PORT) -> void:
 	_reset_session()
 	is_host = false
+	_join_ip = ip
+	_join_port = port
 	_enet = ENetConnection.new()
 	var err := _enet.create_host(1, 2)
 	if err == OK:
@@ -204,6 +230,77 @@ func _upnp_unmap() -> void:
 		t.wait_to_finish.call_deferred())
 
 
+## gh #13: the linked session dropped with resume armed. Hold it open: the host's bound socket
+## keeps listening for the partner's redial; the joiner starts redialing. One grace clock bounds
+## the whole outage (`resume_grace_s`), however many redials or failed handshakes it spans.
+func _enter_lost() -> void:
+	print("[link] connection lost — holding the session for a reconnect (%.0f s grace)" % resume_grace_s)
+	state = "lost"
+	_peer = null
+	_remote_ok = false
+	_accepted = false
+	_was_lost = true
+	_lost_elapsed = 0.0
+	_redial_in = 0.5
+	_redial_backoff = 2.0
+	lost.emit()
+
+
+## A resume attempt fizzled (failed handshake, refused stranger, dead redial): back to waiting.
+## The grace clock keeps running — this never resets it.
+func _back_to_lost() -> void:
+	state = "lost"
+	_peer = null
+	_remote_ok = false
+	_accepted = false
+
+
+## The joiner's redial: a fresh ENet connection to the original host address. Backoff doubles
+## up to 10 s between attempts; a failed attempt surfaces as EVENT_DISCONNECT and re-arms this.
+func _redial() -> void:
+	_redial_in = _redial_backoff
+	_redial_backoff = minf(_redial_backoff * 2.0, 10.0)
+	if _enet != null:
+		_enet.destroy()
+	_enet = ENetConnection.new()
+	var err := _enet.create_host(1, 2)
+	_peer = _enet.connect_to_host(_join_ip, _join_port, 2) if err == OK else null
+	if _peer == null:
+		print("[link] redial could not start — next try in %.0f s" % _redial_in)
+	else:
+		print("[link] redialing %s:%d ..." % [_join_ip, _join_port])
+
+
+## gh #13: true while an armed session outage is being ridden out — the `lost` state itself,
+## and the resume attempt's transient states (the redial's connect + the hello/accept round
+## trip put `state` through "connecting"/"handshake" for a few frames). Consumers HOLD while
+## this is true; only a truly closed link aborts their waits. Without the transient coverage
+## a battle's linkwait voided INSIDE the resume handshake window.
+func holding() -> bool:
+	return state == "lost" or (_was_lost and state != "linked" and state != "closed")
+
+
+## The player gave up waiting for the partner (B on the "Link lost" box): today's teardown.
+func cancel_wait() -> void:
+	if state == "lost" or _was_lost:
+		_was_lost = false
+		close("gave-up")
+
+
+## gh #13 test hook (--blipat): kill the transport exactly as a network blip would. peer_reset()
+## sends the peer NOTHING (a cable pull), and generates no local event either — so this drives
+## the state change itself; the REMOTE side notices via its dead-peer timeout. The normal
+## lost/resume machinery takes over from there on both sides.
+func blip() -> void:
+	print("[link] BLIP injected (%s)" % state)
+	if _peer != null:
+		_peer.reset()                      # forceful, silent: the foreign host is NOT notified
+	if state == "linked" and resume_armed:
+		_enter_lost()
+	elif state != "closed" and state != "idle":
+		_finish("disconnected")
+
+
 ## Hand over (and clear) the messages that arrived before a listener connected.
 func take_inbox() -> Array:
 	var held := inbox
@@ -216,6 +313,9 @@ func _finish(reason: String) -> void:
 		return
 	state = "closed"
 	inbox = []
+	_was_lost = false
+	resume_armed = false
+	_session_token = ""
 	_upnp_unmap()
 	if _enet != null:
 		_enet.destroy()
@@ -234,6 +334,18 @@ func _process(delta: float) -> void:
 		if _elapsed > 3.0:                 # grace for the disconnect round-trip
 			_finish(_close_reason)
 			return
+	elif state == "lost" or _was_lost:
+		# gh #13: the outage grace is ONE clock across every redial and resume handshake —
+		# a stranger's refused connect or a failed attempt never extends the wait.
+		_lost_elapsed += delta
+		if _lost_elapsed > resume_grace_s:
+			print("[link] the partner did not return within %.0f s — closing the session" % resume_grace_s)
+			_finish("resume-timeout")
+			return
+		if state == "lost" and not is_host:
+			_redial_in -= delta
+			if _redial_in <= 0.0:
+				_redial()
 	elif state != "linked":
 		_elapsed += delta
 		if _elapsed > timeout_s:
@@ -245,6 +357,9 @@ func _process(delta: float) -> void:
 		var ev: Array = _enet.service(0)
 		var kind := int(ev[0])
 		if kind == ENetConnection.EVENT_ERROR:
+			if _was_lost:                  # a dead redial attempt is not the end of the grace
+				_back_to_lost()
+				return
 			print("[link] transport error")
 			_finish("transport-error")
 			return
@@ -255,17 +370,28 @@ func _process(delta: float) -> void:
 			# Real networks hiccup: ENet's default drop detection is tuned for LAN. Give the
 			# peer up to ~60 s of unacknowledged silence before declaring it gone — combined
 			# with the human-paced waits, a rough patch stalls the session instead of
-			# killing it (the reported frequent "drops").
-			_peer.set_timeout(10000, 20000, 60000)
+			# killing it (the reported frequent "drops"). Tunable so the gh #13 blip matrix
+			# doesn't wait a minute per injection for the surviving side to notice.
+			_peer.set_timeout(mini(10000, peer_timeout_max_ms), mini(20000, peer_timeout_max_ms),
+				peer_timeout_max_ms)
 			state = "handshake"
 			_elapsed = 0.0
 			var me := identity()
-			print("[link] connected — handshake (we are version %s)" % me["version"])
-			_peer.send(CH_CONTROL, JSON.stringify({"t": "hello", "id": me}).to_utf8_buffer(),
+			var env := {"t": "hello", "id": me}
+			# gh #13: a resume attempt carries the session token minted at the original link-up.
+			if _was_lost and _session_token != "":
+				env["resume"] = _session_token
+			print("[link] connected — handshake (we are version %s%s)" % [
+				me["version"], ", resuming" if _was_lost else ""])
+			_peer.send(CH_CONTROL, JSON.stringify(env).to_utf8_buffer(),
 				ENetPacketPeer.FLAG_RELIABLE)
 		elif kind == ENetConnection.EVENT_DISCONNECT:
 			if state == "closing":
 				_finish(_close_reason)
+			elif state == "linked" and resume_armed:
+				_enter_lost()              # gh #13: an armed table session holds for a reconnect
+			elif _was_lost:
+				_back_to_lost()            # a failed resume attempt; the grace clock decides
 			else:
 				if state == "linked":
 					print("[link] partner disconnected")
@@ -286,6 +412,19 @@ func _on_message(msg: Dictionary) -> void:
 	match str(msg.get("t", "")):
 		"hello":
 			_remote = msg.get("id", {})
+			# gh #13: a half-open session re-admits ONLY its original partner — the reconnect
+			# hello must carry the token minted at link-up. A stranger, or a relaunched process
+			# (which has no token and, by ADR-016 scope, keeps the teardown + journal story), is
+			# turned away and the wait continues on the same grace clock.
+			if _was_lost and str(msg.get("resume", "")) != _session_token:
+				print("[link] resume refused: the reconnecting peer carries no session token")
+				if _peer != null:
+					_peer.send(CH_CONTROL, JSON.stringify({"t": "refuse",
+						"reason": "this session is waiting for its original partner"})
+						.to_utf8_buffer(), ENetPacketPeer.FLAG_RELIABLE)
+					_peer.peer_disconnect_later()
+				_back_to_lost()
+				return
 			var why := _mismatch(identity(), _remote)
 			if why != "":
 				print("[link] REFUSED: %s" % why)
@@ -297,14 +436,29 @@ func _on_message(msg: Dictionary) -> void:
 				return
 			_remote_ok = true
 			if _peer != null:
-				_peer.send(CH_CONTROL, JSON.stringify({"t": "accept"}).to_utf8_buffer(),
+				# The host mints the session token at first link-up and shares it in `accept`;
+				# on a resume the token already exists and rides unchanged.
+				if is_host and _session_token == "":
+					_session_token = Crypto.new().generate_random_bytes(8).hex_encode()
+				var acc := {"t": "accept"}
+				if is_host:
+					acc["token"] = _session_token
+				_peer.send(CH_CONTROL, JSON.stringify(acc).to_utf8_buffer(),
 					ENetPacketPeer.FLAG_RELIABLE)
 			_maybe_establish()
 		"accept":
 			_accepted = true
+			if not is_host and msg.has("token"):
+				_session_token = str(msg["token"])
 			_maybe_establish()
 		"refuse":
 			var why := str(msg.get("reason", "?"))
+			if _was_lost:
+				# Our resume attempt was turned away (a different host answered the port, or a
+				# token disagreement). Keep waiting — the grace clock, or the player, decides.
+				print("[link] resume attempt refused: %s" % why)
+				_back_to_lost()
+				return
 			print("[link] REFUSED by partner: %s" % why)
 			refused.emit(why, true)
 			_finish("refused-by-peer")
@@ -350,6 +504,14 @@ func _maybe_establish() -> void:
 		var rflags: Dictionary = _remote.get("flags", {})
 		session = {"remote": _remote,
 			"dupe": dupe_opt_in and bool(rflags.get("dupe", false))}   # mutual opt-in ONLY
+		if _was_lost:
+			# gh #13: the same session, re-established — the consumers reconcile from here
+			# (ADR-016 rules per state); the lockstep and journal semantics are only READ.
+			_was_lost = false
+			_lost_elapsed = 0.0
+			print("[link] session RESUMED (%s) — the partner is back" % ("host" if is_host else "join"))
+			resumed.emit(session)
+			return
 		print("[link] session established (%s) — version %s, content hashes match%s" % [
 			"host" if is_host else "join", _remote.get("version", "?"),
 			", dupe easter egg ARMED" if session["dupe"] else ""])
