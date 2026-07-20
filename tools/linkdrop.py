@@ -18,10 +18,10 @@ import sys
 import time
 from pathlib import Path
 
-from linktest import launch, collect
+from linktest import launch, collect, godot_user_dir
 
 BASE_PORT = 17701
-UDIR = Path.home() / "AppData/Roaming/Godot/app_userdata/pokeredpc"
+UDIR = godot_user_dir()
 
 
 def check(name, ok, detail=""):

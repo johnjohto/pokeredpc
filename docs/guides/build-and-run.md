@@ -6,10 +6,39 @@
 # from the project root
 git clone --depth 1 https://github.com/pret/pokered.git pokered
 python -m pip install --user Pillow
-# download portable Godot 4.7 win64 into tools/godot/ :
-#   Godot_v4.7-stable_win64.exe          (GUI)
-#   Godot_v4.7-stable_win64_console.exe  (CLI / headless, prints to stdout)
+# download portable Godot 4.7 for your OS into tools/godot/ :
+#   Windows: Godot_v4.7-stable_win64.exe          (GUI)
+#            Godot_v4.7-stable_win64_console.exe  (CLI / headless, prints to stdout)
+#   Linux:   Godot_v4.7-stable_linux.x86_64
+#   macOS:   Godot.app  (the scripts call Godot.app/Contents/MacOS/Godot)
 ```
+
+## Other platforms (Linux / macOS — gh #12)
+
+The project runs from source on any OS Godot 4.7 ships for; there are no exported builds
+(personal-use project — each player builds their own copy). The whole toolchain is
+cross-platform:
+
+- `tools/build.ps1` / `tools/run.ps1` run under [pwsh](https://github.com/PowerShell/PowerShell)
+  on Linux/macOS and pick the per-OS Godot binary above; set the **`POKEREDPC_GODOT`** env var
+  to use a binary elsewhere (e.g. a distro-packaged `godot`). Without pwsh, the direct
+  invocations are just `python tools/extract.py`, then
+  `tools/godot/<binary> --headless --editor --quit --path game` (import), then
+  `tools/godot/<binary> --path game` (play).
+- `tools/linktest.py` / `linksoak.py` / `linkdrop.py` resolve the same per-OS binary (and
+  honor `POKEREDPC_GODOT`), and read saves from Godot's per-OS user-data dir.
+- Saves, trade journals, and keybinds live under Godot's `user://` — per-OS that is
+  `%APPDATA%\Godot\app_userdata\pokeredpc` (Windows),
+  `~/.local/share/godot/app_userdata/pokeredpc` (Linux),
+  `~/Library/Application Support/Godot/app_userdata/pokeredpc` (macOS). Nothing in the
+  save/journal code touches OS paths or newlines directly (audited for gh #12): files are
+  `JSON.stringify` round-trips through `user://`, and the wire protocol is single-line JSON.
+- **Cross-OS link sessions** (the point of gh #12): the link identity handshake requires the
+  exact same game version, the exact same **Godot build** (`Engine.get_version_info().string`
+  travels in the `hello` — cross-OS builds of one release share it, so 4.7-stable on Windows
+  links 4.7-stable on Linux, but 4.7 ≠ 4.7.1), and identical content hashes — both copies
+  extracted from the same pret/pokered (the manifest hashes newline-normalized bytes, so the
+  OSes' CRLF/LF difference doesn't refuse).
 
 ## Build (extract assets + import)
 
@@ -145,7 +174,7 @@ where noted (git-ignored), prints results, and quits — used to verify features
 | `--battledettest` | The battle determinism oracle (gh #2, ADR-014): scenario battles replayed twice per seed — canonical per-turn event streams must be byte-identical, a different seed must diverge; prints per-scenario `stream_md5` (stable across invocations). `--verbose` echoes every event line. |
 | `--monrecordtest` | The mon record codec (gh #4): round-trips varied mons through the `mon/1` wire schema, refuses an unknown version, rejects ~24 malformed fixtures cleanly. Single-process. |
 | `--host [--port=N]` | v1.1 link (gh #3): host a link session and wait; on link, a ping/pong round-trip, then close. See [engine/link.md](../engine/link.md). |
-| `--join <ip>` | v1.1 link (gh #3): connect to a host. Modifiers for both: `--tamper=version\|<part>` (drive the identity refusal), `--linktimeout=N`, `--dupe`. Pairs are driven by `python tools/linktest.py`. |
+| `--join <ip>` | v1.1 link (gh #3): connect to a host. Modifiers for both: `--tamper=version\|engine\|<part>` (drive the identity refusal), `--linktimeout=N`, `--dupe`. Pairs are driven by `python tools/linktest.py`. |
 | `--clubtest` | The Cable Club attendant (gh #5). Alone: every single-instance refusal/timeout path lands back cleanly. With `--clubhost` / `--clubjoin [--port=N] [--tamper=X]`: one side of the full in-game link flow — `--trade` continues into the Trade Center round-trip (gh #6), `--battle` into the Colosseum lockstep battle (gh #7). Driven in pairs by `tools/linktest.py`. |
 | `--colsoak` | One desync-soak battle (gh #8): link up, exchange parties + the pinned `--colseed`, fight with a varied deterministic move policy (`--colparty=N` picks the roster set). Driven in batteries by `python tools/linksoak.py [--battles N]`. |
 | `--killat=X` / `--recovertest` | gh #9 drop injection: pull the cable at a scripted point (`pick`/`confirm`/`commit`/`ack`/`actN`); relaunch the slot to run the trade-journal recovery. Driven by `python tools/linkdrop.py` (battle drops, the trade rollback/roll-forward matrix, the mutual-opt-in dupe egg). |
