@@ -63,6 +63,19 @@ equivalence sweep; config-first knobs are **only what is already data** (`data/r
 additive under `format: 1`); extraction is strangler-fig with `--battledettest` between every
 move. Sub-issues **gh #31–#35** (interfaces+registry → types+formulas → battle+link →
 catch/progression/config → expression evaluator, which carries the phase gate).
+**Landed: gh #33** (2026-07-20): the battle module is behind the seam — `Gen1Battle` owns
+the battle STATE (61 vars: mons/party/stages/volatiles, stored stats, AI state, safari,
+catch/flee outcomes, the determinism RNG + stream, the lockstep link state) and the
+mechanics, moved verbatim in four gated waves: turn resolution (`_resolve`/`_player_act`/
+`_enemy_act`/`_end_of_turn`), the full move-execution chain, status + residuals, the
+complete Gen-1 trainer AI, the lockstep link resolution (incl. resume send/reconcile),
+safari turns, escapes, and the EXP/level/learn chain. `Battle.gd` is the HOST now —
+presentation, menus, the message pump — forwarding state via get/set properties and
+delegating mechanics with unchanged signatures, so the test harness and Cutscene/link
+plumbing never noticed. Boot gained a fail-fast for a ruleset module that fails to load.
+Gate: the four `--battledettest` md5s byte-identical through every wave; `--rulesettest` /
+`--movefxtest` / `--selftest` / `--projparitytest` green; `linktest` ALL GREEN, `linksoak`
+8/8 in sync, `linkdrop` ALL GREEN (dupe egg intact).
 **Landed: gh #32** (2026-07-20): the formula layer is behind the seam — `Gen1Formulas`
 carries the pure kernels moved verbatim (`stat_calc` with the sexp sqrt term, the four
 growth curves + inverse, `crit_roll` incl. the Focus Energy bug, `damage_core` =

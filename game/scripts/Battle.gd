@@ -1,7 +1,10 @@
 extends Control
-## Wild battle (Gen-1 rules). Self-contained modal: draws the scene, runs the
-## action/move/party menus, computes damage (Gen-1 formula), and handles a party
-## with switching, EXP/leveling, and move-learning.
+## The battle HOST (presentation + flow): draws the scene, runs the action/move/
+## party menus and the message pump, and plays the ordered event stream. The
+## MECHANICS — state, turn resolution, move execution, AI, catch, EXP — live in
+## the ruleset's battle module (Gen1Battle, gh #33/ADR-018); this node forwards
+## the battle state via properties and delegates the mechanics calls, so the
+## test harness and link plumbing keep their surface.
 ##
 ## Persistent party mons are built by Main (make_mon); the battle mutates their
 ## hp/exp/level in place, so progress carries back to the overworld.
