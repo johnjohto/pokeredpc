@@ -1200,6 +1200,9 @@ func _club_flow() -> void:
 		await say("The link was\ncanceled.")
 		return
 	await say("OK, please wait\njust a moment.")
+	# Not the asm's line — playtest QoL: the club room has no visible door (the cartridge
+	# exits by walking off the bottom edge too, it just never tells you).
+	await say("When you're done,\nwalk down to the\nexit to come back!")
 	main.link_return_map = main.center_label       # walking out of the room comes back here
 	main.link_return_cell = main.player.cell
 	var room := "TradeCenter" if dest == 0 else "Colosseum"
