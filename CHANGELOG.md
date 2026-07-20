@@ -8,8 +8,24 @@ milestones, `PATCH` bumps are fixes/polish. See `docs/roadmap.md` for the live p
 
 ## [Unreleased]
 
-Toward **v1.1 multiplayer** (the faithful Cable Club over deterministic lockstep — spec gh #1,
-design ADR-014).
+## [1.1.0] - 2026-07-20
+
+**Multiplayer.** The faithful Cable Club — link trades and link battles between two
+self-built copies over LAN or direct IP, exactly as ADR-014 designed it: the attendant is
+the cable, both engines run deterministic lockstep from a shared seed, trades commit
+atomically, and the classic dupe glitch survives as a strictly mutual easter egg.
+
+The ADR-014 two-stage gate is closed: **Stage 1**, the automated suites — `linktest.py`
+(session/identity/club/trade/colosseum, byte-identical lockstep streams across two real
+instances), `linksoak.py` (the desync soak, 8/8 battles in sync across varied parties),
+and `linkdrop.py` (the drop-injection matrix + the dupe egg) — all green repeatedly;
+**Stage 2**, a real remote human session (2026-07-19): trades including trade evolutions,
+battles in both directions, and genuine disconnects, all functional, with the session's
+fix wave (drop tolerance, human-paced waits, room exits, the mon record's explicit maxpp,
+partner names and intro presentation) landed and re-verified.
+
+Spec gh #1, sub-issues gh #2–#9 all closed. Deferred: session resume into an interrupted
+trade/battle (gh #13), cross-platform builds (gh #12), overworld presence (v1.2 candidate).
 
 ### Added
 - **The battle determinism oracle** (gh #2): every battle-logic random draw now comes from a

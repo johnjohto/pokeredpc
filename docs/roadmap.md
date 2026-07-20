@@ -22,9 +22,12 @@ PATCH = fixes/polish). The version lives in `VERSION` + `project.godot`
 Stage 1 (the seeded legit-play bot, NEW GAME → HALL OF FAME, seeds 1+2 GREEN) and Stage 2 (the
 complete human playthrough, signed off after ~60 fixed playtest issues and the full audit
 campaigns gh #19–#22/#176/#185). Every engine system maps to a completed audit; the tracker is
-at zero open bugs. **The v1.1 multiplayer design conversation is held (2026-07-17, ADR-014) — the next
-milestone is building v1.1**: the Cable Club (trades + link battles) over deterministic lockstep,
-gated by a bot-vs-bot desync soak then a real remote session; then v2 (ADR-013). The work is
+at zero open bugs. **v1.1.0 — SHIPPED 2026-07-20**: the faithful Cable Club (link trades +
+lockstep link battles) built and gated in two days — Stage 1 (the automated `linktest` /
+`linksoak` / `linkdrop` suites, byte-identical lockstep streams across real instances) and
+Stage 2 (a real remote human session, 2026-07-19: trades incl. trade evolutions, battles
+both directions, genuine disconnects) both closed. Remaining multiplayer follow-ups: gh #12
+(cross-platform), gh #13 (session resume). **Next: v2** (the fan-game toolkit, ADR-013). The work is
 broken down as gh #1 (spec) with sub-issues #2–#10. **Landed: gh #2 — the battle determinism
 oracle** (2026-07-19): every battle-logic random draw now comes from a battle-local seeded RNG
 (never the frame-paced global RNG), each battle emits a canonical per-turn event stream (turn,
