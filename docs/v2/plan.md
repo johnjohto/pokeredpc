@@ -1,9 +1,10 @@
 # v2 — a monster-RPG creation toolkit (the "Studio" plan)
 
-**Status:** forward-looking north star. **v1 (the faithful port) ships 1.0 first** — its correctness is
-the spec and the test oracle for everything below. Nothing here starts until 1.0 lands
-([roadmap.md](../roadmap.md), [decisions.md](../decisions.md) ADR-011). The four foundational
-decisions this plan is built on are recorded in **ADR-013**.
+**Status:** **active — the build-out is tracked as gh #14 (epic) with phase issues #15–#21**
+(kicked off 2026-07-20). The gates that guarded this start are closed: **1.0 shipped 2026-07-17**
+(its correctness is the spec and the test oracle for everything below) and **v1.1 multiplayer
+shipped 2026-07-20**, pinning the Core requirements §4.7 names. The four foundational decisions
+this plan is built on are recorded in **ADR-013**. Next: the Phase-1 design conversation (gh #15).
 
 ---
 
@@ -319,26 +320,26 @@ Each phase is independently shippable and testable; **the bot + the audits gate 
   battle serialization, and project identity that Phase 1 would otherwise have to guess at. **This is the
   gate on starting v2:** v2 Core work waits until multiplayer's shape is known, so it isn't formalized
   twice.
-- **Phase 1 — Core & project format.** Extract the shared Core (schema, data model, stable IDs). Write
-  the `v1 → project` converter. The runtime loads a **Project** instead of hardcoded assets.
+- **Phase 1 — Core & project format** (**gh #15**). Extract the shared Core (schema, data model, stable
+  IDs). Write the `v1 → project` converter. The runtime loads a **Project** instead of hardcoded assets.
   **Deliverable:** v1 runs unchanged *from a project folder* — proves the split.
-- **Phase 2 — Ruleset seam + `gen1`.** Refactor battle/catch/types/formulas behind ruleset interfaces;
-  the Gen-1 rules become *the* `gen1` ruleset. **Deliverable:** the bot still beats the game *through*
-  the seam.
-- **Phase 3 — Event VM.** Replace map adapters + Cutscene beats with the event system (command library +
-  interpreter + declarative triggers). **Deliverable:** Kanto's whole story runs on authored events; the
-  bot still completes NEW GAME → HALL OF FAME.
-- **Phase 4 — Studio MVP.** Standalone app: project browser + schema-driven content editors
+- **Phase 2 — Ruleset seam + `gen1`** (**gh #16**). Refactor battle/catch/types/formulas behind ruleset
+  interfaces; the Gen-1 rules become *the* `gen1` ruleset. **Deliverable:** the bot still beats the game
+  *through* the seam (and the `--battledettest` md5s don't move by a byte — the refactor oracle).
+- **Phase 3 — Event VM** (**gh #17**). Replace map adapters + Cutscene beats with the event system
+  (command library + interpreter + declarative triggers). **Deliverable:** Kanto's whole story runs on
+  authored events; the bot still completes NEW GAME → HALL OF FAME.
+- **Phase 4 — Studio MVP** (**gh #18**). Standalone app: project browser + schema-driven content editors
   (species/moves/items/trainers) + play-test launch. Maps still via Tiled + converter. **Deliverable:**
   edit a species/trainer in the GUI, play-test the change instantly.
-- **Phase 5 — Map & event editors.** TMX map view + the event GUI + the object/trigger bridge +
-  validation lints. **Deliverable:** build a small *original* map with an NPC + a working event, entirely
-  in Studio.
-- **Phase 6 — Scripting hatch + ruleset config UI.** Sandboxed scripting; GUI for ruleset knobs; custom
-  fields/types. **Deliverable:** a creator makes a non-Gen-1 change (new type, tweaked formula) with no
-  engine code.
-- **Phase 7 — Polish, packaging, a *second* sample.** A deliberately-different second sample game
-  (proves genericity), export-to-`.exe` for players, creator docs/tutorials, community.
+- **Phase 5 — Map & event editors** (**gh #19**). TMX map view + the event GUI + the object/trigger
+  bridge + validation lints. **Deliverable:** build a small *original* map with an NPC + a working event,
+  entirely in Studio.
+- **Phase 6 — Scripting hatch + ruleset config UI** (**gh #20**). Sandboxed scripting; GUI for ruleset
+  knobs; custom fields/types. **Deliverable:** a creator makes a non-Gen-1 change (new type, tweaked
+  formula) with no engine code.
+- **Phase 7 — Polish, packaging, a *second* sample** (**gh #21**). A deliberately-different second sample
+  game (proves genericity), export-to-`.exe` for players, creator docs/tutorials, community.
 
 ---
 

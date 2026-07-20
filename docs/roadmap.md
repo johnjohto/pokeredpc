@@ -30,15 +30,21 @@ both directions, genuine disconnects) both closed. Remaining multiplayer follow-
 (session resume — **design pinned 2026-07-20 in ADR-016**: live-transport reconnect + reconcile,
 ~120 s grace window, journal-phase reconcile closing the two-generals residue, dupe egg stays
 relaunch-only; targeted **v1.2.0**, gated by a `--blipat` injection suite + a real human session),
-and the last mile of gh #12 (cross-platform), whose automatable half closed
+and the last mile of gh #12 (cross-platform, ready-for-human), whose automatable half closed
 2026-07-20: the engine build joined link identity (a differing Godot build refuses naming both
 builds), the toolchain runs per-OS (`POKEREDPC_GODOT`, per-OS user dirs, Linux/macOS setup in
 build-and-run.md), and the dispatchable **`determinism` workflow** built the project from
 scratch on Linux + macOS GitHub runners — both produced battle streams **byte-identical to the
 Windows baseline** (all four `--battledettest` md5s equal) with `linktest.py` + `linksoak.py`
 ALL GREEN on each; what remains is one live two-machine Windows↔Linux session
-(ready-for-human). **Next: v2** (the fan-game toolkit, ADR-013). The work is
-broken down as gh #1 (spec) with sub-issues #2–#10. **Landed: gh #2 — the battle determinism
+(ready-for-human). **Next: v2** (the fan-game toolkit, ADR-013), **kicked off
+2026-07-20**: the build-out is tracked as **gh #14 (epic)** with phase issues **#15–#21** — Core &
+project format → ruleset seam + `gen1` → Event VM → Studio MVP → map/event editors → sandboxed
+scripting + config UI → packaging + the second sample, each phase gated by the bot + the audits +
+the determinism suites (see [v2/plan.md](v2/plan.md) §7). First up: **gh #15 Phase 1**, opening
+with its design conversation (serialization, the schema system, the project manifest/identity
+grown from the link manifest, the stable-ID scheme). (The *v1.1* work had been broken down as
+gh #1 (spec) with sub-issues #2–#10.) **Landed: gh #2 — the battle determinism
 oracle** (2026-07-19): every battle-logic random draw now comes from a battle-local seeded RNG
 (never the frame-paced global RNG), each battle emits a canonical per-turn event stream (turn,
 both actions, RNG cursor, state digest — `det_stream`/`[battledet]`), and `--battledettest`
