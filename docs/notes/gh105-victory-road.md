@@ -188,3 +188,26 @@ always refuse. Observed: 1F's second leg pushes the boulder right from (5,16); t
 legal only if `cell + d` is passable, unoccupied, **not** an elevation pair with `cell - d`,
 and not stairs — then re-derive all three floors' tables and re-run
 `--playthrough --from=victoryroad --seed 1` through to the HALL OF FAME.
+
+## Correction to the correction (2026-07-20, gh #28): the tables were legal all along
+
+The section above mis-diagnosed. `vrdyn.py` **already models** the push rule (its push branch
+refuses `tpblk(behind, ahead)` and a stairs destination; only its header comment claimed
+otherwise), and `tools/vr_push_check.py` — now also checking the stairs rule — confirms **0 of
+the route's 65 shoves** are illegal. The refused push at (6,16)→(7,16) is $20↔$20: no pair, no
+stairs. The engine was right to accept the route, and the solver was right to derive it.
+
+The real culprit is a lock the port didn't have: pokered's `BIT_BOULDER_DUST` (wMiscFlags).
+`TryPushingBoulder` (`engine/overworld/push_boulder.asm`) sets it **at the shove** (`.done`) and
+`ret nz`s on it at entry, so from shove start until `DoBoulderDustAnimation` →
+`ResetBoulderPushFlags`, every further push attempt is ignored — slide + dust are one atomic
+beat. The port's only lock was `cutscene_active`, set *after* the slide tween (0.536 s) while
+the player's own step lands at 0.268 s. In that 0.27 s gap the bot's next-tile press **armed**
+the two-push counter, then its remaining presses vanished into the dust input lock — so the
+second tile of every multi-tile shove read as refused. Single-tile pushes (`--victorytest`)
+never noticed.
+
+Fixed by porting the flag: `Main._boulder_dust_pending` mirrors BIT_BOULDER_DUST
+(set in `try_push_boulder` at the shove, cleared when `_boulder_dust` ends, gate checked before
+the sprite lookup/arming, exactly the asm's order after the STRENGTH bit), and
+`_pt_push_boulder` waits the beat out between tiles. No route re-derivation was needed.

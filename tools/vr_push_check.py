@@ -50,7 +50,7 @@ for f, pushes in ROUTE.items():
             total += 1
             fp, fd = feet(player), feet(dest)
             is_hole = f in HOLE and dest == HOLE[f]
-            blk = pair(fp, fd) and not is_hole
+            blk = (pair(fp, fd) or fd == 0x15) and not is_hole   # elevation pair, or stairs dest
             tag = "  HOLE(exempt)" if is_hole else ("  <<< BLOCKED by pokered!" if blk else "")
             bad += 1 if blk else 0
             print(f"[{f}] push {DN[d]:5} boulder{tuple(b)} player{player} feet=${fp:02x} -> "

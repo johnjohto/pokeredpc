@@ -77,10 +77,15 @@ budget in silence); and the FLY cursor **double-stepping** — `Player._process`
 to `modal.handle_input()`, so the bot's own extra call advanced the Town Map cursor twice per
 press, making a town on the other parity unreachable forever inside an unbounded loop (54 CPU
 minutes, zero output; flying home to Pallet hid it because Pallet is the cursor's own start).
-The bot now reaches **all eight badges** and Victory Road's door, where it fails on the 1F
-boulder shove — **gh #28**, filed, also pre-existing (`--victorytest` passes standalone). So the
-**ADR-011 Stage-1 artifact (NEW GAME → HALL OF FAME) is currently RED for v1-side reasons**;
-gh #28 is what re-earns it. (The *v1.1* work had been broken down as
+The bot now reaches **all eight badges** and Victory Road's door, where it failed on the 1F
+boulder shove — **gh #28**, also pre-existing (`--victorytest` passes standalone). **Fixed**
+(2026-07-20): the port was missing pokered's `BIT_BOULDER_DUST` — a shove's slide + dust puff
+are one atomic beat that ignores further pushes, and without it the bot's next-tile press armed
+mid-slide then vanished into the dust input lock, refusing tile 2 of every multi-tile shove
+(the routes themselves were legal all along; see `docs/notes/gh105-victory-road.md`). With the
+flag ported, `--playthrough --from=victoryroad --seed 1` carries through Victory Road and the
+full Elite Four to the **HALL OF FAME**. The **ADR-011 Stage-1 artifact** still needs the full
+NEW GAME → HALL OF FAME seeded run re-executed to go GREEN. (The *v1.1* work had been broken down as
 gh #1 (spec) with sub-issues #2–#10.) **Landed: gh #2 — the battle determinism
 oracle** (2026-07-19): every battle-logic random draw now comes from a battle-local seeded RNG
 (never the frame-paced global RNG), each battle emits a canonical per-turn event stream (turn,

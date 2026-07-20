@@ -9,6 +9,21 @@ milestones, `PATCH` bumps are fixes/polish. See `docs/roadmap.md` for the live p
 ## [Unreleased]
 
 ### Fixed
+- **Multi-tile STRENGTH shoves refused their second tile — Victory Road (and the endgame behind
+  it) was unreachable** (gh #28). pokered's `TryPushingBoulder`
+  (`engine/overworld/push_boulder.asm`) sets `BIT_BOULDER_DUST` the moment a shove starts and
+  ignores every further push attempt (`ret nz`, before the sprite lookup or the two-push arming)
+  until the dust puff ends (`DoBoulderDustAnimation` → `ResetBoulderPushFlags`) — slide + dust
+  are one atomic beat. The port had no such flag: its only lock (`cutscene_active`) began *after*
+  the boulder's 0.536 s slide, while the pushing player's own step lands at 0.268 s. In that gap
+  the bot's next-tile press armed the two-push counter and its follow-ups then vanished into the
+  dust input lock, so tile 2 of every multi-tile push read as refused — stranding the 1F switch
+  route at its second shove. (`--victorytest` stayed green throughout: it only ever pushes one
+  tile.) The issue's first diagnosis — stale solver routes crossing elevation pairs — was wrong:
+  `tools/vr_push_check.py` (now also checking the stairs-destination rule) proves 0 of the
+  route's 65 shoves illegal, and the refused tile was $20↔$20. `try_push_boulder` now mirrors
+  the flag (`_boulder_dust_pending`, set at the shove, gate first after the STRENGTH check,
+  cleared when the dust ends), and the bot waits the beat out between tiles.
 - **Three latent navigator traps on the road to the Champion** (gh #27), surfaced by the v2
   Phase-1 gate — the first full seeded bot run since v1.1 shipped, and none is project
   fallout (all reproduce on the pre-flip build). **FLY:** the bot pressed a key *and* called

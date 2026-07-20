@@ -218,6 +218,11 @@ var strength_active := false     # STRENGTH used -> the lead mon can push boulde
 # away / a different boulder or direction / a collision resets it (see _boulder_reset_tried, gh #129).
 var _boulder_tried_at := Vector2i(-9999, -9999)
 var _boulder_tried_dir := Vector2i.ZERO
+# BIT_BOULDER_DUST (pokered wMiscFlags): set the moment a shove starts (push_boulder.asm
+# TryPushingBoulder `.done`), cleared when the dust puff ends (DoBoulderDustAnimation ->
+# ResetBoulderPushFlags). While set, TryPushingBoulder `ret nz`s before the sprite lookup or the
+# two-push arming — the slide + dust are one atomic beat and further pushes are ignored (gh #28).
+var _boulder_dust_pending := false
 var in_safari := false           # inside the Safari Zone (safari battles + step counter)
 var safari_balls := 0            # SAFARI BALLs remaining
 var safari_steps := 0            # steps left before the game ends
@@ -1107,6 +1112,9 @@ func _make_placed(label: String, data: Dictionary, ox: int, oy: int) -> Dictiona
 func load_world(center: String, arrive_idx := -1, spawn_override = null, keep_facing := false) -> void:
 	if moneybox:
 		moneybox.hide_box()          # a map redraw clears the MONEY_BOX tiles on the GB
+	# Port artifact, not asm: freeing the NPCs kills an in-flight boulder slide tween, so
+	# _boulder_dust's `await btw.finished` never resumes and could leave the push gate stuck shut.
+	_boulder_dust_pending = false
 	placed = []
 	var c := _make_placed(center, ProjectData.map_json(center), 0, 0)
 	placed.append(c)
@@ -3191,6 +3199,12 @@ func _is_water(cell: Vector2i) -> bool:
 func try_push_boulder(cell: Vector2i, d: Vector2i) -> bool:
 	if not strength_active:
 		return false
+	# pokered TryPushingBoulder: `bit BIT_BOULDER_DUST / ret nz` — while a shove is in flight
+	# (slide + dust), a push attempt is ignored outright, before the sprite lookup or the arming.
+	# Without this gate the bot's next-tile press armed mid-slide and then vanished into the dust
+	# input lock, refusing every multi-tile shove's second tile (gh #28).
+	if _boulder_dust_pending:
+		return false
 	var npc = _npc_at(cell)
 	if npc == null or not str(npc.key).begins_with("SPRITE_BOULDER@"):
 		_boulder_reset_tried()             # not facing a boulder: ResetBoulderPushFlags
@@ -3220,6 +3234,7 @@ func try_push_boulder(cell: Vector2i, d: Vector2i) -> bool:
 	btw.tween_property(npc, "position", Vector2(beyond * 16), npc.STEP_TIME)
 	if audio:
 		audio.play_sfx("push_boulder")     # SFX_PUSH_BOULDER as the slide starts (TryPushingBoulder)
+	_boulder_dust_pending = true           # set BIT_BOULDER_DUST at the shove (TryPushingBoulder .done)
 	_boulder_dust(btw, beyond, d)
 	# Per-map boulder effects: Victory Road floor switches, Seafoam hole falls (gh #53).
 	map_script(center_label).on_boulder(beyond, npc)
@@ -3262,6 +3277,7 @@ func _boulder_dust(btw: Tween, at: Vector2i, d: Vector2i) -> void:
 		for f in 3:                             # Delay3 between steps
 			await get_tree().create_timer(1.0 / 60.0).timeout
 	s.queue_free()
+	_boulder_dust_pending = false               # ResetBoulderPushFlags: the shove beat is over
 	if locked:
 		cutscene_active = false
 	if audio:
@@ -12662,6 +12678,10 @@ func _pt_push_boulder(at: Vector2i, dir: int, times := 1) -> bool:
 				str(at + DIRV4[dir] * i), str(at + DIRV4[dir] * (i + 1)), i + 1, times,
 				_PT_DIR_NAME[dir]])
 			return false
+		# pokered ignores pushes while BIT_BOULDER_DUST is set (shove start -> dust end). Wait the
+		# beat out, or the next tile's arming presses vanish into it and the shove reads as refused:
+		# the player's step (0.268s) ends mid-slide (0.536s), so the bot is always here early (gh #28).
+		await _drive_until(func() -> bool: return not _boulder_dust_pending, 120)
 		if modal != null or cutscene_active:               # a cave-floor wild encounter fired on landing —
 			await _pt_settle()                             # win it before the next shove (gh #105/#106)
 	return true

@@ -6,8 +6,10 @@
 #   - a boulder pushed onto a switch sets that switch's flag (opens a block); a boulder pushed into the
 #     3F hole (23,15) sets VR3b (2F boulder (23,16) appears, 3F boulder (22,15) is gone),
 #   - the 3F hole also warps the PLAYER down to 2F(22,16),
-#   - tile-pair collisions block the player's steps but NOT pushes; ladder warp-tiles aren't standable,
-#     edge/entrance warps are (they only fire facing the map edge, gh #80),
+#   - tile-pair collisions block the player's steps AND pushes: a shove is refused across an elevation
+#     pair between the player's tile (behind the boulder) and the boulder's destination (two steps
+#     ahead), or onto stairs $15 — pokered CheckForCollisionWhenPushingBoulder (gh #28); ladder
+#     warp-tiles aren't standable, edge/entrance warps are (they only fire facing the map edge, gh #80),
 #   - ladders land at the dest map's warps[dest_warp-1].
 # Prints the sequence of (floor, action) to wire into _pt_climb_victory_road.
 import json
