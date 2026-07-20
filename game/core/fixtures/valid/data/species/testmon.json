@@ -1,0 +1,57 @@
+{
+ "id": "species:testmon",
+ "name": "TESTMON",
+ "stats": {
+  "hp": 45,
+  "atk": 49,
+  "def": 49,
+  "spd": 45,
+  "spc": 65
+ },
+ "types": [
+  "type:normal"
+ ],
+ "catch_rate": 45,
+ "base_exp": 64,
+ "growth": "medium_fast",
+ "start_moves": [
+  "move:tackle"
+ ],
+ "level_moves": [
+  {
+   "level": 5,
+   "move": "move:tackle"
+  }
+ ],
+ "tmhm": [
+  "move:tackle"
+ ],
+ "evolutions": [
+  {
+   "method": "level",
+   "level": 16,
+   "into": "species:testmon2"
+  }
+ ],
+ "dex": {
+  "num": 1,
+  "cat": "TEST",
+  "height_ft": 1,
+  "height_in": 0,
+  "weight": 100,
+  "desc": "A fixture."
+ },
+ "cry": {
+  "cry": 1,
+  "pitch": 128,
+  "length": 10
+ },
+ "icon": "mon",
+ "sprites": {
+  "front": "assets/front/testmon.png",
+  "back": "assets/back/testmon.png"
+ },
+ "custom": {
+  "note": "the ADR-017 reserved bag, exercised"
+ }
+}

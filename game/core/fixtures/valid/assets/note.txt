@@ -1,0 +1,1 @@
+binary assets live under assets/ (kind=asset, content-unchecked)

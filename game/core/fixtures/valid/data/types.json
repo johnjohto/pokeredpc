@@ -1,0 +1,12 @@
+{
+ "types": [
+  "type:normal",
+  "type:fire"
+ ],
+ "chart": {
+  "type:fire": {
+   "type:fire": 0.5,
+   "type:normal": 1.0
+  }
+ }
+}

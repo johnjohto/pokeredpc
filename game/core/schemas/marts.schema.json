@@ -1,0 +1,13 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "schema:marts",
+ "type": "object",
+ "x-ref-keys": "map",
+ "additionalProperties": {
+  "type": "array",
+  "items": {
+   "type": "string",
+   "x-ref": "item"
+  }
+ }
+}

@@ -1,0 +1,10 @@
+{
+ "id": "species:testmon",
+ "name": "TESTMON",
+ "types": [
+  "type:normal"
+ ],
+ "catch_rate": 45,
+ "base_exp": 64,
+ "growth": "medium_fast"
+}

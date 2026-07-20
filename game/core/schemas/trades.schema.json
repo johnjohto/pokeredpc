@@ -1,0 +1,44 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "schema:trades",
+ "type": "object",
+ "required": [
+  "trades"
+ ],
+ "properties": {
+  "trades": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "required": [
+     "give",
+     "get",
+     "nick",
+     "dialogset"
+    ],
+    "properties": {
+     "give": {
+      "type": "string",
+      "x-ref": "species"
+     },
+     "get": {
+      "type": "string",
+      "x-ref": "species"
+     },
+     "nick": {
+      "type": "string"
+     },
+     "dialogset": {
+      "type": "integer",
+      "minimum": 0
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  "custom": {
+   "type": "object"
+  }
+ },
+ "additionalProperties": false
+}

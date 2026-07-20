@@ -1,0 +1,81 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "schema:encounters",
+ "type": "object",
+ "required": [
+  "slots",
+  "maps"
+ ],
+ "properties": {
+  "slots": {
+   "type": "array",
+   "items": {
+    "type": "integer",
+    "minimum": 0,
+    "maximum": 255
+   }
+  },
+  "maps": {
+   "type": "object",
+   "x-ref-keys": "map",
+   "additionalProperties": {
+    "type": "object",
+    "properties": {
+     "grass_rate": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 255
+     },
+     "water_rate": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 255
+     },
+     "grass": {
+      "type": "array",
+      "items": {
+       "type": "array",
+       "minItems": 2,
+       "maxItems": 2,
+       "prefixItems": [
+        {
+         "type": "integer",
+         "minimum": 1,
+         "maximum": 100
+        },
+        {
+         "type": "string",
+         "x-ref": "species"
+        }
+       ]
+      }
+     },
+     "water": {
+      "type": "array",
+      "items": {
+       "type": "array",
+       "minItems": 2,
+       "maxItems": 2,
+       "prefixItems": [
+        {
+         "type": "integer",
+         "minimum": 1,
+         "maximum": 100
+        },
+        {
+         "type": "string",
+         "x-ref": "species"
+        }
+       ]
+      }
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  "custom": {
+   "type": "object"
+  }
+ },
+ "additionalProperties": false
+}

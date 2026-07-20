@@ -1,0 +1,67 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "schema:move",
+ "type": "object",
+ "required": [
+  "id",
+  "name",
+  "type",
+  "power",
+  "accuracy",
+  "pp",
+  "effect"
+ ],
+ "properties": {
+  "id": {
+   "type": "string",
+   "pattern": "^move:[a-z0-9_'-]+$"
+  },
+  "name": {
+   "type": "string",
+   "minLength": 1
+  },
+  "type": {
+   "type": "string",
+   "x-ref": "type"
+  },
+  "power": {
+   "type": "integer",
+   "minimum": 0,
+   "maximum": 255
+  },
+  "accuracy": {
+   "type": "integer",
+   "minimum": 0,
+   "maximum": 255,
+   "$comment": "Gen-1 raw /256 scale, as v1 stores it."
+  },
+  "pp": {
+   "type": "integer",
+   "minimum": 0,
+   "maximum": 64
+  },
+  "effect": {
+   "type": "string",
+   "minLength": 1
+  },
+  "sfx": {
+   "type": "object",
+   "required": [
+    "key"
+   ],
+   "properties": {
+    "key": {
+     "type": "string"
+    },
+    "pitch": {
+     "type": "integer"
+    }
+   },
+   "additionalProperties": false
+  },
+  "custom": {
+   "type": "object"
+  }
+ },
+ "additionalProperties": false
+}

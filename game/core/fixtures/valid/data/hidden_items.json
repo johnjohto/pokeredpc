@@ -1,0 +1,9 @@
+{
+ "map:TestTown": [
+  {
+   "x": 1,
+   "y": 1,
+   "item": "item:potion"
+  }
+ ]
+}

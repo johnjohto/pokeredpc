@@ -1,0 +1,35 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "schema:types",
+ "type": "object",
+ "required": [
+  "types",
+  "chart"
+ ],
+ "properties": {
+  "types": {
+   "type": "array",
+   "minItems": 1,
+   "items": {
+    "type": "string",
+    "pattern": "^type:[a-z0-9_-]+$"
+   }
+  },
+  "chart": {
+   "type": "object",
+   "x-ref-keys": "type",
+   "$comment": "Sparse effectiveness matrix: attacker -> defender -> multiplier; absent pairs are neutral (1.0).",
+   "additionalProperties": {
+    "type": "object",
+    "x-ref-keys": "type",
+    "additionalProperties": {
+     "type": "number"
+    }
+   }
+  },
+  "custom": {
+   "type": "object"
+  }
+ },
+ "additionalProperties": false
+}

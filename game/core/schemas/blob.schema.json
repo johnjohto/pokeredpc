@@ -1,0 +1,5 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "schema:blob",
+ "$comment": "Opaque interim presentation data (audio, move anims, title beats...): extractor-owned, schema'd properly when an editor touches it."
+}

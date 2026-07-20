@@ -1,0 +1,25 @@
+{
+ "id": "species:testmon2",
+ "name": "TESTMON2",
+ "stats": {
+  "hp": 60,
+  "atk": 62,
+  "def": 63,
+  "spd": 60,
+  "spc": 80
+ },
+ "types": [
+  "type:normal",
+  "type:fire"
+ ],
+ "catch_rate": 45,
+ "base_exp": 141,
+ "growth": "medium_fast",
+ "evolutions": [
+  {
+   "method": "stone",
+   "item": "item:fire-stone",
+   "into": "species:testmon"
+  }
+ ]
+}

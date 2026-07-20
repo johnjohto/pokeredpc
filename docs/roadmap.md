@@ -46,7 +46,14 @@ the determinism suites (see [v2/plan.md](v2/plan.md) §7). **Phase 1's design is
 reserved `custom` bag, format-speaks-IDs with the loader resolving, interim map JSON until the
 Phase-5 TMX bridge, the extractor *emitting* the project (the importer born, not a converter),
 and `format: 1` + linear migrations. Sub-issues **gh #22–#25** (schemas/Core → manifest+identity
-→ extractor emission → runtime loading, which carries the phase gate). First up: **gh #22**. (The *v1.1* work had been broken down as
+→ extractor emission → runtime loading, which carries the phase gate). **Landed: gh #22**
+(2026-07-20): `core/schemas/` (JSON Schema per content type + the `format.json` layout
+contract), `CoreSchema` (a subset validator that errors on unknown keywords) and
+`ProjectValidator` (claims, record-id registration, dangling-reference resolution, the
+refuse-newer manifest gate) — verified by `--schematest` (valid fixture clean; seven broken
+fixtures each one named error) and `--validate=<dir>`; format spec in
+[v2/project-format.md](v2/project-format.md). Next: **gh #23** (manifest identity) + **gh #24**
+(the extractor emits the Kanto project). (The *v1.1* work had been broken down as
 gh #1 (spec) with sub-issues #2–#10.) **Landed: gh #2 — the battle determinism
 oracle** (2026-07-19): every battle-logic random draw now comes from a battle-local seeded RNG
 (never the frame-paced global RNG), each battle emits a canonical per-turn event stream (turn,

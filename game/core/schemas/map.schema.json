@@ -1,0 +1,61 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "schema:map",
+ "$comment": "INTERIM (ADR-017 d5): v1's extracted map JSON carried byte-for-byte; the TMX switch belongs to the Phase-5 bridge (gh #19) and is a format bump. additionalProperties stays true because this shape is owned by the v1 extractor, not authored.",
+ "type": "object",
+ "required": [
+  "name",
+  "tileset",
+  "width",
+  "height",
+  "blocks",
+  "border_block",
+  "warps",
+  "connections",
+  "bg_events",
+  "object_events"
+ ],
+ "properties": {
+  "name": {
+   "type": "string",
+   "minLength": 1
+  },
+  "tileset": {
+   "type": "string"
+  },
+  "width": {
+   "type": "integer",
+   "minimum": 1
+  },
+  "height": {
+   "type": "integer",
+   "minimum": 1
+  },
+  "blocks": {
+   "type": "array",
+   "items": {
+    "type": "integer",
+    "minimum": 0,
+    "maximum": 255
+   }
+  },
+  "border_block": {
+   "type": "integer",
+   "minimum": 0,
+   "maximum": 255
+  },
+  "warps": {
+   "type": "array"
+  },
+  "connections": {
+   "type": "array"
+  },
+  "bg_events": {
+   "type": "array"
+  },
+  "object_events": {
+   "type": "array"
+  }
+ },
+ "additionalProperties": true
+}

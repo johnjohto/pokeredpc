@@ -1,0 +1,65 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "schema:manifest",
+ "type": "object",
+ "required": [
+  "format",
+  "id",
+  "name",
+  "version",
+  "ruleset"
+ ],
+ "properties": {
+  "format": {
+   "type": "integer",
+   "minimum": 1,
+   "$comment": "Integer format version; linear migrations (ADR-017 d7)."
+  },
+  "id": {
+   "type": "string",
+   "pattern": "^[a-z0-9_-]+$"
+  },
+  "name": {
+   "type": "string",
+   "minLength": 1
+  },
+  "version": {
+   "type": "string",
+   "minLength": 1
+  },
+  "ruleset": {
+   "type": "string",
+   "minLength": 1,
+   "$comment": "Inert until the Phase-2 ruleset seam (gh #16)."
+  },
+  "identity": {
+   "type": "object",
+   "required": [
+    "parts",
+    "content_hash"
+   ],
+   "$comment": "Content-hash identity over canonical bytes (gh #23).",
+   "properties": {
+    "parts": {
+     "type": "object",
+     "patternProperties": {
+      "^[a-z0-9_]+$": {
+       "type": "string",
+       "pattern": "^[0-9a-f]{32}$"
+      }
+     },
+     "additionalProperties": false
+    },
+    "content_hash": {
+     "type": "string",
+     "pattern": "^[0-9a-f]{32}$"
+    }
+   },
+   "additionalProperties": false
+  },
+  "custom": {
+   "type": "object"
+  }
+ },
+ "additionalProperties": false
+}

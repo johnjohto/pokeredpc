@@ -1,0 +1,10 @@
+{
+ "trades": [
+  {
+   "give": "species:testmon",
+   "get": "species:testmon2",
+   "nick": "NICK",
+   "dialogset": 0
+  }
+ ]
+}

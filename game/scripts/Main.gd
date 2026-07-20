@@ -556,6 +556,10 @@ func _ready() -> void:
 		_battledettest()
 	elif "--monrecordtest" in args:
 		_monrecordtest()
+	elif "--schematest" in args:
+		_schematest()
+	elif _validate_dir_arg(args) != "":
+		_validateproject(_validate_dir_arg(args))
 	elif "--recovertest" in args:
 		_recovertest()
 	elif "--clubtest" in args:
@@ -4990,6 +4994,66 @@ func _wraptest() -> void:
 ## fixture dict IS a valid peer message by construction of the versioned schema, so no
 ## second instance is needed. Round-trips varied mons (nicknamed, statused, outsider OT,
 ## every move-slot shape), refuses an unknown schema version, and rejects malformed and
+## gh #22 (ADR-017): the v2 Core schema suite — the valid fixture project validates clean
+## (ids registered per prefix) and every broken fixture is rejected with exactly one error
+## naming the file + path. Run: `pwsh tools/run.ps1 -- --schematest`. Headless.
+func _schematest() -> void:
+	await get_tree().process_frame
+	var ok := true
+	var r: Dictionary = ProjectValidator.validate_project("res://core/fixtures/valid")
+	ok = _schema_check("valid: no errors", (r["errors"] as Array).is_empty() and bool(r["ok"]),
+		"; ".join(PackedStringArray(r["errors"]))) and ok
+	var ids: Dictionary = r["ids"]
+	ok = _schema_check("valid: ids registered (2 species, 1 move, 2 items, 1 trainer, 1 map, 2 types)",
+		int(ids.get("species", 0)) == 2 and int(ids.get("move", 0)) == 1
+		and int(ids.get("item", 0)) == 2 and int(ids.get("trainer", 0)) == 1
+		and int(ids.get("map", 0)) == 1 and int(ids.get("type", 0)) == 2,
+		str(ids)) and ok
+	var cases := [
+		["broken_unknown_field", "unknown field 'prise'"],
+		["broken_wrong_type", "expected integer"],
+		["broken_missing_required", "missing required field 'stats'"],
+		["broken_dangling_ref", "dangling reference 'type:fire'"],
+		["broken_unclaimed", "unclaimed file"],
+		["broken_newer_format", "supports format 1"],
+		["broken_id_mismatch", "does not match its filename"],
+	]
+	for c in cases:
+		var b: Dictionary = ProjectValidator.validate_project("res://core/fixtures/" + str(c[0]))
+		var errs: Array = b["errors"]
+		var hit := errs.size() == 1 and str(errs[0]).contains(str(c[1]))
+		ok = _schema_check("%s: exactly one error naming it" % c[0], hit,
+			"; ".join(PackedStringArray(errs))) and ok
+	print("[schema] %s" % ("ALL GREEN" if ok else "FAIL"))
+	get_tree().quit(0 if ok else 1)
+
+
+func _schema_check(name: String, good: bool, detail: String) -> bool:
+	print("[schema] %s: %s%s" % [name, "PASS" if good else "FAIL",
+		"" if good or detail == "" else " — " + detail])
+	return good
+
+
+## gh #22: validate any project directory (res:// or an OS path) against the format.
+## Run: `pwsh tools/run.ps1 -- --validate=<dir>`. Exit 0 only when the project is clean.
+func _validateproject(dir: String) -> void:
+	await get_tree().process_frame
+	var r: Dictionary = ProjectValidator.validate_project(dir)
+	for e in r["errors"]:
+		print("[validate] %s" % e)
+	print("[validate] %s — %d files, ids %s, %d errors" % [
+		"OK" if bool(r["ok"]) else "INVALID", int(r["files"]), str(r["ids"]),
+		(r["errors"] as Array).size()])
+	get_tree().quit(0 if bool(r["ok"]) else 1)
+
+
+func _validate_dir_arg(args) -> String:
+	for a in args:
+		if str(a).begins_with("--validate="):
+			return str(a).substr(11)
+	return ""
+
+
 ## field-invalid records without crashing. Run: `pwsh tools/run.ps1 -- --monrecordtest`.
 func _monrecordtest() -> void:
 	await get_tree().process_frame

@@ -1,0 +1,87 @@
+{
+ "$comment": "The v2 project layout (ADR-017): which paths exist, which schema each file matches, and how records declare ids. Consumed by ProjectValidator (and, from gh #25, the runtime loader). kind=record: one entity per file, its id field must equal id_prefix:basename (bare_id: the field holds the bare basename, as v1's interim map JSON does). kind=table may declare ids via 'declares' (a JSON pointer to an array of full ids). kind=blob is opaque interim presentation data; kind=asset is binary, content-unchecked.",
+ "format": 1,
+ "layout": [
+  {
+   "path": "manifest.json",
+   "schema": "manifest",
+   "kind": "singleton",
+   "required": true
+  },
+  {
+   "path": "data/species/*.json",
+   "schema": "species",
+   "kind": "record",
+   "id_prefix": "species"
+  },
+  {
+   "path": "data/moves/*.json",
+   "schema": "move",
+   "kind": "record",
+   "id_prefix": "move"
+  },
+  {
+   "path": "data/items/*.json",
+   "schema": "item",
+   "kind": "record",
+   "id_prefix": "item"
+  },
+  {
+   "path": "data/trainers/*.json",
+   "schema": "trainer",
+   "kind": "record",
+   "id_prefix": "trainer"
+  },
+  {
+   "path": "maps/*.json",
+   "schema": "map",
+   "kind": "record",
+   "id_prefix": "map",
+   "id_field": "name",
+   "bare_id": true
+  },
+  {
+   "path": "data/types.json",
+   "schema": "types",
+   "kind": "table",
+   "declares": {
+    "prefix": "type",
+    "pointer": "/types"
+   }
+  },
+  {
+   "path": "data/encounters.json",
+   "schema": "encounters",
+   "kind": "table"
+  },
+  {
+   "path": "data/text.json",
+   "schema": "text",
+   "kind": "table"
+  },
+  {
+   "path": "data/marts.json",
+   "schema": "marts",
+   "kind": "table"
+  },
+  {
+   "path": "data/hidden_items.json",
+   "schema": "hidden_items",
+   "kind": "table"
+  },
+  {
+   "path": "data/trades.json",
+   "schema": "trades",
+   "kind": "table"
+  },
+  {
+   "path": "presentation/*.json",
+   "schema": "blob",
+   "kind": "blob"
+  },
+  {
+   "path": "assets/**",
+   "kind": "asset"
+  }
+ ]
+}

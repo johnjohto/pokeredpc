@@ -1,0 +1,230 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "schema:species",
+ "type": "object",
+ "required": [
+  "id",
+  "name",
+  "stats",
+  "types",
+  "catch_rate",
+  "base_exp",
+  "growth"
+ ],
+ "properties": {
+  "id": {
+   "type": "string",
+   "pattern": "^species:[a-z0-9_.'-]+$"
+  },
+  "name": {
+   "type": "string",
+   "minLength": 1
+  },
+  "stats": {
+   "type": "object",
+   "required": [
+    "hp",
+    "atk",
+    "def",
+    "spd",
+    "spc"
+   ],
+   "properties": {
+    "hp": {
+     "type": "integer",
+     "minimum": 1,
+     "maximum": 255
+    },
+    "atk": {
+     "type": "integer",
+     "minimum": 1,
+     "maximum": 255
+    },
+    "def": {
+     "type": "integer",
+     "minimum": 1,
+     "maximum": 255
+    },
+    "spd": {
+     "type": "integer",
+     "minimum": 1,
+     "maximum": 255
+    },
+    "spc": {
+     "type": "integer",
+     "minimum": 1,
+     "maximum": 255
+    }
+   },
+   "additionalProperties": false
+  },
+  "types": {
+   "type": "array",
+   "minItems": 1,
+   "maxItems": 2,
+   "items": {
+    "type": "string",
+    "x-ref": "type"
+   }
+  },
+  "catch_rate": {
+   "type": "integer",
+   "minimum": 0,
+   "maximum": 255
+  },
+  "base_exp": {
+   "type": "integer",
+   "minimum": 0,
+   "maximum": 255
+  },
+  "growth": {
+   "enum": [
+    "fast",
+    "medium_fast",
+    "medium_slow",
+    "slow"
+   ]
+  },
+  "start_moves": {
+   "type": "array",
+   "maxItems": 4,
+   "items": {
+    "type": "string",
+    "x-ref": "move"
+   }
+  },
+  "level_moves": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "required": [
+     "level",
+     "move"
+    ],
+    "properties": {
+     "level": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100
+     },
+     "move": {
+      "type": "string",
+      "x-ref": "move"
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  "tmhm": {
+   "type": "array",
+   "items": {
+    "type": "string",
+    "x-ref": "move"
+   }
+  },
+  "evolutions": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "required": [
+     "method",
+     "into"
+    ],
+    "properties": {
+     "method": {
+      "enum": [
+       "level",
+       "stone",
+       "trade"
+      ]
+     },
+     "level": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100
+     },
+     "item": {
+      "type": "string",
+      "x-ref": "item"
+     },
+     "into": {
+      "type": "string",
+      "x-ref": "species"
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  "dex": {
+   "type": "object",
+   "required": [
+    "num"
+   ],
+   "properties": {
+    "num": {
+     "type": "integer",
+     "minimum": 1
+    },
+    "cat": {
+     "type": "string"
+    },
+    "height_ft": {
+     "type": "integer",
+     "minimum": 0
+    },
+    "height_in": {
+     "type": "integer",
+     "minimum": 0,
+     "maximum": 11
+    },
+    "weight": {
+     "type": "integer",
+     "minimum": 0
+    },
+    "desc": {
+     "type": "string"
+    }
+   },
+   "additionalProperties": false
+  },
+  "cry": {
+   "type": "object",
+   "required": [
+    "cry",
+    "pitch",
+    "length"
+   ],
+   "properties": {
+    "cry": {
+     "type": "integer"
+    },
+    "pitch": {
+     "type": "integer"
+    },
+    "length": {
+     "type": "integer"
+    }
+   },
+   "additionalProperties": false
+  },
+  "icon": {
+   "type": "string"
+  },
+  "sprites": {
+   "type": "object",
+   "properties": {
+    "front": {
+     "type": "string"
+    },
+    "back": {
+     "type": "string"
+    }
+   },
+   "additionalProperties": false
+  },
+  "custom": {
+   "type": "object"
+  }
+ },
+ "additionalProperties": false
+}

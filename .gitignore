@@ -128,3 +128,6 @@ __pycache__/
 game/*.png
 game/*.png.import
 game/strip/
+
+# Claude Code agent worktrees (harness-internal)
+.claude/worktrees/

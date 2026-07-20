@@ -1,0 +1,16 @@
+{
+ "id": "trainer:tester",
+ "name": "TESTER",
+ "money": 100,
+ "ai": "Generic",
+ "ai_count": 3,
+ "ai_mods": [],
+ "parties": [
+  [
+   {
+    "species": "species:testmon",
+    "level": 5
+   }
+  ]
+ ]
+}

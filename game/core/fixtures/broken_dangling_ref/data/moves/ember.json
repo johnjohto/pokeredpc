@@ -1,0 +1,9 @@
+{
+ "id": "move:ember",
+ "name": "EMBER",
+ "type": "type:fire",
+ "power": 40,
+ "accuracy": 255,
+ "pp": 25,
+ "effect": "BURN_SIDE_EFFECT1"
+}

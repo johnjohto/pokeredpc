@@ -1,0 +1,31 @@
+{
+ "slots": [
+  51,
+  51,
+  39,
+  25,
+  25,
+  25,
+  13,
+  10,
+  10,
+  3,
+  3,
+  1
+ ],
+ "maps": {
+  "map:TestTown": {
+   "grass_rate": 10,
+   "grass": [
+    [
+     3,
+     "species:testmon"
+    ],
+    [
+     5,
+     "species:testmon2"
+    ]
+   ]
+  }
+ }
+}

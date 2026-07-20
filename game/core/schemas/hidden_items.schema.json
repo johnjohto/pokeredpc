@@ -1,0 +1,32 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "schema:hidden_items",
+ "type": "object",
+ "x-ref-keys": "map",
+ "additionalProperties": {
+  "type": "array",
+  "items": {
+   "type": "object",
+   "required": [
+    "x",
+    "y",
+    "item"
+   ],
+   "properties": {
+    "x": {
+     "type": "integer",
+     "minimum": 0
+    },
+    "y": {
+     "type": "integer",
+     "minimum": 0
+    },
+    "item": {
+     "type": "string",
+     "x-ref": "item"
+    }
+   },
+   "additionalProperties": false
+  }
+ }
+}
