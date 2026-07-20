@@ -45,11 +45,18 @@ is a refusal that **names the differing part**: the refuser logs `[link] REFUSED
 
 ```
 { "version": <application/config/version>,
+  "engine":  <Engine.get_version_info().string>,
   "parts":   { "base_stats": md5, "moves": md5, "types": md5 },
   "flags":   { "dupe": bool } }
 ```
 
 - **Version** is the exact game version — no cross-version link compatibility (spec).
+- **Engine** is the exact Godot build (gh #12): the two peers run the same sim on different
+  machines/OSes, and Godot's RNG algorithm and float/string behavior are only guaranteed
+  identical for the identical engine release — a differing build is the same
+  undebuggable-desync risk as differing data, so it refuses naming both builds.
+  `version_info.string` carries major.minor.status + the build git hash; cross-OS builds of
+  one release share it, so a Windows↔Linux pair on the same 4.7-stable links fine.
 - **Parts** come from `assets/link_manifest.json`, written by the extractor
   (`build_link_manifest` in `tools/extract.py`) at extraction time (spec story 24): md5s
   over the link-relevant extracted data — the tables both engines must agree on to simulate
@@ -226,12 +233,13 @@ consent only.
 |---|---|
 | `--host [--port=N]` | Host and wait; on link, send a `ping`, expect `pong`, close. |
 | `--join <ip>` / `--join=<ip>` | Connect to a host; answer the `ping`. |
-| `--tamper=version` / `--tamper=<part>` | Corrupt this side's identity → drives the refusal path. |
+| `--tamper=version` / `--tamper=engine` / `--tamper=<part>` | Corrupt this side's identity → drives the refusal path. |
 | `--linktimeout=N` | Shorten the no-partner timeout (tests). |
 | `--dupe` | Set this side's easter-egg opt-in flag. |
 
 **`python tools/linktest.py`** launches host+join pairs headlessly over localhost and
-asserts both logs across four scenarios: clean link (established both sides + the ping/pong
+asserts both logs across five scenarios: clean link (established both sides + the ping/pong
 round-trip), a tampered content part (both sides refuse naming `'moves'`), a tampered
-version (both sides refuse naming the version), and a join with no host (clean timeout, no
-hang). Judged on log content; exits non-zero on any failure.
+version (both sides refuse naming the version), a tampered engine build (both sides refuse
+naming it — gh #12), and a join with no host (clean timeout, no hang). Judged on log
+content; exits non-zero on any failure.

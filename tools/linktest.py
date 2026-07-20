@@ -4,11 +4,13 @@ headlessly over localhost and asserts both logs, across four scenarios:
   1. clean     — both sides log "session established", the ping/pong round-trip completes
   2. tamper-part    — the joiner's 'moves' hash is corrupted: BOTH logs refuse naming 'moves'
   3. tamper-version — the host's version is corrupted: BOTH logs refuse naming the version
-  4. nobody    — a join with no host times out cleanly within its --linktimeout (no hang)
+  4. tamper-engine  — the joiner's engine build is corrupted: BOTH logs refuse naming it (gh #12)
+  5. nobody    — a join with no host times out cleanly within its --linktimeout (no hang)
 
 Judged by log content, not exit codes (headless Godot may exit 0xC0000005 on shutdown).
 Exits 0 only if every scenario passes. Run:  python tools/linktest.py
 """
+import os
 import subprocess
 import sys
 import threading
@@ -16,9 +18,33 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-GODOT = ROOT / "tools" / "godot" / "Godot_v4.7-stable_win64.exe"
 GAME = ROOT / "game"
 BASE_PORT = 17301
+
+
+def godot_binary():
+    """The Godot 4.7 binary for this OS (tools/godot/<per-OS name>), overridable via the
+    POKEREDPC_GODOT env var — a Linux/macOS peer may keep it elsewhere (gh #12)."""
+    env = os.environ.get("POKEREDPC_GODOT")
+    if env:
+        return Path(env)
+    name = {"win32": "Godot_v4.7-stable_win64.exe",
+            "darwin": "Godot.app/Contents/MacOS/Godot",
+            }.get(sys.platform, "Godot_v4.7-stable_linux.x86_64")
+    return ROOT / "tools" / "godot" / name
+
+
+def godot_user_dir():
+    """Godot's per-user data dir for this OS — where user:// (saves, trade journals) lands."""
+    if sys.platform == "win32":
+        return Path.home() / "AppData/Roaming/Godot/app_userdata/pokeredpc"
+    if sys.platform == "darwin":
+        return Path.home() / "Library/Application Support/Godot/app_userdata/pokeredpc"
+    base = Path(os.environ.get("XDG_DATA_HOME", str(Path.home() / ".local/share")))
+    return base / "godot/app_userdata/pokeredpc"
+
+
+GODOT = godot_binary()
 
 
 def launch(user_args):
@@ -91,6 +117,16 @@ def main():
     ok &= check("tamper-version: no session", "session established" not in hout
                 and "session established" not in jout)
 
+    # gh #12: two peers on the same game version but different Godot builds must refuse —
+    # lockstep only holds when both machines run the identical engine release.
+    hout, jout = run_pair("tamper-engine", [], ["--tamper=engine"], BASE_PORT + 8)
+    ok &= check("tamper-engine: host refuses naming the engine build",
+                "REFUSED" in hout and "engine build differs" in hout)
+    ok &= check("tamper-engine: join sees an engine-build refusal",
+                "REFUSED" in jout and "engine build differs" in jout)
+    ok &= check("tamper-engine: no session", "session established" not in hout
+                and "session established" not in jout)
+
     # gh #5: the full in-game Cable Club flow — attendant -> HOST/JOIN -> save beat ->
     # LinkMenu (the joiner never picks; the host's club_go closes its menu) -> both players
     # standing on the Trade Center floor at their special-warp spots.
@@ -147,7 +183,7 @@ def main():
                 "result=done" in jout and "ALAKAZAM(HOSTA/111)" in jout)
     ok &= check("trade: journals cleared", "journal=false" in hout and "journal=false" in jout)
     import json as _json
-    udir = Path.home() / "AppData/Roaming/Godot/app_userdata/pokeredpc"
+    udir = godot_user_dir()
     try:
         hsave = _json.loads((udir / "pokeredpc_save_tradehost.json").read_text(encoding="utf-8"))
         jsave = _json.loads((udir / "pokeredpc_save_tradejoin.json").read_text(encoding="utf-8"))

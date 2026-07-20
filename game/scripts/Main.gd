@@ -5570,9 +5570,10 @@ func _has_join_arg(args: Array) -> bool:
 ## `--join <ip>` / `--join=<ip>` connects to one. The whole connect flow runs headlessly:
 ## Link.gd raises the session (link identity handshake: exact version + the extraction
 ## manifest's content hashes), then the host sends a ping, the joiner answers pong, and both
-## quit — `tools/linktest.py` launches a pair and asserts both logs. `--tamper=version` or
-## `--tamper=<part>` (base_stats/moves/types) corrupts this side's identity so the refusal
-## path can be driven; `--linktimeout=N` shortens the no-partner timeout for tests.
+## quit — `tools/linktest.py` launches a pair and asserts both logs. `--tamper=version`,
+## `--tamper=engine`, or `--tamper=<part>` (base_stats/moves/types) corrupts this side's
+## identity so the refusal path can be driven; `--linktimeout=N` shortens the no-partner
+## timeout for tests.
 func _linktest(hosting: bool) -> void:
 	await get_tree().process_frame
 	var args := OS.get_cmdline_user_args()

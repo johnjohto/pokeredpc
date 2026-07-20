@@ -1,14 +1,15 @@
 extends Node
 ## The v1.1 link layer (gh #3, ADR-014): the ONE module that touches networking. It owns the
 ## transport (ENet, one reliable-ordered connection between two trusted peers over LAN/direct
-## IP — no servers, no discovery) and the LINK IDENTITY handshake (exact game version + the
-## extractor's content-hash manifest over link-relevant data), and it will carry the mon
-## record and per-turn action exchange in later tickets. Everything outside talks to this
+## IP — no servers, no discovery) and the LINK IDENTITY handshake (exact game version +
+## exact engine build + the extractor's content-hash manifest over link-relevant data), and
+## it will carry the mon record and per-turn action exchange in later tickets. Everything outside talks to this
 ## interface — host()/join()/send_message()/close() + the signals — never to the network.
 ##
 ## Session lifecycle:
 ##   idle -> waiting (host) | connecting (join) -> handshake -> linked -> closed
-## On ENet connect, BOTH sides send `hello` carrying their identity {version, parts, flags}.
+## On ENet connect, BOTH sides send `hello` carrying their identity
+## {version, engine, parts, flags}.
 ## Each side independently compares the peer's identity to its own: any difference is a
 ## refusal NAMING the differing part (`refuse` message + local log + disconnect) — under
 ## lockstep, silent data drift becomes an undebuggable mid-battle desync, so mismatched
@@ -32,7 +33,7 @@ var dupe_opt_in := false             # the easter-egg flag: sent in hello; mutua
 var state := "idle"                  # idle | waiting | connecting | handshake | linked | closing | closed
 var is_host := false
 var session := {}                    # once linked: {"remote": identity, "dupe": bool}
-var tamper := ""                     # debug (--tamper=X): corrupt OUR version/part before send
+var tamper := ""                     # debug (--tamper=X): corrupt OUR version/engine/part before send
 
 var _enet: ENetConnection
 var _peer: ENetPacketPeer
@@ -50,20 +51,29 @@ var _accepted := false               # they validated ours
 var _close_reason := "closed"        # carried through the graceful "closing" state
 
 
-## Our link identity: exact version + the extraction manifest's per-part hashes + session
-## flags. `tamper` corrupts what we SEND (and, honestly, what we believe — a corrupted
-## manifest corrupts both sides of the comparison), which is how the refusal path is tested.
+## Our link identity: exact version + exact engine build + the extraction manifest's
+## per-part hashes + session flags. `tamper` corrupts what we SEND (and, honestly, what we
+## believe — a corrupted manifest corrupts both sides of the comparison), which is how the
+## refusal path is tested.
 func identity() -> Dictionary:
 	var manifest: Dictionary = main._load_json("res://assets/link_manifest.json")
 	var ver := str(ProjectSettings.get_setting("application/config/version", "?"))
+	# gh #12: the engine build is part of link identity. The two peers run the SAME sim on
+	# different machines/OSes; Godot's RNG algorithm and float/string behavior are only
+	# guaranteed identical for the identical engine release, so a differing build is the
+	# same undebuggable-desync risk as differing data. version_info.string carries
+	# major.minor.status + the build git hash — cross-OS builds of one release share it.
+	var eng := str(Engine.get_version_info().get("string", "?"))
 	var parts: Dictionary = (manifest.get("parts", {}) as Dictionary).duplicate()
 	if tamper == "version":
 		ver += "-tampered"
+	elif tamper == "engine":
+		eng += "-tampered"
 	elif tamper != "" and parts.has(tamper):
 		parts[tamper] = "0000tampered"
 	# `name` rides along for display (the trade movie's farewell, the Colosseum label);
 	# it is NOT part of the comparison — names may differ, that's the point of them.
-	return {"version": ver, "parts": parts, "flags": {"dupe": dupe_opt_in},
+	return {"version": ver, "engine": eng, "parts": parts, "flags": {"dupe": dupe_opt_in},
 		"name": str(main.player_name)}
 
 
@@ -312,6 +322,10 @@ func _mismatch(ours: Dictionary, theirs: Dictionary) -> String:
 	if str(theirs.get("version", "?")) != str(ours.get("version", "?")):
 		return "game version differs: ours %s, theirs %s" % [
 			ours.get("version", "?"), theirs.get("version", "?")]
+	# gh #12: same game, different Godot build — refuse before lockstep can desync.
+	if str(theirs.get("engine", "?")) != str(ours.get("engine", "?")):
+		return "engine build differs: ours %s, theirs %s — both copies must run the same Godot release" % [
+			ours.get("engine", "?"), theirs.get("engine", "?")]
 	# gh #9: the dupe easter egg is strictly mutual — an asymmetric opt-in refuses the whole
 	# session, so the egg can never fire one-sided (ADR-014 decision 7; spec story 20).
 	if bool((ours.get("flags", {}) as Dictionary).get("dupe", false)) \
