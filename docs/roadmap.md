@@ -83,9 +83,13 @@ boulder shove — **gh #28**, also pre-existing (`--victorytest` passes standalo
 are one atomic beat that ignores further pushes, and without it the bot's next-tile press armed
 mid-slide then vanished into the dust input lock, refusing tile 2 of every multi-tile shove
 (the routes themselves were legal all along; see `docs/notes/gh105-victory-road.md`). With the
-flag ported, `--playthrough --from=victoryroad --seed 1` carries through Victory Road and the
-full Elite Four to the **HALL OF FAME**. The **ADR-011 Stage-1 artifact** still needs the full
-NEW GAME → HALL OF FAME seeded run re-executed to go GREEN. (The *v1.1* work had been broken down as
+flag ported — plus the saffron stage gaining the standard retry loop it was missing (**gh #29**:
+both seeds' first full runs died to a transient wander-RNG blockage on the Celadon Mart
+approach) — the **ADR-011 Stage-1 artifact is GREEN again**: `--playthrough --seed 1` and
+`--seed 2` each run NEW GAME → **HALL OF FAME** in one unbroken process (all 21 checkpoints in
+order, `validate_gate.py` → **GATE GREEN** on both logs, Champion beaten at L67/L71). The
+recovery-path weakness the failed runs exposed (a stage failure *inside* Victory Road strands
+the retry loop) is split out to **gh #30**. (The *v1.1* work had been broken down as
 gh #1 (spec) with sub-issues #2–#10.) **Landed: gh #2 — the battle determinism
 oracle** (2026-07-19): every battle-logic random draw now comes from a battle-local seeded RNG
 (never the frame-paced global RNG), each battle emits a canonical per-turn event stream (turn,
