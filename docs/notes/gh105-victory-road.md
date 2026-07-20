@@ -154,3 +154,37 @@ never has to cross a pocket boundary itself).
 
 Just the **full chained gate re-verify** (NEW GAME → HALL OF FAME, seed 1, on this branch — which also
 validates the game-wide #80 warp change), then land on main + close #105/#128/#80.
+
+## Correction (2026-07-20, gh #28): pushes are NOT tile-pair-exempt
+
+`tools/vrdyn.py`'s header states the model as "tile-pair collisions block the player's steps
+but **NOT** pushes", and this note's step 2 repeats it ("boulder push is tile-pair-exempt").
+**That is wrong**, and the derived push tables inherit the error.
+
+pokered `engine/overworld/player_state.asm`, `CheckForCollisionWhenPushingBoulder`:
+
+```
+	call GetTileTwoStepsInFrontOfPlayer
+	...
+	ld hl, TilePairCollisionsLand
+	call CheckForTilePairCollisions2
+	ld a, $ff
+	jr c, .done ; if there is an elevation difference between the current tile and the one two steps ahead
+	ld a, [wTileInFrontOfBoulderAndBoulderCollisionResult]
+	cp $15 ; stairs tile
+	ld a, $ff
+	jr z, .done ; if the tile two steps ahead is stairs
+```
+
+So a shove is refused when the player's **current** tile and the tile **two steps ahead**
+(the boulder's destination) are an elevation pair — and also when that destination is stairs.
+`Main.try_push_boulder` ports this correctly; the solver is what disagrees with the cartridge.
+
+**Consequence:** `_PT_VR1F_PUSHES` (and the 2F/3F tables) can contain shoves the engine will
+always refuse. Observed: 1F's second leg pushes the boulder right from (5,16); tile 1
+(→ (6,16)) lands, tile 2 (→ (7,16)) is refused, stranding the climb (gh #28).
+
+**Fix:** teach `vrdyn.py`/`vrsolve.py` the same rule — a push from `cell` in direction `d` is
+legal only if `cell + d` is passable, unoccupied, **not** an elevation pair with `cell - d`,
+and not stairs — then re-derive all three floors' tables and re-run
+`--playthrough --from=victoryroad --seed 1` through to the HALL OF FAME.
