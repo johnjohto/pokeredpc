@@ -2,6 +2,45 @@
 
 Newest first. Each entry: context → decision → consequences.
 
+## ADR-016 — Link session resume: live-transport reconnect + reconcile (2026-07-20)
+
+**Context:** v1.1 tears down any dead link — battles end stakeless, trades resolve via the phased
+journal, players walk back to the attendant — which is correct but unfriendly, and it leaves
+ADR-015's documented two-generals residue: an ack lost in transit at the instant of a drop can
+strand the peers on opposite sides of the trade decision. Only a reconnect + reconcile
+conversation can close that window (gh #13). Design conversation held 2026-07-20; six decisions.
+**Decision:** (1) **Scope: transport blips only** — both game processes still alive, the socket
+died (Wi-Fi drop, cable pull). A process death keeps today's teardown + journal-recovery story;
+persisting battle state for relaunch-resume is out of scope. (2) **Grace window: ~120 s,
+player-cancellable** — the survivor shows "Link lost — waiting for your partner…", B gives up
+immediately into today's teardown; the host keeps listening on the session port, the joiner
+auto-redials with backoff. (ADR-015's human/machine-paced rule doesn't apply: during an outage
+there is no liveness to bind to, so this wait gets its own bound.) (3) **Resume identity: a
+session token** minted by the host at link-up rides the normal identity handshake on
+reconnection; a wrong or absent token takes the ordinary fresh-session path, so a stranger can
+never join into a half-open session. (4) **Reconcile rules by state:** *mid-battle* — compare
+last-acknowledged turn + RNG cursor + state digest from the lockstep stream: equal → continue,
+one action in flight → retransmit it, digests differ → a determinism bug by definition, void
+stakeless as today, loudly logged; *trade pre-commit* — restart at the pick screens (parties
+re-exchanged; nothing at stake, keeps the reconcile protocol tiny); *trade commit* — exchange
+journal phases: `acked`+`acked` → both apply, `acked`+`ready` → roll the ready side forward
+(**the two-generals closure**), `ready`+`ready` → roll back to picks; *pre-table states*
+(attendant flow, save beat, LinkMenu) — teardown as today. (5) **The dupe easter egg is
+relaunch-only:** resume reconciles honestly even for opted-in sessions — the glitch keeps its
+faithful power-cut ritual (kill the game in the ack window and relaunch), and a lag spike can
+never fork a mon. (6) **Ships as v1.2.0** (a player-visible capability + a new protocol surface
+= a feature milestone), with the milestone kept pure: ADR-015's parked faithfulness pair
+(items in link battles, link MIMIC's real pick menu) stays parked. **The gate is the house
+two-stage:** Stage 1 — a `--blipat` injection mode that resets the ENet connection *without*
+killing the process, scripted across mid-battle turns, every trade phase, and the ack window,
+plus a blip-soak, asserting resume + byte-identical streams and every commit-phase case ending
+consistent on both saves; Stage 2 — a real remote human session with genuine Wi-Fi drops.
+**Consequences:** the two-generals residue is closed for live processes — the only case a
+reconcile can reach, since a relaunch already resolves correctly (and deliberately, for the
+egg) via the journal; teardown remains the universal fallback wherever resume doesn't prove
+itself; the wire grows a session token and a small `resume`/reconcile vocabulary but the
+lockstep and journal semantics are unchanged — reconcile only *reads* them.
+
 ## ADR-015 — Lockstep implementation: mirrored sims, canonical streams, presumed-commit trades (2026-07-19)
 
 **Context:** Building ADR-014 (gh #2–#9) forced implementation-level choices the design left open, several

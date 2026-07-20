@@ -27,7 +27,10 @@ lockstep link battles) built and gated in two days — Stage 1 (the automated `l
 `linksoak` / `linkdrop` suites, byte-identical lockstep streams across real instances) and
 Stage 2 (a real remote human session, 2026-07-19: trades incl. trade evolutions, battles
 both directions, genuine disconnects) both closed. Remaining multiplayer follow-ups: gh #13
-(session resume), and the last mile of gh #12 (cross-platform), whose automatable half closed
+(session resume — **design pinned 2026-07-20 in ADR-016**: live-transport reconnect + reconcile,
+~120 s grace window, journal-phase reconcile closing the two-generals residue, dupe egg stays
+relaunch-only; targeted **v1.2.0**, gated by a `--blipat` injection suite + a real human session),
+and the last mile of gh #12 (cross-platform), whose automatable half closed
 2026-07-20: the engine build joined link identity (a differing Godot build refuses naming both
 builds), the toolchain runs per-OS (`POKEREDPC_GODOT`, per-OS user dirs, Linux/macOS setup in
 build-and-run.md), and the dispatchable **`determinism` workflow** built the project from
