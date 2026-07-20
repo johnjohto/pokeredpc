@@ -106,16 +106,6 @@ var _ai_uses: int:
 var _ai_turn: int:         # enemy moves taken (wAILayer2Encouragement)
 	get: return mech._ai_turn
 	set(v): mech._ai_turn = v
-# AIMoveChoiceModification2's effect ranges: [ATTACK_UP1, BIDE) + [ATTACK_UP2, POISON).
-const MOD2_EFFECTS := ["ATTACK_UP1_EFFECT", "DEFENSE_UP1_EFFECT", "SPEED_UP1_EFFECT",
-	"SPECIAL_UP1_EFFECT", "ACCURACY_UP1_EFFECT", "EVASION_UP1_EFFECT", "PAY_DAY_EFFECT",
-	"SWIFT_EFFECT", "ATTACK_DOWN1_EFFECT", "DEFENSE_DOWN1_EFFECT", "SPEED_DOWN1_EFFECT",
-	"SPECIAL_DOWN1_EFFECT", "ACCURACY_DOWN1_EFFECT", "EVASION_DOWN1_EFFECT",
-	"CONVERSION_EFFECT", "HAZE_EFFECT", "ATTACK_UP2_EFFECT", "DEFENSE_UP2_EFFECT",
-	"SPEED_UP2_EFFECT", "SPECIAL_UP2_EFFECT", "ACCURACY_UP2_EFFECT", "EVASION_UP2_EFFECT",
-	"HEAL_EFFECT", "TRANSFORM_EFFECT", "ATTACK_DOWN2_EFFECT", "DEFENSE_DOWN2_EFFECT",
-	"SPEED_DOWN2_EFFECT", "SPECIAL_DOWN2_EFFECT", "ACCURACY_DOWN2_EFFECT",
-	"EVASION_DOWN2_EFFECT", "LIGHT_SCREEN_EFFECT", "REFLECT_EFFECT"]
 var ghost: bool:           # unidentified GHOST (Pokémon Tower, no SILPH SCOPE): can't be fought
 	get: return mech.ghost
 	set(v): mech.ghost = v
@@ -1150,23 +1140,8 @@ func _nav_grid() -> void:
 		cursor = cursor ^ 1; queue_redraw()
 
 
-## TryRunningFromBattle: ghosts and safari mons never hold you; otherwise escape is free when
-## you're at least as fast, else odds are playerSpeed*32 / ((enemySpeed/4) % 256) + 30 per
-## prior attempt against a byte roll — and failing costs the turn (the wild mon attacks).
 func _try_run() -> void:
-	_det_paction = "r"
-	run_attempts += 1
-	if not (ghost or is_safari or demo):
-		var ps := _eff_speed(true)
-		var es := _eff_speed(false)
-		if ps < es:
-			var b := (es >> 2) % 256
-			if b > 0:
-				var q := (ps * 32) / b + 30 * (run_attempts - 1)
-				if q <= 255 and _ri(256) >= q:
-					_enemy_turn_after_item(["Can't escape!"])
-					return
-	_say([{"sfx": "run"}, "Got away\nsafely!"], "run")
+	mech._try_run()
 
 
 func _choose_action() -> void:
@@ -1514,33 +1489,8 @@ func _safari_ball() -> void:
 			_safari_turn(msgs)
 
 
-## The wild mon's turn: show eating/angry (decrementing the factor), then roll to flee.
 func _safari_turn(msgs: Array) -> void:
-	if safari_bait > 0:
-		safari_bait -= 1
-		msgs.append("%s is eating!" % enemy_mon["name"])
-	elif safari_escape > 0:
-		safari_escape -= 1
-		if safari_escape == 0:                       # anger faded -> catch rate back to normal
-			safari_catch = int(base_stats[enemy_mon["species"]]["catch"])
-		msgs.append("%s is angry!" % enemy_mon["name"])
-	var spd := int(enemy_mon["spd"]) % 256
-	var b := spd * 2                                  # flee chance /256 (safari_zone.asm)
-	var ran: bool = spd > 127
-	if not ran:
-		if safari_bait > 0:
-			b = b >> 2                                # eating -> a quarter as likely to flee
-		elif safari_escape > 0:
-			b = min(255, b << 1)                      # angry -> twice as likely to flee
-		ran = _ri(256) < b
-	if ran:
-		msgs.append("%s fled!" % enemy_mon["name"])
-		_say(msgs, "run")
-	else:
-		_say(msgs, "menu")
-	turn_no += 1
-	_det_event("T%d" % turn_no, "p[%s]e[safari]" % _det_paction)
-	_det_paction = "-"
+	mech._safari_turn(msgs)
 
 
 ## Party AND box full refuses a ball throw before it is spent (BoxFullCannotThrowBall ->
@@ -1574,199 +1524,45 @@ func _attempt_catch(ball := "POKé BALL", rate_override := -1) -> Dictionary:
 
 
 func _enemy_turn_after_item(msgs: Array) -> void:
-	# The item was the player's action; the enemy still moves — and speed order still decides
-	# whether the player's own residual ticks before or after the enemy's move (the item turn
-	# runs the same MainInBattleLoop with ExecutePlayerMove a no-op).
-	var emove := _enemy_choose()
-	_det_eaction = "m:" + emove
-	var pf: bool = _eff_speed(true) > _eff_speed(false) \
-		or (_eff_speed(true) == _eff_speed(false) and _rf() < 0.5)
-	if pf:
-		if enemy_mon["hp"] > 0 and player_mon["hp"] > 0:
-			_residual(player_mon, p_vol, enemy_mon, msgs)
-		if enemy_mon["hp"] > 0 and player_mon["hp"] > 0:
-			_enemy_act(emove, msgs)
-			if enemy_mon["hp"] > 0 and player_mon["hp"] > 0:
-				_residual(enemy_mon, e_vol, player_mon, msgs)
-	else:
-		if enemy_mon["hp"] > 0 and player_mon["hp"] > 0:
-			_enemy_act(emove, msgs)
-			if enemy_mon["hp"] > 0 and player_mon["hp"] > 0:
-				_residual(enemy_mon, e_vol, player_mon, msgs)
-		if enemy_mon["hp"] > 0 and player_mon["hp"] > 0:
-			_residual(player_mon, p_vol, enemy_mon, msgs)
-	_end_of_turn(msgs)
+	mech._enemy_turn_after_item(msgs)
 
 
 # ---- link lockstep (gh #7) -------------------------------------------------
 
-## Where a chosen action enters the engine. Non-link: resolve immediately (the AI supplies
-## the enemy's move). Link: send ours, hold in "linkwait" until the peer's arrives, then
-## both sims resolve the same pair.
 func _submit_action(action: Dictionary) -> void:
-	if not link_battle:
-		_resolve(action)
-		return
-	_link_pact = action
-	_link_pact_turn = turn_no
-	main.link.send_message({"t": "col_act", "action": _det_action(action)})
-	main._maybe_kill("act%d" % (turn_no + 1))    # gh #9: cable pull after our turn-N action
-	_link_wait = "act"
-	_link_elapsed = 0.0
-	msg = "Waiting..."
-	revealed = 999
-	state = "linkwait"                 # ignores input; _process watches the queues
-	queue_redraw()
+	mech._submit_action(action)
 
 
-## gh #13 (ADR-016): after a transport resume both peers exchange where their sims stand —
-## turn, RNG cursor, state digest, what they wait on, and their last-sent action/replacement
-## (with its turn) so anything that died in flight rides along. Equal points continue; a
-## missing in-flight action is fed from the peer's report (each side feeds ITSELF from the
-## other's col_resume — both always send one); equal turn+cursor with differing digests is a
-## determinism bug by definition — void, stakeless, loud. Mid-resolution skew (same turn,
-## different cursor) is NOT comparable and not a desync: the retransmit rules cover it.
 func link_send_resume() -> void:
-	main.link.send_message({"t": "col_resume", "turn": turn_no, "cursor": rng_cursor,
-		"digest": _det_digest(), "wait": _link_wait,
-		"act": _det_action(_link_pact) if _link_pact_turn >= 0 else "", "act_turn": _link_pact_turn,
-		"swap": _link_lswap, "swap_turn": _link_lswap_turn})
+	mech.link_send_resume()
 
 
 func link_reconcile(peer: Dictionary) -> void:
-	if not link_battle or link_over:
-		return
-	var pturn := int(peer.get("turn", -1))
-	print("[col] resume reconcile: ours t=%d c=%d wait='%s' | peer t=%d c=%d wait='%s'" % [
-		turn_no, rng_cursor, _link_wait, pturn, int(peer.get("cursor", -1)), str(peer.get("wait", ""))])
-	if absi(pturn - turn_no) > 1:
-		print("[col] reconcile: impossible turn gap under lockstep — determinism bug; voiding stakeless")
-		_link_dead()
-		return
-	if pturn == turn_no and int(peer.get("cursor", -1)) == rng_cursor \
-			and str(peer.get("digest", "")) != _det_digest():
-		print("[col] reconcile: DIGEST MISMATCH at t=%d c=%d — determinism bug; voiding stakeless" % [
-			turn_no, rng_cursor])
-		_link_dead()
-		return
-	if _link_wait == "act" and link_actions.is_empty() \
-			and int(peer.get("act_turn", -2)) == turn_no and str(peer.get("act", "")) != "":
-		link_actions.append(str(peer["act"]))
-		print("[col] reconcile: recovered the peer's turn-%d action from the resume report" % turn_no)
-	if _link_wait == "swap" and link_swaps.is_empty() \
-			and int(peer.get("swap_turn", -2)) == turn_no and int(peer.get("swap", -1)) >= 0:
-		link_swaps.append(int(peer["swap"]))
-		print("[col] reconcile: recovered the peer's turn-%d replacement from the resume report" % turn_no)
+	mech.link_reconcile(peer)
 
 
-## The peer's canonical action string back into an enemy action. The forced tag matters:
-## a forced continuation (bind/thrash/charge/RAGE/Bide) spends no PP on the sender's sim,
-## so it must spend none here either — and the stream label must match byte for byte.
 func _parse_peer_action(s: String) -> Dictionary:
-	if s.begins_with("w:"):
-		return {"kind": "eswitch", "idx": int(s.substr(2))}
-	if s.begins_with("f:"):
-		return {"kind": "emove", "move": s.substr(2), "forced": true}
-	if s.begins_with("m:"):
-		return {"kind": "emove", "move": s.substr(2), "forced": false}
-	return {"kind": "emove", "move": "STRUGGLE", "forced": false}
+	return mech._parse_peer_action(s)
 
 
-## Both actions in hand: switches first (independent), then the moves in canonical speed
-## order — a tie draws the shared coin as "heads = the HOST acts first", so the mirrored
-## sims order it identically (pokered's link battles resolve ties off the shared random
-## list the same way).
 func _resolve_link(pact: Dictionary, eact: Dictionary) -> void:
-	_det_paction = _det_action(pact) if str(pact.get("kind", "")) != "" else "-"
-	_det_eaction = ("w:%d" % int(eact["idx"])) if str(eact["kind"]) == "eswitch" \
-		else ("f:" if bool(eact.get("forced", false)) else "m:") + str(eact["move"])
-	var msgs: Array = []
-	if str(pact["kind"]) == "switch":
-		_player_act(pact, msgs)
-	if str(eact["kind"]) == "eswitch":
-		_link_enemy_switch(int(eact["idx"]), msgs)
-	var p_moves: bool = str(pact["kind"]) in ["move", "forced"]
-	var e_moves: bool = str(eact["kind"]) == "emove"
-	if p_moves or e_moves:
-		var pf := true
-		if p_moves and e_moves:
-			var ps := _eff_speed(true)
-			var es := _eff_speed(false)
-			if ps == es:
-				var host_first := _rf() < 0.5
-				pf = host_first if link_host else not host_first
-			else:
-				pf = ps > es
-		elif e_moves:
-			pf = false
-		var emove := str(eact.get("move", ""))
-		var eforced := bool(eact.get("forced", false))
-		if pf:
-			if p_moves:
-				_player_act(pact, msgs)
-				if enemy_mon["hp"] > 0 and player_mon["hp"] > 0:
-					_residual(player_mon, p_vol, enemy_mon, msgs)
-			if e_moves and enemy_mon["hp"] > 0 and player_mon["hp"] > 0:
-				_link_enemy_act(emove, msgs, eforced)
-				if enemy_mon["hp"] > 0 and player_mon["hp"] > 0:
-					_residual(enemy_mon, e_vol, player_mon, msgs)
-		else:
-			if e_moves:
-				_link_enemy_act(emove, msgs, eforced)
-				if enemy_mon["hp"] > 0 and player_mon["hp"] > 0:
-					_residual(enemy_mon, e_vol, player_mon, msgs)
-			if p_moves and enemy_mon["hp"] > 0 and player_mon["hp"] > 0:
-				_player_act(pact, msgs)
-				if enemy_mon["hp"] > 0 and player_mon["hp"] > 0:
-					_residual(player_mon, p_vol, enemy_mon, msgs)
-	p_vol["flinch"] = false
-	e_vol["flinch"] = false
-	_end_of_turn(msgs)
+	mech._resolve_link(pact, eact)
 
 
-## The peer's move, no AI anywhere near it (the item/switch handler is theirs to choose).
-## A forced continuation spends no PP, exactly like the local forced branch.
 func _link_enemy_act(move: String, msgs: Array, forced := false) -> void:
-	if not forced and str(e_vol["charging"]) == "" and not _is_two_turn(move):
-		for mv in enemy_mon["moves"]:
-			if str(mv["move"]) == move:
-				mv["pp"] = max(0, int(mv["pp"]) - 1)
-				break
-	_do_move(enemy_mon, player_mon, move, msgs, e_stages, p_stages, false)
+	mech._link_enemy_act(move, msgs, forced)
 
 
-## The peer switched: their pick lands on our enemy side, applied SYNCHRONOUSLY (their sim
-## applied their own switch synchronously, and the turn digest compares end states) with
-## the revert their sim ran on switch-out; the markers replay it for presentation.
 func _link_enemy_switch(idx: int, msgs: Array) -> void:
-	if idx < 0 or idx >= enemy_party.size() or int(enemy_party[idx]["hp"]) <= 0:
-		return
-	msgs.append("%s withdrew\n%s!" % [peer_name, enemy_mon["name"]])
-	msgs.append({"hide_pic": "enemy"})
-	_revert_battle_copy(enemy_mon, e_vol)
-	_set_enemy(idx)
-	msgs.append({"auto": "%s sent\nout %s!" % [peer_name, enemy_party[idx]["name"]]})
-	msgs.append({"next_enemy": idx})
+	mech._link_enemy_switch(idx, msgs)
 
 
 func _link_enemy_has_usable() -> bool:
-	for i in enemy_party.size():
-		if i != enemy_active and int(enemy_party[i]["hp"]) > 0:
-			return true
-	return false
+	return mech._link_enemy_has_usable()
 
 
-## The peer's faint replacement arrived: send it out. The swap applies SYNCHRONOUSLY (the
-## presentation's next_enemy marker re-applies it, idempotently) so this side's X event
-## digests the same post-swap state the replacing side digested — byte-identical streams.
 func _link_enemy_swap_in(idx: int) -> void:
-	if idx < 0 or idx >= enemy_party.size():
-		idx = 0
-	_revert_battle_copy(enemy_mon, e_vol)   # the outgoing mon sheds Transform/Mimic, as the
-	_set_enemy(idx)                         # peer's own sim reverts it on switch-out
-	_det_event("X", "%s:w:%d" % ["j" if link_host else "h", idx])   # mirror of the peer's X
-	_say([{"auto": "%s sent\nout %s!" % [peer_name, enemy_party[idx]["name"]]},
-		{"next_enemy": idx}], "menu")
+	mech._link_enemy_swap_in(idx)
 
 
 ## The link died mid-battle: the session simply ends, stakeless (spec story 17).
@@ -1780,273 +1576,53 @@ func _link_dead() -> void:
 # ---- turn resolution -------------------------------------------------------
 
 func _resolve(action: Dictionary) -> void:
-	if ghost and action["kind"] == "move":
-		# Unidentified GHOST (PrintGhostText): the player's mon is too scared to attack, and
-		# the ghost only wails — nobody deals damage; running is the only way out.
-		_say(["%s is too\nscared to move!" % player_mon["name"],
-			"GHOST: Get out...\nGet out..."], "menu")
-		return
-	_det_paction = _det_action(action)
-	var msgs: Array = []
-	var emove := _enemy_choose()
-	_det_eaction = "m:" + emove
-	# Each side's own psn/brn/LEECH SEED tick lands right after ITS action, in act order —
-	# MainInBattleLoop calls HandlePoisonBurnLeechSeed per side, not at end of turn — and is
-	# skipped when that action ended in a faint (a KO'd opponent, or your own recoil/EXPLODE):
-	# the asm faint-checks before each residual. A first mover fainted by its own poison also
-	# costs the second mover its move (the loop jumps to the faint handler).
-	var pf := true                                     # a switch resolves player-first
-	if action["kind"] != "switch":
-		var ps := _eff_speed(true)
-		var es := _eff_speed(false)
-		pf = ps > es or (ps == es and _rf() < 0.5)
-	if pf:
-		_player_act(action, msgs)
-		if enemy_mon["hp"] > 0 and player_mon["hp"] > 0:
-			_residual(player_mon, p_vol, enemy_mon, msgs)
-		if enemy_mon["hp"] > 0 and player_mon["hp"] > 0:
-			_enemy_act(emove, msgs)
-			if enemy_mon["hp"] > 0 and player_mon["hp"] > 0:
-				_residual(enemy_mon, e_vol, player_mon, msgs)
-	else:
-		_enemy_act(emove, msgs)
-		if enemy_mon["hp"] > 0 and player_mon["hp"] > 0:
-			_residual(enemy_mon, e_vol, player_mon, msgs)
-		if enemy_mon["hp"] > 0 and player_mon["hp"] > 0:
-			_player_act(action, msgs)
-			if enemy_mon["hp"] > 0 and player_mon["hp"] > 0:
-				_residual(player_mon, p_vol, enemy_mon, msgs)
-	p_vol["flinch"] = false
-	e_vol["flinch"] = false
-	_end_of_turn(msgs)
+	mech._resolve(action)
 
 
 func _player_act(action: Dictionary, msgs: Array) -> void:
-	if action["kind"] == "switch":
-		player_mon["label"] = player_mon["name"]
-		msgs.append("Come back,\n%s!" % player_mon["name"])
-		msgs.append({"recall": true})  # the withdrawn mon's pic vanishes with the text (gh #72)
-		_revert_battle_copy(player_mon, p_vol)
-		active = action["idx"]
-		player_mon = party[active]
-		player_mon["label"] = player_mon["name"]
-		p_stages = _new_stages()       # stat changes + volatiles reset on switch
-		p_vol = _new_vol()
-		_rebuild_mod_stats(true)
-		_sub_shown["player"] = false
-		if not active in participants:
-			participants.append(active)
-		msgs.append({"auto": "Go! %s!" % player_mon["name"]})
-		msgs.append({"send_player": true})   # ball throw + poof + pop-out (same as battle start)
-	elif action["kind"] == "forced":
-		_do_move(player_mon, enemy_mon, str(action["move"]), msgs, p_stages, e_stages, true)
-	else:
-		var mv: Dictionary = player_mon["moves"][action["idx"]]
-		# gh #168: a two-turn charge move spends no PP on its charge turn — DecrementPP happens when it
-		# fires next turn (in _do_move). Turn-2 firing comes through the "forced" branch above (which also
-		# spends no PP). Charging turn-2 never reaches here. Every other move spends its PP now.
-		if str(p_vol["charging"]) == "" and not _is_two_turn(str(mv["move"])):
-			mv["pp"] = max(0, int(mv["pp"]) - 1)
-		_do_move(player_mon, enemy_mon, str(mv["move"]), msgs, p_stages, e_stages, true)
+	mech._player_act(action, msgs)
 
 
 func _enemy_choose() -> String:
-	var forced := _forced_move(e_vol)
-	if forced != "":
-		return forced
-	var usable: Array = []
-	for mv in enemy_mon["moves"]:
-		if int(mv["pp"]) > 0 and str(mv["move"]) != str(e_vol["disabled"]):
-			usable.append(str(mv["move"]))
-	if usable.is_empty():
-		return "STRUGGLE"
-	# AIEnemyTrainerChooseMoves: every move starts at priority 10, the class's modification
-	# layers adjust, and the pick is uniform among the minimum-priority moves.
-	if is_trainer and not ai_mods.is_empty():
-		var pri := {}
-		for m in usable:
-			pri[m] = 10
-		if 1 in ai_mods and str(player_mon["status"]) != "":
-			for m in usable:               # Mod1: don't re-status an already-statused player
-				var md: Dictionary = moves_db.get(m, {})
-				if int(md.get("power", 0)) == 0 and str(md.get("effect", "")) in \
-						["SLEEP_EFFECT", "POISON_EFFECT", "PARALYZE_EFFECT"]:
-					pri[m] += 5
-		if 2 in ai_mods and _ai_turn == 1:
-			for m in usable:               # Mod2: favour set-up moves on the second turn
-				if str(moves_db.get(m, {}).get("effect", "")) in MOD2_EFFECTS:
-					pri[m] -= 1
-		if 3 in ai_mods:
-			for m in usable:               # Mod3: play the type matchup vs the player's mon
-				var eff := _ai_eff(m)
-				if eff > 1.0:
-					pri[m] -= 1
-				elif eff < 1.0 and _ai_better_move(usable, m):
-					pri[m] += 1
-		var best := 999
-		for m in usable:
-			best = mini(best, int(pri[m]))
-		var picks: Array = []
-		for m in usable:
-			if int(pri[m]) == best:
-				picks.append(m)
-		usable = picks
-	return str(usable[_ri(usable.size())])
+	return mech._enemy_choose()
 
 
-## AIGetTypeEffectiveness: the FIRST TypeEffects entry matching the move's type against either
-## of the player's types wins — the AI never composes the table like the damage engine does.
-## A dual-type pairing reads as whichever entry comes first in table order (ELECTRIC into
-## WATER/FLYING reads 2x, not the real 4x), and no match reads neutral.
 func _ai_eff(move: String) -> float:
-	var row: Dictionary = rset.types.row(str(moves_db.get(move, {}).get("type", "")))
-	for dt in row:
-		if str(player_mon["types"][0]) == dt or str(player_mon["types"][1]) == dt:
-			return float(row[dt])
-	return 1.0
+	return mech._ai_eff(move)
 
 
-## Mod3's "better move" scan: Super Fang / fixed damage / Fly, or any damaging move of a
-## different type, makes a not-very-effective move worth discouraging.
 func _ai_better_move(usable: Array, than: String) -> bool:
-	var tt := str(moves_db.get(than, {}).get("type", ""))
-	for m in usable:
-		if m == than:
-			continue
-		var md: Dictionary = moves_db.get(m, {})
-		var eff := str(md.get("effect", ""))
-		if eff in ["SUPER_FANG_EFFECT", "SPECIAL_DAMAGE_EFFECT", "FLY_EFFECT"]:
-			return true
-		if str(md.get("type", "")) != tt and int(md.get("power", 0)) > 0:
-			return true
-	return false
+	return mech._ai_better_move(usable, than)
 
 
 # ---- Gen-1 trainer item/switch AI (engine/battle/trainer_ai.asm, handler for handler) ----
 
-## The class handler rolls its chance and may spend the enemy's turn on an item or switch.
-## Thresholds are the asm's raw random-byte compares: "25 percent + 1" = r < 65,
-## "50 percent + 1" = r < 129, "13 percent - 1" = r < 32, Agatha's "8 percent" = r < 20.
 func _ai_item_turn(msgs: Array) -> bool:
-	if _ai_uses <= 0:
-		return false
-	var r := _ri(256)
-	match ai_kind:
-		"Juggler":
-			if r < 65: return _ai_switch(msgs)
-		"Blackbelt":
-			if r < 32: return _ai_x_item("atk", "X ATTACK", msgs)
-		"Giovanni":
-			if r < 65: return _ai_guard_spec(msgs)
-		"CooltrainerM":
-			if r < 65: return _ai_x_item("atk", "X ATTACK", msgs)
-		"CooltrainerF":
-			# the asm's 25% gate falls through (its ret nc is missing) — kept verbatim
-			if _hp_below(10): return _ai_heal(200, "HYPER POTION", msgs)
-			if _hp_below(5): return _ai_switch(msgs)
-		"Brock":
-			if str(enemy_mon["status"]) != "": return _ai_full_heal(msgs)
-		"Misty":
-			if r < 65: return _ai_x_item("def", "X DEFEND", msgs)
-		"LtSurge":
-			if r < 65: return _ai_x_item("spd", "X SPEED", msgs)
-		"Erika":
-			if r < 129 and _hp_below(10): return _ai_heal(50, "SUPER POTION", msgs)
-		"Koga":
-			if r < 65: return _ai_x_item("atk", "X ATTACK", msgs)
-		"Blaine":
-			# no HP check, faithfully: Blaine potions at ANY hp — full included (heals 0,
-			# still spends the use and his move; AIRecoverHP has no full-HP guard)
-			if r < 65: return _ai_heal(50, "SUPER POTION", msgs)
-		"Sabrina":
-			if r < 65 and _hp_below(10): return _ai_heal(200, "HYPER POTION", msgs)
-		"Rival2":
-			if r < 32 and _hp_below(5): return _ai_heal(20, "POTION", msgs)
-		"Rival3":
-			if r < 32 and _hp_below(5): return _ai_heal(-1, "FULL RESTORE", msgs)
-		"Lorelei":
-			if r < 129 and _hp_below(5): return _ai_heal(50, "SUPER POTION", msgs)
-		"Bruno":
-			if r < 65: return _ai_x_item("def", "X DEFEND", msgs)
-		"Agatha":
-			if r < 20: return _ai_switch(msgs)
-			if r < 129 and _hp_below(4): return _ai_heal(50, "SUPER POTION", msgs)
-		"Lance":
-			if r < 129 and _hp_below(5): return _ai_heal(200, "HYPER POTION", msgs)
-	return false
+	return mech._ai_item_turn(msgs)
 
 
-func _hp_below(frac: int) -> bool:                 # AICheckIfHPBelowFraction: hp < maxhp/frac
-	return int(enemy_mon["hp"]) < int(enemy_mon["maxhp"]) / frac
+func _hp_below(frac: int) -> bool:
+	return mech._hp_below(frac)
 
 
-## AIRecoverHP / AIUseFullRestore: no full-HP guard — the use (and the enemy's move) is spent
-## even when the heal lands 0 (Blaine really does waste SUPER POTIONs at full HP).
 func _ai_heal(amount: int, item: String, msgs: Array) -> bool:
-	_ai_uses -= 1
-	if amount < 0:                                 # FULL RESTORE: full HP + status cure
-		enemy_mon["hp"] = int(enemy_mon["maxhp"])
-		enemy_mon["status"] = ""
-		enemy_mon["sleep"] = 0
-	else:
-		enemy_mon["hp"] = mini(int(enemy_mon["maxhp"]), int(enemy_mon["hp"]) + amount)
-	msgs.append("%s used\n%s!" % [trainer_name, item])
-	if amount < 0:
-		_show_status(enemy_mon, msgs)
-	msgs.append({"hp": "enemy", "to": int(enemy_mon["hp"])})
-	return true
+	return mech._ai_heal(amount, item, msgs)
 
 
 func _ai_full_heal(msgs: Array) -> bool:
-	if str(enemy_mon["status"]) == "":
-		return false
-	_ai_uses -= 1
-	enemy_mon["status"] = ""
-	enemy_mon["sleep"] = 0
-	msgs.append("%s used\nFULL HEAL!" % trainer_name)
-	msgs.append("%s became\nhealthy!" % enemy_mon["name"])
-	_show_status(enemy_mon, msgs)
-	return true
+	return mech._ai_full_heal(msgs)
 
 
-## AIIncreaseStat: the use (and the turn) is spent even at +6, where StatModifierUpEffect
-## just reports failure. A successful boost runs the full recalc + trailer — including the
-## trailer's re-penalizing of the PLAYER's par/brn stats (the compounding glitch).
 func _ai_x_item(stat: String, item: String, msgs: Array) -> bool:
-	_ai_uses -= 1
-	msgs.append("%s used\n%s!" % [trainer_name, item])
-	if int(e_stages[stat]) >= 6:
-		msgs.append("Nothing happened!")
-		return true
-	var label: String = {"atk": "ATTACK", "def": "DEFENSE", "spd": "SPEED", "spc": "SPECIAL"}[stat]
-	_change_stage(enemy_mon, e_stages, label, 1, msgs)
-	return true
+	return mech._ai_x_item(stat, item, msgs)
 
 
 func _ai_guard_spec(msgs: Array) -> bool:
-	# AIUseGuardSpec sets the bit unconditionally — an already-misted mon still costs the use.
-	_ai_uses -= 1
-	e_vol["mist"] = true
-	msgs.append("%s used\nGUARD SPEC.!" % trainer_name)
-	msgs.append("%s's shrouded\nin mist!" % enemy_mon["name"])
-	return true
+	return mech._ai_guard_spec(msgs)
 
 
 func _ai_switch(msgs: Array) -> bool:              # AISwitchIfEnoughMons
-	var next := -1
-	for i in enemy_party.size():
-		if i != enemy_active and int(enemy_party[i]["hp"]) > 0:
-			next = i
-			break
-	if next < 0:
-		return false
-	# No _ai_uses spend: SwitchEnemyMon never calls DecrementAICount — switching is free,
-	# only the item routines consume the class's wAICount budget.
-	msgs.append("%s withdrew\n%s!" % [trainer_name, enemy_mon["name"]])
-	msgs.append({"hide_pic": "enemy"})
-	msgs.append({"auto": "%s sent\nout %s!" % [trainer_name, enemy_party[next]["name"]]})
-	msgs.append({"next_enemy": next})
-	return true
+	return mech._ai_switch(msgs)
 
 
 func _forced_move(vol: Dictionary) -> String:
@@ -2062,220 +1638,35 @@ func _spend_pp(mon: Dictionary, move: String) -> void:
 
 
 func _enemy_act(move: String, msgs: Array) -> void:
-	# TrainerAI: the class handler may spend this turn on an item or a switch instead. It is
-	# rolled unconditionally before the move — the asm call site has no lock gate, so even a
-	# wrapping, thrashing, or mid-FLY trainer mon can potion, its multi-turn state left to
-	# resume on the next turn (the skipped move doesn't tick any of its counters).
-	if is_trainer and _ai_item_turn(msgs):
-		_ai_turn += 1
-		return
-	_ai_turn += 1                                  # wAILayer2Encouragement
-	if str(e_vol["charging"]) == "" and not _is_two_turn(move):   # gh #168: charge PP is spent on turn 2 (in _do_move)
-		for mv in enemy_mon["moves"]:
-			if str(mv["move"]) == move:
-				mv["pp"] = max(0, int(mv["pp"]) - 1)
-				break
-	_do_move(enemy_mon, player_mon, move, msgs, e_stages, p_stages, false)
+	mech._enemy_act(move, msgs)
 
 
 func _end_of_turn(msgs: Array) -> void:
-	var nxt := "menu"
-	if _flee_pending:
-		_flee_pending = false
-		_say(msgs, "run")
-		return
-	# gh #112: BOTH faints must be handled on a double KO (recoil / EXPLODE / end-of-turn poison can drop
-	# both mons the same turn). The old `if enemy… elif player…` fainted only the enemy and left the
-	# player's 0-HP mon active — it could still pick a move the next turn. pokered's HandleEnemyMonFainted
-	# also removes a co-fainted player mon (RemoveFaintedPlayerMon) and, if that empties the party, blacks
-	# the player out even though the enemy was KO'd (AnyPartyAlive → HandlePlayerBlackOut).
-	var player_dead: bool = int(player_mon["hp"]) <= 0
-	if int(enemy_mon["hp"]) <= 0:
-		msgs.append({"faint": "enemy"})
-		msgs.append("%s\nfainted!" % enemy_mon["label"])
-		_award_exp(msgs)
-		if link_battle and _link_enemy_has_usable():
-			# The next enemy is the PEER's pick, arriving as col_swap — _resolve_after's
-			# "menu" gate holds in linkwait until it does. No SHIFT prompt in link (asm).
-			nxt = "menu"
-		elif is_trainer and not link_battle and enemy_active < enemy_party.size() - 1:
-			# SHIFT battle style (the default): the trainer announces the next mon and offers a
-			# free switch first (EnemySendOutFirstMon's TrainerAboutToUseText + party menu).
-			# Tests (fast_hp) run as SET — the prompt needs interactive input.
-			if main and main.options["battle_shift"] and not fast_hp and not player_dead and _has_other_usable():
-				msgs.append("%s is about to use\n%s!" % [trainer_name, enemy_party[enemy_active + 1]["name"]])
-				msgs.append({"shift": true})
-			# The swap is deferred to a queue marker: calling _set_enemy here (at queue-build
-			# time) would put the next mon's pic/HUD on screen and play its cry while the
-			# fainted mon's slide and messages are still presenting. As in EnemySendOut, the
-			# "sent out" text flows straight into the new mon growing in + its cry.
-			msgs.append({"auto": "%s sent\nout %s!" % [trainer_name, enemy_party[enemy_active + 1]["name"]]})
-			msgs.append({"next_enemy": enemy_active + 1})
-			nxt = "menu"
-		else:
-			# The enemy's last mon fell. But a mutual KO that also empties the player's party is a
-			# blackout, not a win (pokered checks AnyPartyAlive before TrainerBattleVictory) — so withhold
-			# the victory text/prize/`won` when the player is about to black out below.
-			var player_blackout: bool = player_dead and not _has_other_usable()
-			if is_trainer and not player_blackout:
-				if trainer_pic_tex:
-					msgs.append({"trainer_slide": "in"})
-				msgs.append("%s was\ndefeated!" % trainer_name)
-				if prize > 0:
-					main.player_money += prize
-					msgs.append("%s got ¥%d\nfor winning!" % [main.player_name, prize])
-			if not player_blackout:
-				won = true
-			nxt = "end"
-	if player_dead:
-		msgs.append({"faint": "player"})
-		msgs.append("%s\nfainted!" % player_mon["label"])
-		if _has_other_usable():
-			# A fainted mon must send out a replacement — unless the enemy's last mon fainted this same
-			# turn (won == true), where the win stands and the battle ends with a fainted lead.
-			if not won:
-				nxt = "party_forced"
-		else:
-			msgs.append("%s is out of\nuseable POKéMON!" % main.player_name)
-			msgs.append("%s whited out!" % main.player_name)
-			blacked_out = true            # Main warps to the last Center on battle finish
-			won = false                   # a mutual KO that empties your party is a blackout, not a win
-			nxt = "end"
-	_say(msgs, nxt)
-	# Determinism oracle (gh #2): every turn kind funnels through here — emit its event.
-	# Link (gh #7): host/join labels, host first, so both peers' lines are byte-identical.
-	turn_no += 1
-	if link_battle:
-		_det_event("T%d" % turn_no, "h[%s]j[%s]" % [
-			_det_paction if link_host else _det_eaction,
-			_det_eaction if link_host else _det_paction])
-	else:
-		_det_event("T%d" % turn_no, "p[%s]e[%s]" % [_det_paction, _det_eaction])
-	_det_paction = "-"
-	_det_eaction = "-"
+	mech._end_of_turn(msgs)
 
 
-## GainExperience (engine/battle/experience.asm), driven by HandleExpGain (core.asm). Each
-## LIVING participant gains exp = ((base_exp / N) * level / 7), floored at every step, then the
-## ×1.5 BoostExp for a traded mon (foreign OT) and again for a trainer battle — both can stack.
-## Stat exp accumulates the enemy's raw base stats / N (capped 65535). With EXP.ALL held, the
-## base exp AND base stats are halved up front (core.asm .halveExpDataLoop), then a second pass
-## splits that halved pool across the WHOLE party — fighters or not — divided by the party count.
-## (A fainted participant loses its gain-exp flag in RemoveFaintedPlayerMon, so N is the living
-## count both here and in DivideExpDataByNumMonsGainingExp.)
 func _award_exp(msgs: Array) -> void:
-	if link_battle:
-		return                       # link battles award nothing — stakeless (gh #7)
-	var alive: Array = []
-	for idx in participants:
-		if idx < party.size() and int(party[idx]["hp"]) > 0:
-			alive.append(idx)
-	if alive.is_empty():
-		return
-	var exp_all: bool = main.player_bag.has("EXP.ALL")
-	var be := int(enemy_mon["base_exp"])
-	if exp_all:
-		be = be >> 1                          # EXP.ALL halves base exp (and base stats) first
-	_award_exp_pass(alive, alive.size(), be, exp_all, msgs)
-	if exp_all:
-		var whole: Array = []
-		for idx in party.size():
-			if int(party[idx]["hp"]) > 0:
-				whole.append(idx)
-		msgs.append("with EXP.ALL,")
-		_award_exp_pass(whole, party.size(), be, exp_all, msgs)
+	mech._award_exp(msgs)
 
 
-## One GainExperience pass: the (already-halved for EXP.ALL) base exp / base stats are divided
-## among `n` mons (DivideExpDataByNumMonsGainingExp) and handed to each recipient with its boosts.
 func _award_exp_pass(recipients: Array, n: int, base_exp: int, halve_stats: bool, msgs: Array) -> void:
-	var per := int(base_exp / n) * int(enemy_mon["level"]) / 7      # floor((be/N) * L / 7)
-	for idx in recipients:
-		var mon: Dictionary = party[idx]
-		var e := per
-		if str(mon.get("ot", main.player_name)) != main.player_name:
-			e = _boost_exp(e)                 # traded mon: ×1.5 (BoostExp)
-		if is_trainer:
-			e = _boost_exp(e)                 # trainer battle: ×1.5 (BoostExp)
-		var cap: int = main.exp_for_level(100, str(mon["growth"]))
-		mon["exp"] = mini(cap, int(mon["exp"]) + e)   # capped at the level-100 exp (GainExperience)
-		_gain_stat_exp(mon, n, halve_stats)
-		msgs.append("%s gained\n%d EXP. Points!" % [mon["name"], e])
-		_level_up_loop(mon, msgs, idx == active)
+	mech._award_exp_pass(recipients, n, base_exp, halve_stats, msgs)
 
 
-## BoostExp: exp × 1.5 = q + floor(q/2) (the asm's 16-bit srl/rr then add).
 func _boost_exp(q: int) -> int:
-	return q + int(q / 2)
+	return mech._boost_exp(q)
 
 
-## GainExperience's stat-exp loop: the defeated mon's raw base stats (halved for EXP.ALL, then
-## divided by the N mons gaining exp) accumulate into each mon's pool, capped 65535; the stats
-## pick the pool up at the next recalc (level-up) via CalcStat's sqrt term.
 func _gain_stat_exp(mon: Dictionary, n := 1, halve := false) -> void:
-	var eb: Dictionary = enemy_mon["base"]
-	var se: Dictionary = mon.get("sexp", {"hp": 0, "atk": 0, "def": 0, "spd": 0, "spc": 0})
-	for k in ["hp", "atk", "def", "spd", "spc"]:
-		var gain := int(eb[k]) >> 1 if halve else int(eb[k])   # EXP.ALL halves the base stats too
-		gain = int(gain / n)                                   # then / the mons gaining exp
-		se[k] = mini(65535, int(se.get(k, 0)) + gain)
-	mon["sexp"] = se
+	mech._gain_stat_exp(mon, n, halve)
 
 
 func _level_up_loop(mon: Dictionary, msgs: Array, allow_prompt: bool) -> void:
-	var species: String = mon["species"]
-	while int(mon["level"]) < 100 \
-			and int(mon["exp"]) >= main.exp_for_level(int(mon["level"]) + 1, str(mon["growth"])):
-		var oldmax := int(mon["maxhp"])
-		mon["level"] = int(mon["level"]) + 1
-		main.recompute_stats(mon)
-		mon["hp"] = int(mon["hp"]) + (int(mon["maxhp"]) - oldmax)
-		msgs.append({"sfx": "level_up"})
-		msgs.append("%s grew to\nlevel %d!" % [mon["name"], mon["level"]])
-		if allow_prompt:                              # the active mon shows its new stats box (PrintStatsBox)
-			# A mid-battle level-up rebuilds the battle stats from the new party stats with
-			# penalties and badges fresh (GainExperience: CalculateModifiedStats ->
-			# ApplyBurnAndParalysisPenaltiesToPlayer -> ApplyBadgeStatBoosts).
-			_rebuild_mod_stats(true)
-			msgs.append({"levelstats": {"atk": int(mon["atk"]), "def": int(mon["def"]),
-				"spd": int(mon["spd"]), "spc": int(mon["spc"])}})
-		for lm in base_stats[species]["level_moves"]:
-			if int(lm[0]) == int(mon["level"]):
-				_learn(mon, str(lm[1]), msgs, allow_prompt)
-		# Evolution waits for the battle to end (wCanEvolveFlags -> Evolution_PartyMonLoop);
-		# Main runs the full sequence for each flagged mon after `finished` (gh #67).
-		var pi := party.find(mon)
-		if pi >= 0 and not can_evolve.has(pi):
-			can_evolve.append(pi)
+	mech._level_up_loop(mon, msgs, allow_prompt)
 
 
 func _learn(mon: Dictionary, move: String, msgs: Array, allow_prompt: bool) -> void:
-	for mv in mon["moves"]:
-		if str(mv["move"]) == move:
-			return
-	var pp := int(moves_db[move]["pp"])
-	if mon["moves"].size() < 4:
-		mon["moves"].append({"move": move, "pp": pp, "maxpp": pp})
-		msgs.append("%s learned\n%s!" % [mon["name"], str(moves_db[move]["name"])])
-	elif allow_prompt:
-		# Interactive prompt (active mon only): a {"learn": ...} marker pauses the queue for the
-		# move-forget screen (learn_move.asm TryingToLearnText -> WhichMoveToForgetText).
-		msgs.append("%s is trying to\nlearn %s!" % [mon["name"], str(moves_db[move]["name"])])
-		msgs.append("But, %s can't learn\nmore than 4 moves!" % mon["name"])
-		msgs.append({"learn": move})
-	else:
-		# A benched participant levels up: no prompt, but LearnMove still never deletes an HM (gh #93),
-		# so give up the first slot that isn't one. Four HMs means there is nothing to give up.
-		var slot := -1
-		for i in (mon["moves"] as Array).size():
-			if not str(mon["moves"][i]["move"]) in main.HM_MOVES.values():
-				slot = i
-				break
-		if slot < 0:
-			return
-		var forgot: String = str(moves_db[str(mon["moves"][slot]["move"])]["name"])
-		mon["moves"][slot] = {"move": move, "pp": pp, "maxpp": pp}
-		msgs.append("%s forgot %s\nand learned %s!" % [mon["name"], forgot, str(moves_db[move]["name"])])
+	mech._learn(mon, move, msgs, allow_prompt)
 
 
 # ---- damage ----------------------------------------------------------------
