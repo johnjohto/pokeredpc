@@ -336,6 +336,13 @@ func _ready() -> void:
 		get_tree().quit(1)
 		return
 	ruleset.configure()
+	if ruleset.types == null or ruleset.formulas == null or ruleset.battle == null:
+		# A module class that failed to load configures to null — refuse loudly instead
+		# of limping into per-frame nil errors (gh #33).
+		push_error("[ruleset] '%s' configured incompletely (a module script failed to load)" % rs_id)
+		print("[ruleset] FATAL: '%s' configured incompletely (a module script failed to load)" % rs_id)
+		get_tree().quit(1)
+		return
 	sprite_index = ProjectData.legacy("sprites/index.json")
 	text_data = ProjectData.legacy("text.json")
 	var ui := CanvasLayer.new()
