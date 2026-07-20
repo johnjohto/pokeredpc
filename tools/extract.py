@@ -2203,6 +2203,195 @@ def render_map_preview(slug_name, label, path):
 
 # --------------------------------------------------------------------------- #
 
+PROJ = ROOT / "game" / "project"
+
+
+def _species_display_name(key):
+    """Display names are derived, not stored (mirrors Main.gd mon_display_name)."""
+    return {"nidoranm": "NIDORAN♂", "nidoranf": "NIDORAN♀",
+            "mrmime": "MR.MIME", "farfetchd": "FARFETCH'D"}.get(key, key.upper())
+
+
+def _type_id(t):
+    return "type:" + t.removesuffix("_TYPE").lower()
+
+
+def _pj_write(rel, obj):
+    """Canonical project serialization (ADR-017): indent 1, sorted keys, LF, trailing
+    newline — the exact bytes the gh #23 identity hash will consume."""
+    p = PROJ / rel
+    p.parent.mkdir(parents=True, exist_ok=True)
+    with open(p, "w", encoding="utf-8", newline="\n") as f:
+        json.dump(obj, f, indent=1, ensure_ascii=False, sort_keys=True)
+        f.write("\n")
+
+
+def build_project():
+    """gh #24 (ADR-017 d6): emit the v2 Kanto project — the extractor IS the importer.
+    Reads the just-emitted per-type JSONs back and writes game/project/ in the format-1
+    shape (docs/v2/project-format.md): per-record entity files addressed by stable string
+    ids (`species:abra`, `move:pound` — positional resolution ends at this boundary),
+    table singletons, v1's map JSON carried verbatim as the documented interim format,
+    remaining presentation blobs verbatim under presentation/, and every binary asset
+    under assets/. Reading back (rather than plumbing every build_* return) keeps this
+    one stage; direct emission replaces it when gh #25 retires the legacy assets tree.
+    Deterministic by construction: canonical serialization + byte-copies."""
+    import shutil
+    if PROJ.exists():
+        shutil.rmtree(PROJ)
+    def J(name):
+        return json.load(open(OUT / name, encoding="utf-8"))
+
+    base = J("pokemon/base_stats.json")
+    dex_entries, dex_order = J("dex_entries.json"), J("dex_order.json")
+    cries, icons = J("cries.json"), J("mon_icons.json")
+    moves, move_sfx = J("moves.json"), J("move_sfx.json")
+    items, prices = J("items.json"), J("item_prices.json")
+    trainers, pics = J("trainers.json"), J("trainer_pics.json")
+    types = J("types.json")
+
+    version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
+    _pj_write("manifest.json", {"format": 1, "id": "kanto", "name": "Pokémon Red (Kanto)",
+                                "version": version, "ruleset": "gen1"})
+    # Keep Godot's importer out of the project tree (the runtime reads it via raw
+    # FileAccess/Image.load_from_file, not imported resources); dotfiles are outside
+    # the format walk.
+    PROJ.mkdir(parents=True, exist_ok=True)
+    (PROJ / ".gdignore").write_text("", encoding="utf-8")
+
+    # --- species: the consolidated record (stats + learnsets + evolutions + dex + cry
+    # + icon + sprites), plan 4.1's "species" content type assembled from v1's parallel
+    # per-type dicts. Empty optional lists are omitted, not emitted.
+    growth_names = {"GROWTH_FAST": "fast", "GROWTH_MEDIUM_FAST": "medium_fast",
+                    "GROWTH_MEDIUM_SLOW": "medium_slow", "GROWTH_SLOW": "slow"}
+    for key, b in base.items():
+        tlist = [_type_id(t) for t in b["types"]]
+        if len(tlist) == 2 and tlist[0] == tlist[1]:
+            tlist = tlist[:1]                       # Gen-1 mono-type is a doubled entry
+        evos = []
+        for e in b["evolutions"]:
+            if e[0] == "EVOLVE_LEVEL":
+                evos.append({"method": "level", "level": int(e[1]),
+                             "into": "species:" + e[2].lower()})
+            elif e[0] == "EVOLVE_ITEM":
+                evos.append({"method": "stone", "item": "item:" + e[1].lower(),
+                             "into": "species:" + e[3].lower()})
+            elif e[0] == "EVOLVE_TRADE":
+                evos.append({"method": "trade", "into": "species:" + e[2].lower()})
+        d = dex_entries[key]
+        rec = {"id": "species:" + key, "name": _species_display_name(key),
+               "stats": {"hp": b["hp"], "atk": b["atk"], "def": b["def"],
+                         "spd": b["spd"], "spc": b["spc"]},
+               "types": tlist, "catch_rate": b["catch"], "base_exp": b["base_exp"],
+               "growth": growth_names[b["growth"]],
+               "dex": {"num": dex_order.index(key) + 1, "cat": d["cat"],
+                       "height_ft": d["ft"], "height_in": d["in"], "weight": d["wt"],
+                       "desc": d["desc"]},
+               "cry": cries[key], "icon": icons[key],
+               "sprites": {"front": f"assets/pokemon/front/{key}.png",
+                           "back": f"assets/pokemon/back/{key}.png"}}
+        if b["learnset"]:
+            rec["start_moves"] = ["move:" + m.lower() for m in b["learnset"]]
+        if b["level_moves"]:
+            rec["level_moves"] = [{"level": lv, "move": "move:" + m.lower()}
+                                  for lv, m in b["level_moves"]]
+        tmhm = [m for m in b["tmhm"] if m != "UNUSED"]   # Mew's table pads unused TM slots
+        if tmhm:
+            rec["tmhm"] = ["move:" + m.lower() for m in tmhm]
+        if evos:
+            rec["evolutions"] = evos
+        _pj_write(f"data/species/{key}.json", rec)
+
+    for key, m in moves.items():
+        rec = {"id": "move:" + key.lower(), "name": m["name"], "type": _type_id(m["type"]),
+               "power": m["power"], "accuracy": m["accuracy"], "pp": m["pp"],
+               "effect": m["effect"]}
+        if key in move_sfx:
+            rec["sfx"] = {"key": move_sfx[key][0], "pitch": move_sfx[key][1]}
+        _pj_write(f"data/moves/{key.lower()}.json", rec)
+
+    for key, display in items.items():
+        rec = {"id": "item:" + key.lower(), "name": display}
+        if display in prices:
+            rec["price"] = prices[display]
+        if key.startswith(("TM_", "HM_")):          # TM_MEGA_PUNCH -> move:mega_punch
+            rec["tm_move"] = "move:" + key.split("_", 1)[1].lower()
+        _pj_write(f"data/items/{key.lower()}.json", rec)
+
+    for key, t in trainers.items():
+        rec = {"id": "trainer:" + key.lower(), "name": t["name"], "money": t["money"],
+               "ai": t["ai"], "ai_count": t["ai_count"], "ai_mods": t["ai_mods"],
+               "parties": [[{"species": "species:" + p["species"], "level": p["level"]}
+                            for p in party] for party in t["parties"]]}
+        if key in pics:
+            rec["pic"] = pics[key]
+        _pj_write(f"data/trainers/{key.lower()}.json", rec)
+
+    _pj_write("data/types.json", {
+        "types": sorted(_type_id(t) for t in types),
+        "chart": {_type_id(atk): {_type_id(d): mult for d, mult in row.items()}
+                  for atk, row in types.items()}})
+
+    wild = J("wild.json")
+    _pj_write("data/encounters.json", {
+        "slots": wild["slots"],
+        "maps": {"map:" + label: {
+            "grass_rate": w["grass_rate"], "water_rate": w["water_rate"],
+            "grass": [[lv, "species:" + s] for lv, s in w["grass"]],
+            "water": [[lv, "species:" + s] for lv, s in w["water"]]}
+            for label, w in wild["maps"].items()}})
+
+    map_labels = {f.stem for f in (OUT / "maps").glob("*.json")}
+    _pj_write("data/marts.json",
+              {"map:" + label: ["item:" + i.lower() for i in stock]
+               for label, stock in J("marts.json").items()
+               if label in map_labels})     # pokered ships UnusedMart/UnusedBikeShop
+                                            # stock for maps that don't exist
+    _pj_write("data/hidden_items.json",
+              {"map:" + label: [{"x": h["x"], "y": h["y"], "item": "item:" + h["item"].lower()}
+                                for h in spots]
+               for label, spots in J("hidden_items.json").items()})
+    tr = J("trades.json")
+    _pj_write("data/trades.json", {
+        "trades": [{"give": "species:" + t["give"], "get": "species:" + t["get"],
+                    "nick": t["nick"], "dialogset": t["dialogset"]}
+                   for t in tr["trades"]],
+        "text_trades": tr["text_trades"]})
+    _pj_write("data/text.json", J("text.json"))
+
+    # cries not owned by a species record (missingno — the ghost's pitch source)
+    extra_cries = {k: v for k, v in cries.items() if k not in base}
+    if extra_cries:
+        _pj_write("presentation/cries_extra.json", extra_cries)
+
+    # interim maps + presentation blobs: verbatim byte-copies (deterministic, and the
+    # map shape is explicitly the v1 interim format per ADR-017 d5)
+    for f in sorted((OUT / "maps").glob("*.json")):
+        (PROJ / "maps").mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(f, PROJ / "maps" / f.name)
+    presentation = ["audio.json", "sfx.json", "charmap.json", "credits.json",
+                    "dungeon_maps.json", "map_music.json", "move_anims.json",
+                    "spinners.json", "title_intro.json", "title_mons.json",
+                    "town_map.json", "trade_gfx.json", "warp_rules.json"]
+    (PROJ / "presentation").mkdir(parents=True, exist_ok=True)
+    for name in presentation:
+        shutil.copyfile(OUT / name, PROJ / "presentation" / name)
+
+    # every binary asset, tree preserved (species sprite paths point in here)
+    n_assets = 0
+    for f in sorted(OUT.rglob("*")):
+        if f.is_dir() or f.suffix in (".json", ".import"):
+            continue
+        rel = f.relative_to(OUT)
+        dest = PROJ / "assets" / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(f, dest)
+        n_assets += 1
+    print(f"project: {len(base)} species, {len(moves)} moves, {len(items)} items, "
+          f"{len(trainers)} trainers, {len(list((PROJ / 'maps').glob('*.json')))} maps, "
+          f"{n_assets} assets -> {PROJ}")
+
+
 def main():
     for d in ["tilesets", "maps", "sprites"]:
         (OUT / d).mkdir(parents=True, exist_ok=True)
@@ -2237,6 +2426,7 @@ def main():
     build_audio()
     const_to_label = build_maps(const_to_slug)
     build_hidden_items(const_to_label)
+    build_project()
     size = render_map_preview("overworld", "PalletTown", PREVIEW / "PalletTown.png")
     print(f"preview PalletTown: {size[0]}x{size[1]}px")
 

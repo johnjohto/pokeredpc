@@ -131,3 +131,4 @@ game/strip/
 
 # Claude Code agent worktrees (harness-internal)
 .claude/worktrees/
+/game/project/

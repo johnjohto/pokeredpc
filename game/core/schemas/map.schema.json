@@ -34,10 +34,14 @@
   "blocks": {
    "type": "array",
    "items": {
-    "type": "integer",
-    "minimum": 0,
-    "maximum": 255
-   }
+    "type": "array",
+    "items": {
+     "type": "integer",
+     "minimum": 0,
+     "maximum": 255
+    }
+   },
+   "$comment": "Row-major: height rows of width block ids."
   },
   "border_block": {
    "type": "integer",

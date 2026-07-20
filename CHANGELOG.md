@@ -29,6 +29,17 @@ milestones, `PATCH` bumps are fixes/polish. See `docs/roadmap.md` for the live p
   clean, seven broken variants each exactly one error naming file + path) and
   `--validate=<dir>`. Spec: `docs/v2/project-format.md`.
 
+- **v2 Core: the extractor emits the Kanto project** (gh #24, ADR-017 d6): `build_project()`
+  runs as extraction's final stage — pokered clone in, `game/project/` out (1255 files:
+  151 species / 165 moves / 152 items / 47 trainers / 15 types / 223 interim maps / 496
+  assets). Species records consolidate base stats + learnsets + evolutions + dex + cry +
+  icon + sprites; items absorb prices and the TM→move mapping; every cross-reference is a
+  prefixed stable string id — positional resolution ends at the project boundary. Verified:
+  `--validate` reports **0 errors** across the emitted project (after the validator caught
+  2189 real shape mismatches in the first honest round), and two full extractions produce
+  **byte-identical trees**. The project root carries `.gdignore`; the tree is git-ignored
+  (extracted Nintendo-derived data, personal use, never distributed).
+
 - **Cross-platform link, verified** (gh #12): the **engine build joins link identity** —
   `Engine.get_version_info().string` travels in the handshake `hello`, and a differing Godot
   build refuses naming both builds (Godot's RNG and float behavior are only guaranteed

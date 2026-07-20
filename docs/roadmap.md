@@ -52,8 +52,15 @@ contract), `CoreSchema` (a subset validator that errors on unknown keywords) and
 `ProjectValidator` (claims, record-id registration, dangling-reference resolution, the
 refuse-newer manifest gate) — verified by `--schematest` (valid fixture clean; seven broken
 fixtures each one named error) and `--validate=<dir>`; format spec in
-[v2/project-format.md](v2/project-format.md). Next: **gh #23** (manifest identity) + **gh #24**
-(the extractor emits the Kanto project). (The *v1.1* work had been broken down as
+[v2/project-format.md](v2/project-format.md). **Landed: gh #24** (2026-07-20): `build_project()`
+is extraction's last stage — the full **Kanto project** emitted to `game/project/` (151 species /
+165 moves / 152 items / 47 trainers / 15 types / 223 maps / 496 assets, 1255 files), records
+consolidated + every reference prefixed, interim maps byte-copied, `.gdignore` at the root.
+Gates: `--validate` **0 errors** with all six id sets registered; **byte-identical trees across
+two extractions**; `--schematest` + `--selftest` green. The clean run took two honest rounds —
+the validator caught 2189 real mismatches first (row-array blocks, string cry keys, numeric
+ai_mods, empty unused parties, dead mart stock, Mew's UNUSED TM padding). Next: **gh #23**
+(manifest identity), then **gh #25** (the runtime loads the project — the phase gate). (The *v1.1* work had been broken down as
 gh #1 (spec) with sub-issues #2–#10.) **Landed: gh #2 — the battle determinism
 oracle** (2026-07-19): every battle-logic random draw now comes from a battle-local seeded RNG
 (never the frame-paced global RNG), each battle emits a canonical per-turn event stream (turn,

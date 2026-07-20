@@ -31,15 +31,16 @@
   "ai_mods": {
    "type": "array",
    "items": {
-    "type": "string"
-   }
+    "type": "integer"
+   },
+   "$comment": "Move-effect ids the AI discourages (v1 numeric form)."
   },
   "pic": {
    "type": "string"
   },
   "parties": {
    "type": "array",
-   "minItems": 1,
+   "minItems": 0,
    "items": {
     "type": "array",
     "minItems": 1,

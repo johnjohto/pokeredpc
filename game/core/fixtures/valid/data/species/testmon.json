@@ -42,11 +42,11 @@
   "desc": "A fixture."
  },
  "cry": {
-  "cry": 1,
-  "pitch": 128,
-  "length": 10
+  "cry": "cry11",
+  "pitch": 0,
+  "length": 128
  },
- "icon": "mon",
+ "icon": 1,
  "sprites": {
   "front": "assets/front/testmon.png",
   "back": "assets/back/testmon.png"

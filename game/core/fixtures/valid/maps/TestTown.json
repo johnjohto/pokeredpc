@@ -4,10 +4,14 @@
  "width": 2,
  "height": 2,
  "blocks": [
-  0,
-  0,
-  0,
-  0
+  [
+   0,
+   0
+  ],
+  [
+   0,
+   0
+  ]
  ],
  "border_block": 0,
  "warps": [],

@@ -32,13 +32,13 @@
   "accuracy": {
    "type": "integer",
    "minimum": 0,
-   "maximum": 255,
-   "$comment": "Gen-1 raw /256 scale, as v1 stores it."
+   "maximum": 100,
+   "$comment": "Percent, as v1 stores it (30-100 in Gen 1)."
   },
   "pp": {
    "type": "integer",
    "minimum": 0,
-   "maximum": 64
+   "maximum": 40
   },
   "effect": {
    "type": "string",

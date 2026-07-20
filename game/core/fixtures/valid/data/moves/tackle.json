@@ -3,7 +3,7 @@
  "name": "TACKLE",
  "type": "type:normal",
  "power": 35,
- "accuracy": 242,
+ "accuracy": 95,
  "pp": 35,
  "effect": "NO_ADDITIONAL_EFFECT",
  "sfx": {

@@ -71,5 +71,17 @@ Rules (enforced by `ProjectValidator`, `game/core/ProjectValidator.gd`):
 ## Provenance
 
 The Kanto project is **emitted by the extractor** (ADR-017 d6; gh #24): pokered clone in,
-project folder out — the same bring-your-own-source, personal-use model as v1
-(`pokered/` and everything extracted stay git-ignored, never redistributed).
+`game/project/` out — `build_project()` runs as the last extraction stage, consolidating
+v1's parallel per-type dicts into records (species = base stats + learnsets + evolutions +
+dex + cry + icon + sprites; items absorb prices and the TM→move mapping; trainers absorb
+pics) and prefixing every cross-reference. Same bring-your-own-source, personal-use model
+as v1 (`pokered/` and everything extracted stay git-ignored, never redistributed).
+Emission is **deterministic**: two extractions produce byte-identical trees (the gh #24
+gate), which is what makes the gh #23 identity hash meaningful. The project root carries
+a `.gdignore` so Godot never imports the tree — the runtime reads it via raw
+`FileAccess`/`Image.load_from_file` (gh #25).
+
+Dead data pokered ships is filtered at emission, not schema'd around: the
+`UnusedMart`/`UnusedBikeShop` stock (maps that don't exist) and the `UNUSED` padding in
+Mew's TM table. The `missingno` cry (not a species record) lands in
+`presentation/cries_extra.json`.

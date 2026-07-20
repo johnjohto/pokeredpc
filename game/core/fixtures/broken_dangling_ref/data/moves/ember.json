@@ -3,7 +3,7 @@
  "name": "EMBER",
  "type": "type:fire",
  "power": 40,
- "accuracy": 255,
+ "accuracy": 100,
  "pp": 25,
  "effect": "BURN_SIDE_EFFECT1"
 }

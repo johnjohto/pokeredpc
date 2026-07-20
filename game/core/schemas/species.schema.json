@@ -196,7 +196,8 @@
    ],
    "properties": {
     "cry": {
-     "type": "integer"
+     "type": "string",
+     "$comment": "Base cry sfx key (e.g. 'cry11')."
     },
     "pitch": {
      "type": "integer"
@@ -208,7 +209,9 @@
    "additionalProperties": false
   },
   "icon": {
-   "type": "string"
+   "type": "integer",
+   "minimum": 0,
+   "$comment": "Index into the icon sheet (v1 mon_icons)."
   },
   "sprites": {
    "type": "object",

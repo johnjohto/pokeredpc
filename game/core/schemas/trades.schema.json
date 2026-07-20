@@ -38,6 +38,13 @@
   },
   "custom": {
    "type": "object"
+  },
+  "text_trades": {
+   "type": "object",
+   "additionalProperties": {
+    "type": "integer"
+   },
+   "$comment": "Trade-house text id -> index into trades (v1 shape)."
   }
  },
  "additionalProperties": false
