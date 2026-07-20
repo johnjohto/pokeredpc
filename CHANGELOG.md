@@ -9,6 +9,19 @@ milestones, `PATCH` bumps are fixes/polish. See `docs/roadmap.md` for the live p
 ## [Unreleased]
 
 ### Fixed
+- **The saffron stage now retries — one transient Celadon walk failure no longer ends the whole
+  run** (gh #29). The run's longest unguarded walk (Fuchsia → Lavender → Celadon → the Mart's
+  rooftop drink → Route 7's gate → Saffron) was one of two stages the gh #131 hardening pass
+  deliberately left without a retry loop because it had passed both seeds — and both of today's
+  full gate runs then cashed that "theoretical" gap in, each dying to a transient wander-RNG
+  blockage on the Celadon Mart approach (different cells, same class). The stage now runs the
+  standard ×3 location-guarded attempt: every leg is skipped once its outcome holds
+  (center_label / the drink / GAVE_SAFFRON_GUARDS_DRINK), so a retry resumes from wherever the
+  last attempt ended — out of the respawn Center after a whiteout, out of the Route 7 gate or
+  the Mart mid-errand, or straight back to the vending machine. `_pt_warp_out` also no longer
+  fails silently: it names the map+cell its walk died on, which is the whole diagnosis for a
+  wander-RNG blockage.
+
 - **Multi-tile STRENGTH shoves refused their second tile — Victory Road (and the endgame behind
   it) was unreachable** (gh #28). pokered's `TryPushingBoulder`
   (`engine/overworld/push_boulder.asm`) sets `BIT_BOULDER_DUST` the moment a shove starts and

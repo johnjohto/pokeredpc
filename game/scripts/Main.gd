@@ -10210,6 +10210,7 @@ func _pt_warp_out(dest_map: String, avoid_warps := false) -> bool:
 				is_last_map = true
 				break
 	if exit_cell.x < 0:
+		print("[playthrough] warp_out(%s): %s has no warp to it" % [dest_map, center_label])
 		return false
 	if is_last_map:
 		last_outside_map = dest_map            # make the LAST_MAP exit resolve to where we came from
@@ -10238,6 +10239,11 @@ func _pt_warp_out(dest_map: String, avoid_warps := false) -> bool:
 		if edge >= 0:
 			await _pt_step(edge)
 			await _drive_until(func() -> bool: return center_label == dest_map and modal == null, 300)
+	if center_label != dest_map:
+		# gh #29: this walk used to fail silently, and a whole stage died with nothing in the log.
+		# Name where it actually ended — "which cell" is the diagnosis for a wander-RNG blockage.
+		print("[playthrough] warp_out(%s): walk ended on %s @%s (aimed for the %s door)" % [
+			dest_map, center_label, str(player.cell), str(exit_cell)])
 	return center_label == dest_map
 
 
@@ -11825,31 +11831,66 @@ const _PT_SILPH_LEVEL := 48
 func _pt_stage_saffron() -> bool:
 	if str(center_label) == "SaffronCity":
 		return true                                        # already done (resumed)
-	if not await _pt_fuchsia_to_lavender():
-		return _pt_fail("Fuchsia -> Lavender (on %s)" % center_label)
-	print("[playthrough] MILESTONE walked back up to Lavender")
-	if not await _pt_lavender_to_celadon(_PT_SILPH_LEVEL, false, true):   # catch a FLY carrier (PIDGEY) too
-		return _pt_fail("Lavender -> Celadon (on %s)" % center_label)
-	print("[playthrough] MILESTONE reached Celadon")
-	if not has_event("GAVE_SAFFRON_GUARDS_DRINK") and not await _pt_buy_drink():
-		return _pt_fail("buy a drink on the Celadon Mart roof (on %s)" % center_label)
-	if not await _pt_hop(3, "Route7"):                     # Celadon -> Route 7 (east)
-		return _pt_fail("Celadon -> Route 7")
-	# Route 7's east edge is walled but for the gate house, and the guard inside wants a drink. Its east
-	# door drops us back on Route 7 (both doors are LAST_MAP), past the wall.
-	if not await _pt_warp_via(Vector2i(11, 10), "Route7Gate"):   # (11,9) is a wall; the door is the lower cell
-		return _pt_fail("enter the Route 7 gate")
-	if not await _pt_warp_via(Vector2i(5, 3), "Route7", "Route7"):   # stepping on (3,3) buys us past
-		return _pt_fail("get past the thirsty guard (on %s)" % center_label)
-	if not has_event("GAVE_SAFFRON_GUARDS_DRINK"):
-		return _pt_fail("the Saffron guard never took the drink")
-	print("[playthrough] MILESTONE gave the Saffron guards a drink")
-	if not await _pt_hop(3, "SaffronCity"):
-		return _pt_fail("Route 7 -> Saffron (on %s)" % center_label)
+	# gh #29: the run's longest unguarded walk (Fuchsia -> Lavender -> Celadon -> the Mart's rooftop
+	# drink -> Route 7's gate -> Saffron) had no retry, so one transient wander-RNG blockage or
+	# whiteout anywhere ended the whole run — it had passed both seeds, and the gh #131 hardening
+	# left it as a "theoretical" gap. Standard pattern now: each leg of the attempt is skipped once
+	# its outcome holds, so a retry resumes from wherever the last attempt actually ended.
+	var why := ""
+	for attempt in 3:
+		why = await _pt_saffron_attempt()
+		if why == "":
+			break
+		print("[playthrough] saffron attempt %d ended on %s @%s (%s) — heal + retry" % [
+			attempt + 1, center_label, str(player.cell), why])
+		heal_party()
+	if why != "":
+		return _pt_fail("saffron: %s (all attempts, on %s)" % [why, center_label])
 	heal_party()
 	respawn_map = "SaffronPokecenter"
 	print("[playthrough] MILESTONE reached Saffron City — %s" % str(_pt_party_summary()))
 	return true
+
+
+## One saffron attempt, resumable (gh #29): returns "" once we stand in Saffron, else the leg that
+## failed. Legs are guarded by center_label / the drink / GAVE_SAFFRON_GUARDS_DRINK, so a retry
+## picks up mid-walk — out of the respawn Center after a whiteout, or from the city a transient
+## walk failure stranded us in — instead of demanding the Fuchsia start over.
+func _pt_saffron_attempt() -> String:
+	if str(center_label) == "SaffronCity":
+		return ""                                          # a prior attempt died past the gate
+	if str(center_label) == "LavenderPokecenter" and not await _pt_warp_out("LavenderTown"):
+		return "step out of the Lavender Center"           # a Lavender->Celadon whiteout parks us here
+	if str(center_label) == "Route7Gate" and not await _pt_warp_out("Route7"):
+		return "step out of the Route 7 gate"              # stranded mid-gate (either side resumes)
+	if not has_event("GAVE_SAFFRON_GUARDS_DRINK") and not _pt_have_drink() \
+			and str(center_label) != "CeladonCity" and str(center_label) != "Route7" \
+			and not str(center_label).begins_with("CeladonMart"):
+		if not await _pt_fuchsia_to_lavender():            # no-ops on Lavender; warps out of Fuchsia's Center
+			return "Fuchsia -> Lavender"
+		print("[playthrough] MILESTONE walked back up to Lavender")
+		if not await _pt_lavender_to_celadon(_PT_SILPH_LEVEL, false, true):   # catch a FLY carrier (PIDGEY) too
+			return "Lavender -> Celadon"
+		print("[playthrough] MILESTONE reached Celadon")
+	if not has_event("GAVE_SAFFRON_GUARDS_DRINK") and not await _pt_buy_drink():
+		return "buy a drink on the Celadon Mart roof"
+	if str(center_label).begins_with("CeladonMart") and not await _pt_warp_out("CeladonCity"):
+		return "walk back out of the Mart"                 # a resume with the drink already in the bag
+	if str(center_label) != "Route7" and not await _pt_hop(3, "Route7"):   # Celadon -> Route 7 (east)
+		return "Celadon -> Route 7"
+	if not has_event("GAVE_SAFFRON_GUARDS_DRINK"):
+		# Route 7's east edge is walled but for the gate house, and the guard inside wants a drink. Its
+		# east door drops us back on Route 7 (both doors are LAST_MAP), past the wall.
+		if not await _pt_warp_via(Vector2i(11, 10), "Route7Gate"):   # (11,9) is a wall; the door is the lower cell
+			return "enter the Route 7 gate"
+		if not await _pt_warp_via(Vector2i(5, 3), "Route7", "Route7"):   # stepping on (3,3) buys us past
+			return "get past the thirsty guard"
+		if not has_event("GAVE_SAFFRON_GUARDS_DRINK"):
+			return "the Saffron guard never took the drink"
+		print("[playthrough] MILESTONE gave the Saffron guards a drink")
+	if not await _pt_hop(3, "SaffronCity"):
+		return "Route 7 -> Saffron"
+	return ""
 
 
 ## --- SILPH CO stage (gh #76): liberate Silph and open Saffron Gym. Beating GIOVANNI here is what
