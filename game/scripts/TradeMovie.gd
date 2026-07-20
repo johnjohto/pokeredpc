@@ -121,9 +121,13 @@ func _begin(phase: String) -> void:
 ## `partner` is the person across the cable (the farewell texts); `get_ot` is the incoming
 ## mon's card OT. NPC trades keep the cartridge's "TRAINER" defaults; link trades pass the
 ## partner's real name and the record's OT (gh #6 playtest).
+var partner_label := "TRAINER"     # the right Game Boy's name box (link: the partner)
+
+
 func play(give_sp: String, give_ot: String, give_otid: int, get_sp: String, get_otid: int,
 		partner := "TRAINER", get_ot := "TRAINER") -> void:
 	visible = true
+	partner_label = partner
 	var give_name: String = main.mon_display_name(give_sp)
 	var get_name: String = main.mon_display_name(get_sp)
 	# 1) Trade_ShowPlayerMon: the card + flipped pic slide in from the right, poof, ball
@@ -315,7 +319,11 @@ func _draw_crawl() -> void:
 			var s := minf(8.0, (_t - CRAWL_H) / 8.0)
 			icon += Vector2(minf(s, 4.0) * 4.0, maxf(0.0, s - 4.0) * 10.0)
 	else:
-		icon = Vector2(108, 76)                   # base ($64,$44): circle TL (100,60)
+		# base ($64,$44), same OAM->screen mapping as the send's ($54,$1c)->(92,28):
+		# TL (108,68), so the icon sits centered on the right GB's cable mouth (y 72-80)
+		# and the up-40 walk lands it exactly on the tube row like the send side.
+		# (It rode 8 px below the pipe the whole receive leg — playtest report.)
+		icon = Vector2(108, 68)
 		if _t <= CRAWL_V:                         # up 40, then left 16, before the scroll
 			var s := minf(8.0, _t / 8.0)
 			icon += Vector2(-maxf(0.0, s - 4.0) * 4.0, -minf(s, 4.0) * 10.0)
@@ -367,4 +375,4 @@ func _draw_right_gb(o: float, flash: bool) -> void:
 	_tile(44, o + 104, 72, flash)                 # $5d open end at (13,9)
 	_tilemap("game_boy", o + 56, 64, flash)       # the GAME BOY pic at (7,8)
 	Frame.draw(self, frame_tex, o + 48, 0, 9, 4, LIGHT)    # the name box at (6,0)
-	_str("TRAINER", o + 56, 16)
+	_str(partner_label, o + 56, 16)              # the partner's GB (link: their real name)

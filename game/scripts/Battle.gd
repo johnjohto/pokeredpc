@@ -480,12 +480,20 @@ func start_link(p_party: Array, e_party: Array, host: bool, seed_v: int, pname: 
 	_link_wait = ""
 	link_over = false
 	_set_enemy(0)
-	trainer_pic_tex = null
-	var q: Array = [{"intro": "silhouette"}, {"intro": "reveal"}, {"intro": "pokeballs"},
-		{"auto": "%s\nwants to fight!" % pname},
-		{"auto": "%s sent\nout %s!" % [pname, enemy_mon["name"]]},
+	# cable_club.asm sets wCurOpponent = OPP_RIVAL1 for a link battle: the partner appears
+	# as the rival, pic and all, through the ordinary trainer intro. (A pic-less trainer
+	# intro is a combination that never exists on cartridge — running one meshed the enemy
+	# mon's slide-in with its HUD; playtest report.)
+	var pic_slug := str(main.trainer_pics.get("OPP_RIVAL1", "")) if main else ""
+	trainer_pic_tex = load("res://assets/trainers/pics/%s.png" % pic_slug) if pic_slug != "" else null
+	_trainer_intro = trainer_pic_tex != null
+	var q: Array = [{"intro": "silhouette"}, {"intro": "reveal"}, {"intro": "t_appeared"},
+		{"intro": "pokeballs"}, {"auto": "%s\nwants to fight!" % pname}]
+	if trainer_pic_tex:
+		q.append({"intro": "t_slide_off"})
+	q.append_array([{"auto": "%s sent\nout %s!" % [pname, enemy_mon["name"]]},
 		{"intro": "enemy_grow"}, {"intro": "enemy_hud"}, {"intro": "pause"},
-		{"intro": "slide_off"}, {"auto": "Go! %s!" % player_mon["name"]}, {"intro": "throw"}]
+		{"intro": "slide_off"}, {"auto": "Go! %s!" % player_mon["name"]}, {"intro": "throw"}])
 	_det_event("S", "link seed=%d" % battle_seed)
 	_say(q, "menu")
 
