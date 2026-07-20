@@ -2,6 +2,50 @@
 
 Newest first. Each entry: context → decision → consequences.
 
+## ADR-018 — The ruleset seam: interface modules in Core, gen1 native, expressions proven beside it (2026-07-20)
+
+**Context:** v2 Phase 2 (gh #16, ADR-013, plan §4.2) puts battle / catch / types / formulas /
+progression behind ruleset interfaces, with the Gen-1 rules becoming the built-in `gen1`
+ruleset. The mechanics are fused today: `Battle.gd` (4.2k lines) mixes turn resolution, damage,
+status, AI, and catch with presentation; stat-calc and exp curves live in `Main.gd`; the
+manifest already names `ruleset: "gen1"` but nothing consumes it. The refactor oracle is the
+strongest we own — the `--battledettest` per-scenario md5s must not move by a byte, the bot
+still beats Kanto, and the link suites stay green (link battles run through the seam on both
+peers). Design conversation held 2026-07-20; the issue assigned three decisions.
+**Decision:** (1) **Module boundaries:** Core (`game/core/ruleset/`) defines five interfaces —
+**Battle** (`battle state + chosen actions → the ordered event stream`; v1's ADR-009
+message/marker queue *is* this contract already), **Types** (the data-defined chart +
+resolver), **Formulas** (damage / accuracy / crit / catch-rate / stat-calc / exp-curve as a
+formula provider), **Catch**, and **Progression** (flags + gate conditions, generalizing
+badges and HM gates). The engine keeps presentation — drawing, HUD, move animations consume
+the event stream and never compute mechanics. A built-in **registry** resolves the manifest's
+`ruleset` string to an implementation; `game/rulesets/gen1/` is the only entry. (2) **The
+Gen-1 trainer AI is part of gen1's battle module**, not a separate interface — the AI layers
+and 19 item/switch handlers are Gen-1 mechanics; an AI seam waits until the second sample
+demands one (no speculative generality). (3) **Formula layer: interface + native gen1.** The
+`gen1` formulas stay native GDScript (asm-faithful, byte-identical — expressions cannot cheaply
+reproduce Gen-1's integer truncation and overflow quirks under the md5 gate). The
+**expression evaluator** (named variables, operators, integer-exact semantics: truncating
+division, explicit clamps) still lands in Phase 2 as an *alternate* formula provider, proven by
+an equivalence sweep against gen1's native formulas over a fixed test-vector matrix — real
+running code, but not on gen1's hot path. Exotic math waits for the Phase-6 hatch. (4)
+**Config-first knobs: only what is already data.** The type chart (already a project content
+type), the badge-boost mapping, exp growth curves, stat-stage multipliers, and crit-rate
+parameters are formalized as a schema'd `data/ruleset.json` singleton (base + config) emitted
+by the extractor with the faithful gen1 values; absent keys fall back to gen1 built-in
+defaults. No invented knobs — Phase 6's config UI decides what else earns exposure. (5)
+**Strangler-fig extraction**, module by module, `--battledettest` after every move — the
+oracle only localizes faults if the steps are small. ADR-017's deferred positional-index
+internals migrate opportunistically as each mechanic is touched.
+**Consequences:** Phase 2 decomposes into sub-issues cut from this ADR (interfaces + registry
++ a delegating gen1 skeleton; types + formulas through the seam; the battle module + link
+through the seam; catch + progression + the ruleset config record; the expression evaluator +
+equivalence sweep, carrying the phase gate). Battle presentation's only input becomes the
+event stream, which is exactly the boundary Phase 3's Event VM and Phase 4's live play-test
+need. The `data/ruleset.json` addition is additive under `format: 1` (defaults apply when
+absent). The deliverable is unchanged: the bot beats the game *through* the seam and no
+determinism stream moves by a byte.
+
 ## ADR-017 — The v2 project format: JSON-schema'd, per-record, ID-addressed, importer-emitted (2026-07-20)
 
 **Context:** v2 Phase 1 (gh #15, ADR-013, plan §4.1) separates Engine from Project: today's

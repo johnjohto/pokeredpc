@@ -52,7 +52,18 @@ the determinism suites (see [v2/plan.md](v2/plan.md) §7). **Phase 1's design is
 reserved `custom` bag, format-speaks-IDs with the loader resolving, interim map JSON until the
 Phase-5 TMX bridge, the extractor *emitting* the project (the importer born, not a converter),
 and `format: 1` + linear migrations. Sub-issues **gh #22–#25** (schemas/Core → manifest+identity
-→ extractor emission → runtime loading, which carries the phase gate). **Landed: gh #22**
+→ extractor emission → runtime loading, which carries the phase gate). **Phase 1 closed
+2026-07-20** (all four sub-issues landed; component evidence + the gh #27/#28/#29 gate-run
+fixes below). **Phase 2's design is pinned (ADR-018, 2026-07-20)**: five Core interfaces
+(Battle = `state + actions → ordered event stream`, Types, Formulas, Catch, Progression) with
+a registry resolving the manifest's `ruleset` field; the Gen-1 trainer AI stays inside gen1's
+battle module; the formula layer is interface + **native** gen1 (asm-faithful under the md5
+oracle) with the integer-exact expression evaluator landing *beside* it, proven by an
+equivalence sweep; config-first knobs are **only what is already data** (`data/ruleset.json`,
+additive under `format: 1`); extraction is strangler-fig with `--battledettest` between every
+move. Sub-issues **gh #31–#35** (interfaces+registry → types+formulas → battle+link →
+catch/progression/config → expression evaluator, which carries the phase gate).
+**Landed: gh #22**
 (2026-07-20): `core/schemas/` (JSON Schema per content type + the `format.json` layout
 contract), `CoreSchema` (a subset validator that errors on unknown keywords) and
 `ProjectValidator` (claims, record-id registration, dangling-reference resolution, the
