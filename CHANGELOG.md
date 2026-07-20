@@ -6,7 +6,13 @@ the disassembly), and **`1.0.0` requires a complete playthrough sign-off** on to
 systems in isolation; only a full run proves the game. `MINOR` bumps mark content/feature
 milestones, `PATCH` bumps are fixes/polish. See `docs/roadmap.md` for the live per-feature detail.
 
-## [Unreleased]
+## [1.2.0] — 2026-07-20
+
+Link session resume — the headline — plus the endgame-unblocking engine/bot fixes that
+re-earned the Stage-1 gate on both seeds, and a playable Windows export. The ADR-016
+two-stage gate is closed: Stage 1 (the `linkblip.py` injection matrix, ALL GREEN twice
+consecutively with every v1.1 suite still green) and Stage 2 (a real remote human session
+with genuine Wi-Fi drops, signed off 2026-07-20).
 
 ### Added
 - **A playable Windows export** (`pwsh tools/export.ps1`): `build/windows/pokeredpc.exe`

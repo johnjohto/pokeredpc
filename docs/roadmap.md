@@ -27,13 +27,15 @@ lockstep link battles) built and gated in two days — Stage 1 (the automated `l
 `linksoak` / `linkdrop` suites, byte-identical lockstep streams across real instances) and
 Stage 2 (a real remote human session, 2026-07-19: trades incl. trade evolutions, battles
 both directions, genuine disconnects) both closed. Remaining multiplayer follow-ups: gh #13
-(session resume — ADR-016 **implemented 2026-07-20**: the lost-state transport (host listens,
-joiner redials, ~120 s player-cancellable grace, session token), the battle reconcile
-(turn+cursor+digest reports carrying the in-flight action), and the trade journal-phase
-reconcile whose max-phase rule **closes the two-generals residue**; the dupe egg stays
-relaunch-only. **Stage 1 of its gate is GREEN** — `tools/linkblip.py`'s `--blipat`/`--blipevery`
-matrix twice consecutively, with `linktest`/`linkdrop`/`linksoak` all still green — leaving
-**Stage 2 (a real human session with genuine Wi-Fi drops)** before the **v1.2.0** release),
+(session resume — **SHIPPED as v1.2.0, 2026-07-20**: ADR-016 implemented in full — the
+lost-state transport (host listens, joiner redials, ~120 s player-cancellable grace, session
+token), the battle reconcile (turn+cursor+digest reports carrying the in-flight action), and
+the trade journal-phase reconcile whose max-phase rule **closed the two-generals residue**;
+the dupe egg stays relaunch-only. The two-stage gate closed same-day: Stage 1
+(`tools/linkblip.py`'s `--blipat`/`--blipevery` matrix, ALL GREEN twice consecutively with
+`linktest`/`linkdrop`/`linksoak` still green) and Stage 2 (a real human session with genuine
+Wi-Fi drops, signed off 2026-07-20). v1.2.0 also carries the gh #28/#29/#30 endgame fixes
+and the `tools/export.ps1` playable Windows build),
 and the last mile of gh #12 (cross-platform, ready-for-human), whose automatable half closed
 2026-07-20: the engine build joined link identity (a differing Godot build refuses naming both
 builds), the toolchain runs per-OS (`POKEREDPC_GODOT`, per-OS user dirs, Linux/macOS setup in
