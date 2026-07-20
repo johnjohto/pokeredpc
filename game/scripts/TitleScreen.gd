@@ -117,10 +117,8 @@ func setup(tex: Texture2D, cols: int, cmap: Dictionary) -> void:
 		load("res://assets/title/nidorino_2.png"), load("res://assets/title/nidorino_3.png")]
 	gengar = [load("res://assets/title/gengar_0.png"),
 		load("res://assets/title/gengar_1.png"), load("res://assets/title/gengar_2.png")]
-	var f := FileAccess.open("res://assets/title_mons.json", FileAccess.READ)
-	title_mons = JSON.parse_string(f.get_as_text())
-	var fi := FileAccess.open("res://assets/title_intro.json", FileAccess.READ)
-	intro_anims = JSON.parse_string(fi.get_as_text())
+	title_mons = ProjectData.legacy("title_mons.json")   # gh #25: data rides the project
+	intro_anims = ProjectData.legacy("title_intro.json")
 	_build_timeline()
 	visible = false
 

@@ -304,12 +304,22 @@ func _ready() -> void:
 		randomize()
 	Keybinds.apply()                  # apply user-editable key bindings (user://keybinds.cfg)
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	sprite_index = _load_json("res://assets/sprites/index.json")
-	text_data = _load_json("res://assets/text.json")
+	# gh #25 (ADR-017): every data table now loads from the PROJECT (res://project, the
+	# extractor's emission, or --project=<dir>) through the Core loader, which rebuilds
+	# the exact v1 shapes — proven equal by --projparitytest. Textures still load from
+	# res://assets via Godot's import pipeline this phase (the project carries copies).
+	var perr := ProjectData.open(_project_dir())
+	if perr != "":
+		push_error("[project] " + perr)
+		print("[project] FATAL: " + perr)
+		get_tree().quit(1)
+		return
+	sprite_index = ProjectData.legacy("sprites/index.json")
+	text_data = ProjectData.legacy("text.json")
 	var ui := CanvasLayer.new()
 	add_child(ui)
 	var ft: Texture2D = load("res://assets/font.png")
-	var cmap := _load_json("res://assets/charmap.json")
+	var cmap: Dictionary = ProjectData.legacy("charmap.json")
 	var fcols := int(ft.get_width() / 8)
 	textbox = preload("res://scripts/TextBox.gd").new()
 	ui.add_child(textbox)
@@ -324,7 +334,7 @@ func _ready() -> void:
 	ui.add_child(menu)
 	menu.setup(ft, fcols, cmap)
 	menu.mon_icons_tex = load("res://assets/mon_icons.png")
-	menu.mon_icons_map = _load_json("res://assets/mon_icons.json")
+	menu.mon_icons_map = ProjectData.legacy("mon_icons.json")
 	menu.chosen.connect(_on_menu_chosen)
 	menu.selected.connect(_on_menu_select)
 	naming = preload("res://scripts/NamingScreen.gd").new()
@@ -358,7 +368,7 @@ func _ready() -> void:
 	martscreen.closed.connect(func() -> void:
 		modal = null
 		_say("Thank you!"))                          # the clerk's farewell on any exit
-	credits_pages = _load_json_array("res://assets/credits.json")
+	credits_pages = ProjectData.legacy("credits.json")
 	darkness = ColorRect.new()                  # dark-cave palette swap (FLASH clears it; gh #127)
 	darkness.color = Color(0, 0, 0, 1)
 	darkness.size = Vector2(160, 144)
@@ -369,12 +379,12 @@ func _ready() -> void:
 	dark_mat.shader = load("res://shaders/cave_dark.gdshader")
 	darkness.material = dark_mat
 	ui.add_child(darkness)
-	mon_base = _load_json("res://assets/pokemon/base_stats.json")
-	mon_moves = _load_json("res://assets/moves.json")
-	move_sfx = _load_json("res://assets/move_sfx.json")
+	mon_base = ProjectData.legacy("pokemon/base_stats.json")
+	mon_moves = ProjectData.legacy("moves.json")
+	move_sfx = ProjectData.legacy("move_sfx.json")
 	battle = preload("res://scripts/Battle.gd").new()
 	ui.add_child(battle)
-	battle.setup(ft, fcols, cmap, mon_base, mon_moves, _load_json("res://assets/types.json"))
+	battle.setup(ft, fcols, cmap, mon_base, mon_moves, ProjectData.legacy("types.json"))
 	battle.main = self
 	battle.finished.connect(_on_battle_finished)
 	link = preload("res://scripts/Link.gd").new()
@@ -393,7 +403,7 @@ func _ready() -> void:
 	slots.finished.connect(func() -> void: modal = null)
 	townmap = preload("res://scripts/TownMap.gd").new()
 	ui.add_child(townmap)
-	var tm_data := _load_json("res://assets/town_map.json")
+	var tm_data: Dictionary = ProjectData.legacy("town_map.json")
 	townmap_start = tm_data.get("start", {})
 	townmap.setup(ft, fcols, cmap, self, tm_data)
 	townmap.closed.connect(func() -> void:
@@ -427,28 +437,28 @@ func _ready() -> void:
 	transition = preload("res://scripts/Transition.gd").new()
 	ui.add_child(transition)                    # topmost: wipes draw over the world and UI
 	transition.setup()
-	dungeon_maps = _load_json_array("res://assets/dungeon_maps.json")
-	spinners = _load_json("res://assets/spinners.json")
+	dungeon_maps = ProjectData.legacy("dungeon_maps.json")
+	spinners = ProjectData.legacy("spinners.json")
 	_flower_tex = load("res://assets/tilesets/flower.png")
-	trainers = _load_json("res://assets/trainers.json")
-	trades_data = _load_json("res://assets/trades.json")
-	wild_data = _load_json("res://assets/wild.json")
-	item_names = _load_json("res://assets/items.json")
-	item_prices = _load_json("res://assets/item_prices.json")
-	trainer_pics = _load_json("res://assets/trainer_pics.json")
-	dex_entries = _load_json("res://assets/dex_entries.json")
-	tm_moves = _load_json("res://assets/tm_moves.json")
-	marts = _load_json("res://assets/marts.json")
-	hidden_items = _load_json("res://assets/hidden_items.json")
-	dex_order = _load_json_array("res://assets/dex_order.json")
+	trainers = ProjectData.legacy("trainers.json")
+	trades_data = ProjectData.legacy("trades.json")
+	wild_data = ProjectData.legacy("wild.json")
+	item_names = ProjectData.legacy("items.json")
+	item_prices = ProjectData.legacy("item_prices.json")
+	trainer_pics = ProjectData.legacy("trainer_pics.json")
+	dex_entries = ProjectData.legacy("dex_entries.json")
+	tm_moves = ProjectData.legacy("tm_moves.json")
+	marts = ProjectData.legacy("marts.json")
+	hidden_items = ProjectData.legacy("hidden_items.json")
+	dex_order = ProjectData.legacy("dex_order.json")
 	player_party = [
 		make_mon("charmander", 8, ["SCRATCH", "GROWL", "EMBER"]),
 		make_mon("pidgey", 5, []),
 	]
 	audio = preload("res://scripts/Audio.gd").new()
 	add_child(audio)
-	audio.setup(_load_json("res://assets/audio.json"), _load_json("res://assets/map_music.json"),
-		_load_json("res://assets/sfx.json"), _load_json("res://assets/cries.json"))
+	audio.setup(ProjectData.legacy("audio.json"), ProjectData.legacy("map_music.json"),
+		ProjectData.legacy("sfx.json"), ProjectData.legacy("cries.json"))
 	audio.enabled = OS.get_cmdline_user_args().is_empty()   # no music synthesis during tests
 	if not OS.get_cmdline_user_args().is_empty():
 		SAVE_PATH = "user://pokeredpc_save_test.json"       # never clobber the real save (gh #40)
@@ -558,6 +568,8 @@ func _ready() -> void:
 		_monrecordtest()
 	elif "--schematest" in args:
 		_schematest()
+	elif "--projparitytest" in args:
+		_projparitytest()
 	elif _validate_dir_arg(args) != "":
 		_validateproject(_validate_dir_arg(args))
 	elif "--recovertest" in args:
@@ -1028,14 +1040,14 @@ func load_game() -> bool:
 
 
 func _map_exists(label: String) -> bool:
-	return FileAccess.file_exists("res://assets/maps/%s.json" % label)
+	return ProjectData.map_exists(label)      # gh #25: maps ride the project
 
 
 # ---- tileset / map loading -------------------------------------------------
 
 func _get_tileset(slug: String) -> Dictionary:
 	if not _ts_cache.has(slug):
-		var ts := _load_json("res://assets/tilesets/%s.json" % slug)
+		var ts: Dictionary = ProjectData.legacy("tilesets/%s.json" % slug)
 		var wk := {}
 		for t in ts["walkable_tiles"]:
 			wk[int(t)] = true
@@ -1096,7 +1108,7 @@ func load_world(center: String, arrive_idx := -1, spawn_override = null, keep_fa
 	if moneybox:
 		moneybox.hide_box()          # a map redraw clears the MONEY_BOX tiles on the GB
 	placed = []
-	var c := _make_placed(center, _load_json("res://assets/maps/%s.json" % center), 0, 0)
+	var c := _make_placed(center, ProjectData.map_json(center), 0, 0)
 	placed.append(c)
 	map = c["data"]
 	map_w = c["w"]; map_h = c["h"]
@@ -1118,7 +1130,7 @@ func load_world(center: String, arrive_idx := -1, spawn_override = null, keep_fa
 		var label := str(conn["map"])
 		if not _map_exists(label):
 			continue
-		var nd := _load_json("res://assets/maps/%s.json" % label)
+		var nd: Dictionary = ProjectData.map_json(label)
 		var nw := int(nd["width"])
 		var nh := int(nd["height"])
 		var off := int(conn["offset"])
@@ -5034,6 +5046,100 @@ func _schema_check(name: String, good: bool, detail: String) -> bool:
 	return good
 
 
+## gh #25: the reconstruction parity oracle — ProjectData.legacy(name) must equal the
+## legacy res://assets file for EVERY data table (and all 223 interim maps byte-load
+## identically), with exactly two documented exceptions where emission filters dead
+## pokered data: Mew's UNUSED TM padding and the UnusedMart/UnusedBikeShop stock.
+## Run: `pwsh tools/run.ps1 -- --projparitytest`. Headless.
+func _projparitytest() -> void:
+	await get_tree().process_frame
+	var ok := true
+	var perr := ProjectData.open(_project_dir())
+	ok = _schema_check("project opened", perr == "", perr) and ok
+	if perr != "":
+		print("[parity] FAIL")
+		get_tree().quit(1)
+		return
+	var names := ["pokemon/base_stats.json", "dex_entries.json", "cries.json",
+		"mon_icons.json", "dex_order.json", "moves.json", "move_sfx.json", "items.json",
+		"item_prices.json", "tm_moves.json", "trainers.json", "trainer_pics.json",
+		"types.json", "wild.json", "marts.json", "hidden_items.json", "trades.json",
+		"text.json", "audio.json", "sfx.json", "charmap.json", "credits.json",
+		"dungeon_maps.json", "map_music.json", "move_anims.json", "spinners.json",
+		"title_intro.json", "title_mons.json", "town_map.json", "trade_gfx.json",
+		"warp_rules.json", "sprites/index.json"]
+	for name in names:
+		var want = _load_json_any("res://assets/" + name)
+		var got = ProjectData.legacy(name)
+		# documented emission filters (see docs/v2/project-format.md "Provenance")
+		if name == "pokemon/base_stats.json":
+			var tm: Array = (want["mew"]["tmhm"] as Array).duplicate()
+			tm.erase("UNUSED")
+			want["mew"]["tmhm"] = tm
+		elif name == "marts.json":
+			for dead in ["UnusedMart", "UnusedBikeShop"]:
+				want.erase(dead)
+		var diff := _deep_diff(want, got, "/")
+		ok = _schema_check("parity %s" % name, diff == "", diff) and ok
+	var ts_ok := true
+	for slug in ["overworld", "gym", "facility", "interior", "cavern"]:
+		var d := _deep_diff(_load_json_any("res://assets/tilesets/%s.json" % slug),
+			ProjectData.legacy("tilesets/%s.json" % slug), "/")
+		ts_ok = ts_ok and d == ""
+	ok = _schema_check("parity tilesets (5 sampled)", ts_ok, "") and ok
+	var map_ok := true
+	var map_n := 0
+	var mda := DirAccess.open("res://assets/maps")
+	mda.list_dir_begin()
+	var mf := mda.get_next()
+	while mf != "":
+		if mf.ends_with(".json"):
+			map_n += 1
+			var label := mf.get_basename()
+			if _deep_diff(_load_json_any("res://assets/maps/" + mf),
+					ProjectData.map_json(label), "/") != "" or not ProjectData.map_exists(label):
+				map_ok = false
+				print("[schema] map parity FAIL: %s" % label)
+		mf = mda.get_next()
+	mda.list_dir_end()
+	ok = _schema_check("parity maps (%d compared)" % map_n, map_ok and map_n > 200, "") and ok
+	print("[parity] %s" % ("ALL GREEN" if ok else "FAIL"))
+	get_tree().quit(0 if ok else 1)
+
+
+func _load_json_any(path: String):
+	var f := FileAccess.open(path, FileAccess.READ)
+	return JSON.parse_string(f.get_as_text()) if f != null else null
+
+
+## First difference between two parsed-JSON values as "path: what", "" when equal.
+func _deep_diff(a, b, path: String) -> String:
+	if typeof(a) != typeof(b):
+		return "%s: type %s vs %s" % [path, type_string(typeof(a)), type_string(typeof(b))]
+	if a is Dictionary:
+		for k in a:
+			if not b.has(k):
+				return "%s: missing key '%s'" % [path, k]
+			var d := _deep_diff(a[k], b[k], path + str(k) + "/")
+			if d != "":
+				return d
+		for k in b:
+			if not a.has(k):
+				return "%s: extra key '%s'" % [path, k]
+		return ""
+	if a is Array:
+		if a.size() != b.size():
+			return "%s: size %d vs %d" % [path, a.size(), b.size()]
+		for i in a.size():
+			var d := _deep_diff(a[i], b[i], "%s%d/" % [path, i])
+			if d != "":
+				return d
+		return ""
+	if a != b:
+		return "%s: %s vs %s" % [path, str(a).left(40), str(b).left(40)]
+	return ""
+
+
 ## gh #22: validate any project directory (res:// or an OS path) against the format.
 ## Run: `pwsh tools/run.ps1 -- --validate=<dir>`. Exit 0 only when the project is clean.
 func _validateproject(dir: String) -> void:
@@ -5052,6 +5158,15 @@ func _validate_dir_arg(args) -> String:
 		if str(a).begins_with("--validate="):
 			return str(a).substr(11)
 	return ""
+
+
+## gh #25: the project directory the runtime loads — res://project (the extractor's
+## emission) unless --project=<dir> points elsewhere.
+func _project_dir() -> String:
+	for a in OS.get_cmdline_user_args():
+		if str(a).begins_with("--project="):
+			return str(a).substr(10)
+	return "res://project"
 
 
 ## field-invalid records without crashing. Run: `pwsh tools/run.ps1 -- --monrecordtest`.

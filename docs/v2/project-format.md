@@ -54,6 +54,25 @@ Rules (enforced by `ProjectValidator`, `game/core/ProjectValidator.gd`):
   free-form under validation, so Phase-6 custom fields never break format 1 projects.
   Everything else is `additionalProperties: false`.
 
+## The runtime loads the project (gh #25)
+
+`game/core/ProjectData.gd` opens the project once at boot (`--project=<dir>` overrides the
+default `res://project`): the manifest gate (refuse-newer naming both versions), then every
+record collection reconstructs into the exact v1-shaped dictionaries the engine has always
+consumed — prefixes stripped, `PSYCHIC_TYPE` restored, mono-types re-doubled, evolution
+arrays back to their string-level form. `legacy(name)` answers by old asset filename and
+returns a **deep copy** (v1 parsed fresh per call site; mutation semantics must not
+change), and maps parse fresh per load for the same reason. Reconstruction is proven
+field-for-field by **`--projparitytest`** (every table + all 223 maps vs the legacy files,
+modulo the two documented emission filters), and proven *behaviorally* by the standing
+gates — which is not redundant: the first flip passed parity and still moved the copycat
+battledet md5, because **dictionary iteration order is behavior** (Metronome/Mimic pick
+over the move table's order) while dictionary equality ignores it. That is why
+move/item/trainer records carry **`num`** — the canonical Gen-1 table index — and the
+reconstruction sorts by it. Binary assets (textures/audio synth inputs) still load through
+Godot's import pipeline from `game/assets/` this phase; the project carries byte-identical
+copies, and the raw-load switch belongs to the Studio phases.
+
 ## Schemas + validator (gh #22)
 
 - `game/core/schemas/*.schema.json` — standard JSON Schema documents (external tools can

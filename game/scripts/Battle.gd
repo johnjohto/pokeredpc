@@ -321,9 +321,7 @@ func setup(ftex: Texture2D, cols: int, cmap: Dictionary, base: Dictionary, mdb: 
 	_monster_tex = load("res://assets/sprites/monster.png")
 	_fbe_tex = load("res://assets/font_battle_extra.png")
 	_icons_tex = load("res://assets/mon_icons.png")
-	var icf := FileAccess.open("res://assets/mon_icons.json", FileAccess.READ)
-	if icf:
-		_icons_map = JSON.parse_string(icf.get_as_text())
+	_icons_map = ProjectData.legacy("mon_icons.json")   # gh #25: data rides the project
 	_invert = ColorRect.new()                  # the AnimationFlashScreen palette inversion
 	_invert.size = Vector2(160, 144)
 	var iv := ShaderMaterial.new()
@@ -332,7 +330,7 @@ func setup(ftex: Texture2D, cols: int, cmap: Dictionary, base: Dictionary, mdb: 
 	_invert.visible = false
 	add_child(_invert)
 	_balls_tex = load("res://assets/balls.png")
-	_manim = JSON.parse_string(FileAccess.get_file_as_string("res://assets/move_anims.json"))
+	_manim = ProjectData.legacy("move_anims.json")
 	for ts in _manim["tilesets"]:
 		if not _manim_tex.has(str(ts["img"])):
 			_manim_tex[str(ts["img"])] = load("res://assets/%s.png" % str(ts["img"]))

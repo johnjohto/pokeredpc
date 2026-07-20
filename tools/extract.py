@@ -2292,25 +2292,30 @@ def build_project():
             rec["evolutions"] = evos
         _pj_write(f"data/species/{key}.json", rec)
 
-    for key, m in moves.items():
-        rec = {"id": "move:" + key.lower(), "name": m["name"], "type": _type_id(m["type"]),
-               "power": m["power"], "accuracy": m["accuracy"], "pp": m["pp"],
-               "effect": m["effect"]}
+    # `num` = the canonical Gen-1 table index (v1's dict insertion order follows pokered's
+    # constant order). It is DATA, not bookkeeping: Metronome/Mimic's random pick space is
+    # the move table's order, so the reconstruction (ProjectData) must restore it exactly —
+    # the copycat battledet md5 is the regression proof.
+    for i, (key, m) in enumerate(moves.items()):
+        rec = {"id": "move:" + key.lower(), "num": i + 1, "name": m["name"],
+               "type": _type_id(m["type"]), "power": m["power"], "accuracy": m["accuracy"],
+               "pp": m["pp"], "effect": m["effect"]}
         if key in move_sfx:
             rec["sfx"] = {"key": move_sfx[key][0], "pitch": move_sfx[key][1]}
         _pj_write(f"data/moves/{key.lower()}.json", rec)
 
-    for key, display in items.items():
-        rec = {"id": "item:" + key.lower(), "name": display}
+    for i, (key, display) in enumerate(items.items()):
+        rec = {"id": "item:" + key.lower(), "num": i + 1, "name": display}
         if display in prices:
             rec["price"] = prices[display]
         if key.startswith(("TM_", "HM_")):          # TM_MEGA_PUNCH -> move:mega_punch
             rec["tm_move"] = "move:" + key.split("_", 1)[1].lower()
         _pj_write(f"data/items/{key.lower()}.json", rec)
 
-    for key, t in trainers.items():
-        rec = {"id": "trainer:" + key.lower(), "name": t["name"], "money": t["money"],
-               "ai": t["ai"], "ai_count": t["ai_count"], "ai_mods": t["ai_mods"],
+    for i, (key, t) in enumerate(trainers.items()):
+        rec = {"id": "trainer:" + key.lower(), "num": i + 1, "name": t["name"],
+               "money": t["money"], "ai": t["ai"], "ai_count": t["ai_count"],
+               "ai_mods": t["ai_mods"],
                "parties": [[{"species": "species:" + p["species"], "level": p["level"]}
                             for p in party] for party in t["parties"]]}
         if key in pics:

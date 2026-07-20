@@ -40,6 +40,18 @@ milestones, `PATCH` bumps are fixes/polish. See `docs/roadmap.md` for the live p
   **byte-identical trees**. The project root carries `.gdignore`; the tree is git-ignored
   (extracted Nintendo-derived data, personal use, never distributed).
 
+- **v2 Phase 1 complete: the runtime loads a Project** (gh #23/#25, closing #15):
+  `manifest.identity` carries per-part content hashes over canonical bytes (13 parts;
+  the v1.1 link manifest is now a derived view of it — one identity, computed once), and
+  `ProjectData` (Core) serves the engine every data table from the project folder,
+  reconstructed into the exact v1 shapes and proven equal by the new `--projparitytest`
+  (every table + all 223 maps). The gate stack held: `--battledettest` md5s unchanged —
+  after catching one real regression the parity oracle *couldn't* see (dictionary
+  iteration order is behavior: Metronome's pick space is the move table's order, so
+  move/item/trainer records now carry `num`, the canonical Gen-1 table index) — plus the
+  full seeded bot run NEW GAME → HALL OF FAME from the project, the link suites, and the
+  audits. `--project=<dir>` points the engine at any project.
+
 - **Cross-platform link, verified** (gh #12): the **engine build joins link identity** —
   `Engine.get_version_info().string` travels in the handshake `hello`, and a differing Godot
   build refuses naming both builds (Godot's RNG and float behavior are only guaranteed

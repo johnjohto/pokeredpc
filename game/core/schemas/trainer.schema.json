@@ -67,6 +67,11 @@
   },
   "custom": {
    "type": "object"
+  },
+  "num": {
+   "type": "integer",
+   "minimum": 1,
+   "$comment": "Canonical Gen-1 table index — iteration order is behavior (Metronome/Mimic pick over the move table order); reconstruction sorts by it."
   }
  },
  "additionalProperties": false

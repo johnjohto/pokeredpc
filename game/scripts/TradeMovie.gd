@@ -47,12 +47,11 @@ func setup(m, ft: Texture2D, cols: int, cmap: Dictionary, b) -> void:
 	frame_tex = load("res://assets/frame.png")
 	tiles_tex = load("res://assets/trade_tiles.png")
 	tiles_flash_tex = _flash_variant(tiles_tex)
-	var f := FileAccess.open("res://assets/trade_gfx.json", FileAccess.READ)
-	gfx_maps = JSON.parse_string(f.get_as_text())
+	gfx_maps = ProjectData.legacy("trade_gfx.json")     # gh #25: data rides the project
 	ball_texs = [_quad_of(load("res://assets/trade_ball.png"), 2), _quad_of(load("res://assets/trade_ball.png"), 3)]
 	bubble_tex = load("res://assets/trade_bubble.png")
 	icons_tex = load("res://assets/mon_icons.png")
-	icons_map = main._load_json("res://assets/mon_icons.json")
+	icons_map = ProjectData.legacy("mon_icons.json")
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	visible = false
