@@ -118,7 +118,11 @@ func _begin(phase: String) -> void:
 
 
 ## The full internal-clock movie. give/get: species slugs; the info cards read OT/ID.
-func play(give_sp: String, give_ot: String, give_otid: int, get_sp: String, get_otid: int) -> void:
+## `partner` is the person across the cable (the farewell texts); `get_ot` is the incoming
+## mon's card OT. NPC trades keep the cartridge's "TRAINER" defaults; link trades pass the
+## partner's real name and the record's OT (gh #6 playtest).
+func play(give_sp: String, give_ot: String, give_otid: int, get_sp: String, get_otid: int,
+		partner := "TRAINER", get_ot := "TRAINER") -> void:
 	visible = true
 	var give_name: String = main.mon_display_name(give_sp)
 	var get_name: String = main.mon_display_name(get_sp)
@@ -152,10 +156,10 @@ func play(give_sp: String, give_ot: String, give_otid: int, get_sp: String, get_
 	await _wait(CRAWL_H + CRAWL_V)
 	# 5) the farewell texts on a cleared window.
 	_begin("text")
-	await _movie_text("%s went\nto TRAINER." % give_name, 200)
+	await _movie_text("%s went\nto %s." % [give_name, partner], 200)
 	await _movie_text("For %s's\n%s," % [main.player_name, give_name], 80)
-	await _movie_text("TRAINER sends\n%s." % get_name, 80)
-	await _movie_text("TRAINER waves\nfarewell as", 80)
+	await _movie_text("%s sends\n%s." % [partner, get_name], 80)
+	await _movie_text("%s waves\nfarewell as" % partner, 80)
 	await _movie_text("%s is\ntransferred." % get_name, 80)
 	# 6) the crawl back, right GB -> left GB, with the received mon's icon.
 	_state = {"dir": -1, "species": get_sp}
@@ -167,7 +171,7 @@ func play(give_sp: String, give_ot: String, give_otid: int, get_sp: String, get_
 		main.audio.play_sfx("heal_hp")
 	await _wait(10)
 	await _ball_anim("TRADE_BALL_TILT_ANIM")
-	_state = {"species": get_sp, "ot": "TRAINER", "otid": get_otid,
+	_state = {"species": get_sp, "ot": get_ot, "otid": get_otid,
 		"pic": load("res://assets/pokemon/front/%s.png" % get_sp), "hide_pic": false,
 		"box_y": 80.0}
 	_begin("show_mon")
@@ -176,6 +180,10 @@ func play(give_sp: String, give_ot: String, give_otid: int, get_sp: String, get_
 	if main.audio:
 		main.audio.play_cry(get_sp)
 	await _wait(63 + 100)                         # Trade_Delay100
+	# ClearScreenArea (4,10) 8x12 wipes the CARD before the farewell prints — the pic stays.
+	# Leaving it drew the text box over the card's body, a floating-border mess (playtest).
+	_state["hide_box"] = true
+	queue_redraw()
 	await _movie_text("Take good care of\n%s." % get_name, 80)
 	_phase = ""
 	visible = false
@@ -277,8 +285,9 @@ func _draw() -> void:
 			var dx: float = maxf(0.0, 126.0 - 2.0 * _t)
 			if not bool(_state["hide_pic"]):
 				_draw_flipped_pic(_state["pic"], dx)
-			_info_box(32.0 + dx, float(_state["box_y"]), str(_state["species"]),
-				str(_state["ot"]), int(_state["otid"]))
+			if not bool(_state.get("hide_box", false)):
+				_info_box(32.0 + dx, float(_state["box_y"]), str(_state["species"]),
+					str(_state["ot"]), int(_state["otid"]))
 		"cable_end":
 			_tilemap("link_cable", 48, 16)
 		"ball_roll":

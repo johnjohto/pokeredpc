@@ -61,7 +61,10 @@ func identity() -> Dictionary:
 		ver += "-tampered"
 	elif tamper != "" and parts.has(tamper):
 		parts[tamper] = "0000tampered"
-	return {"version": ver, "parts": parts, "flags": {"dupe": dupe_opt_in}}
+	# `name` rides along for display (the trade movie's farewell, the Colosseum label);
+	# it is NOT part of the comparison — names may differ, that's the point of them.
+	return {"version": ver, "parts": parts, "flags": {"dupe": dupe_opt_in},
+		"name": str(main.player_name)}
 
 
 ## Fresh handshake state per attempt: the one Link node serves many sessions (and the

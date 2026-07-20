@@ -1570,9 +1570,11 @@ func _tc_commit(idx: int) -> bool:
 	var give_sp := str(give["species"])
 	var give_ot := str(give.get("ot", main.player_name))
 	var give_otid := int(give.get("otid", main.player_id))
+	var partner := str((main.link.session.get("remote", {}) as Dictionary).get("name", "TRAINER"))
 	main.player_party.remove_at(idx)
 	await main.trademovie.play(give_sp, give_ot, give_otid,
-		str(received["species"]), int(received.get("otid", 0)))
+		str(received["species"]), int(received.get("otid", 0)),
+		partner, str(received.get("ot", partner)))
 	if main.player_party.size() < 6:                       # a trade never strands a mon
 		main.player_party.append(received)
 	else:

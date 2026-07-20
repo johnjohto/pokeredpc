@@ -157,6 +157,9 @@ def main():
                     "machamp" in hsp and "kadabra" not in hsp, str(hsp))
         ok &= check("trade: join SAVE holds alakazam, machoke gone",
                     "alakazam" in jsp and "machoke" not in jsp, str(jsp))
+        ok &= check("trade: saves point OUTSIDE the club (no reload-strand)",
+                    hsave["map"] == "CeruleanPokecenter" and jsave["map"] == "CeruleanPokecenter",
+                    f"{hsave['map']} / {jsave['map']}")
     except OSError as e:
         ok &= check("trade: save files readable", False, str(e))
 

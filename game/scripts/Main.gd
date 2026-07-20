@@ -882,9 +882,18 @@ func _load_json_array(path: String) -> Array:
 
 ## Write the full game state to the save slot. Returns success.
 func save_game() -> bool:
+	# Never record a Cable Club room as the save location (the trade commit saves while
+	# standing at the table): a reload has no link session, so the save points back to
+	# where the club flow started — beside the attendant (playtest: a player reloaded
+	# INTO the dead Trade Center).
+	var save_map := center_label
+	var save_cell: Vector2i = player.cell
+	if center_label in ["TradeCenter", "Colosseum"] and link_return_map != "":
+		save_map = link_return_map
+		save_cell = link_return_cell
 	var data := {
-		"map": center_label,
-		"cell": [player.cell.x, player.cell.y],
+		"map": save_map,
+		"cell": [save_cell.x, save_cell.y],
 		"facing": player.facing,
 		"player_id": player_id,
 		"play_seconds": play_seconds,
@@ -997,7 +1006,13 @@ func load_game() -> bool:
 	# CONTINUE after the Hall of Fame lands in PALLET TOWN, not the HoF floor: main_menu.asm's
 	# .choseContinue sees wCurMap == HALL_OF_FAME (with a HoF team recorded), zeroes
 	# wDestinationMap and fly-warps there via PrepareForSpecialWarp (gh #184).
-	if str(data["map"]) == "HallOfFame" and not hall_of_fame.is_empty():
+	if str(data["map"]) in ["TradeCenter", "Colosseum"]:
+		# A pre-fix save stranded inside the Cable Club (the trade commit used to save at
+		# the table, and a reload has no link session): wake up outside the last Center,
+		# like the escape warp does.
+		print("[link] save was inside the Cable Club — waking up at %s instead" % respawn_map)
+		_escape_warp()
+	elif str(data["map"]) == "HallOfFame" and not hall_of_fame.is_empty():
 		load_world("PalletTown", -1, FLY_DESTS["PalletTown"][0])
 		player.facing = 0                      # PLAYER_DIR_DOWN, set just before the warp
 	else:
@@ -5464,24 +5479,29 @@ func _clubtest() -> void:
 			player_party = [make_mon("kadabra" if hosting else "machoke", 40, []),
 				make_mon("pidgey", 20, [])]
 			save_game()          # the trade party is save-truth, as a real player's would be
-			player.facing = player.RIGHT if hosting else player.LEFT   # face the table
-			interact(player)
-			g = 0
-			while str(cutscene._tc_result) == "" and g < 12000:
-				if modal == menu and menu_mode == "cutscene":
-					menu.chosen.emit(0)                    # pick the first mon / YES
-					await get_tree().process_frame
-				elif modal == textbox and textbox.active:
-					await _press("ui_accept")
-				else:
-					await get_tree().process_frame
-				g += 1
-			var names: Array = []
-			for m in player_party:
-				names.append("%s(%s/%d)" % [m["name"], str(m.get("ot", "?")), int(m.get("otid", -1))])
-			print("[trade] %s: result=%s party=%s box=%d journal=%s" % [
-				"host" if hosting else "join", cutscene._tc_result, names, pc_box.size(),
-				FileAccess.file_exists(_tc_journal_path())])
+			var rounds: int = 2 if "--trade2" in args else 1
+			for round_n in rounds:
+				cutscene._tc_result = ""
+				player.facing = player.RIGHT if hosting else player.LEFT   # face the table
+				interact(player)
+				g = 0
+				while str(cutscene._tc_result) == "" and g < 12000:
+					if modal == menu and menu_mode == "cutscene":
+						menu.chosen.emit(0)                # pick the first mon / YES
+						await get_tree().process_frame
+					elif modal == textbox and textbox.active:
+						await _press("ui_accept")
+					else:
+						await get_tree().process_frame
+					g += 1
+				var names: Array = []
+				for m in player_party:
+					names.append("%s(%s/%d)" % [m["name"], str(m.get("ot", "?")), int(m.get("otid", -1))])
+				print("[trade] %s: result=%s party=%s box=%d journal=%s" % [
+					"host" if hosting else "join", cutscene._tc_result, names, pc_box.size(),
+					FileAccess.file_exists(_tc_journal_path())])
+				if str(cutscene._tc_result) != "done":
+					break
 			if str(cutscene._tc_result) != "done":
 				# the dead-link kick must walk us back out (the stuck-in-room bug)
 				var t3 := Time.get_ticks_msec()
@@ -8140,15 +8160,35 @@ func _tradetest() -> void:
 	player_party.append(make_mon(str(lola["give"]), 20, []))
 	var i1: int = player_party.size() - 1
 	_start_trade("TEXT_CERULEANTRADEHOUSE_GAMBLER", 6)
+	var strip := "--strip" in OS.get_cmdline_user_args()   # save a frame every 12 for review
+	var strip_n := 0
 	var g := 0
 	var shot := false
 	var card_shot := false
+	var ball_shot := false
+	var roll_shot := false
 	while cutscene_active and g < 9000:
 		await get_tree().process_frame
+		if strip and trademovie.visible and g % 12 == 0 and strip_n < 90:
+			await RenderingServer.frame_post_draw
+			get_viewport().get_texture().get_image().save_png("res://strip/tm_%03d.png" % strip_n)
+			strip_n += 1
+			await get_tree().process_frame
 		if trademovie._phase == "show_mon" and trademovie._t > 63.0 and not card_shot:
 			card_shot = true
 			await RenderingServer.frame_post_draw
 			get_viewport().get_texture().get_image().save_png("res://trade_card.png")
+			await get_tree().process_frame
+		elif trademovie._phase == "show_mon" and not trademovie._anim_sprites.is_empty() \
+				and not ball_shot:
+			ball_shot = true
+			await RenderingServer.frame_post_draw
+			get_viewport().get_texture().get_image().save_png("res://trade_ball.png")
+			await get_tree().process_frame
+		elif trademovie._phase == "ball_roll" and trademovie._t > 20 and not roll_shot:
+			roll_shot = true
+			await RenderingServer.frame_post_draw
+			get_viewport().get_texture().get_image().save_png("res://trade_roll.png")
 			await get_tree().process_frame
 		elif trademovie._phase == "crawl" and not shot:
 			shot = true
