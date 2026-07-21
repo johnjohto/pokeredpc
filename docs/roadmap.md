@@ -82,7 +82,17 @@ pre-Phase-2 code** — environmental, gh #37; gh #38 tracked a once-seen silent 
 wedge in the bot — closed 2026-07-21: `--playthrough` now runs a progress watchdog that fails
 loudly on a frozen run, proven on a full seed-1 GATE GREEN). Kanto's mechanics are now a plug-in: the engine core knows five
 interfaces, `gen1` implements them asm-faithfully, and the config knobs are live data.
-**Next: Phase 3 — the Event VM (gh #17).**
+**Next: Phase 3 — the Event VM (gh #17). Phase 3's design is pinned (ADR-019, 2026-07-21)**:
+three tiers (story beats + **all** event-shaped data-keyed mechanisms become authored events —
+the design conversation widened this beyond story-path-only; ceremonies stay native, invoked by
+commands); per-record `data/events/<id>.json` with nested-block branching; FormulaExpr as the
+one condition language; triggers declared by the event record (map files stay geometry-only;
+`visible_when` is a query, not a VM run; `(map, kind, cell)`-indexed dispatch); a coroutine VM,
+one event at a time, flags + a saved vars store, event names byte-exact, events save-atomic;
+commands only on a beat's demand; the extractor byte-copies authored events into the project;
+strangler-fig with a tracer bullet. Sub-issues **gh #39–#43** (Core schemas + VM + dispatcher +
+tracer → adapter waves by mechanism family → Cutscene beats by questline → extractor emission +
+event lints → the phase gate).
 **Landed: gh #34** (2026-07-20): Catch + Progression are behind the seam and the
 **config-first knobs are real** — `Gen1Catch` (`attempt` over the byte-exact kernel + the
 safari `bait_rate`/`rock_rate` transitions, which moved out of the host's input handler),

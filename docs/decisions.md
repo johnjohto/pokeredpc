@@ -2,6 +2,62 @@
 
 Newest first. Each entry: context → decision → consequences.
 
+## ADR-019 — The Event VM: Kanto's story as schema'd, authored event records (2026-07-21)
+
+**Context:** v2 Phase 3 (gh #17, ADR-013, plan §4.3) replaces the hand-written per-map GDScript
+adapters (~80, behind ADR-010's eight hooks — migration-complete since gh #53) and
+`Cutscene.gd`'s ~139 functions with **authored events**: a command library, a deterministic
+save-aware Event VM, and declarative triggers. The demand list is finite and measured: the
+eight hooks with two documented faithfulness rules (the post-battle re-run; `on_step` before
+trainer sight — see engine/map-scripts.md), roughly two thirds of Cutscene being story beats
+and a third engine ceremonies, plus Main's data-keyed generic mechanisms (`BENCH_GUY_TEXT`,
+`GIFT_NPCS`, `HIDDEN_EVENTS`, `_GYM_LEADERS`, elevators, `guard_door`/`thirsty_guard`, …).
+Design conversation held 2026-07-21 over the gh #17 brief.
+**Decision:** (1) **Three tiers.** Story beats become authored events; engine **ceremonies**
+(Cable Club/Trade Center plumbing, credits, the naming screen, fly/fall transitions, Town Map,
+slots) stay native, *invoked by* a command, never *expressed in* events; and — the
+conversation widened this beyond the brief's default — **all data-keyed generic mechanisms
+that are event-shaped migrate to events in Phase 3** (gift NPCs, bench guys, hidden events,
+gym leaders, elevators, guard doors, …), so the event system is proven against every shape
+Kanto has and the engine ends leaner. Per-frame/global *data* (`FLY_DESTS`, `DARK_MAPS`,
+fishing tables) stays project data, not events. (2) **Data model per ADR-017:** per-record
+`data/events/<id>.json`, an `event:` id namespace, the `custom` bag,
+`additionalProperties: false`, schemas in `core/schemas/`. A command is `{cmd, args…}` in an
+ordered list; **branching is nested blocks** (`if: {cond, then, else}`), no jump labels —
+Kanto's branches are shallow and blocks map 1:1 onto the Phase-5 command-list editor.
+(3) **Conditions reuse Phase 2's FormulaExpr** (flags/vars as named variables) — one
+expression language in the toolkit, already integer-exact, schema'd, and sweep-proven.
+(4) **Triggers are declared by the event record** (`{map, kind, cell|object|region, consume,
+when}`), never written into map files — the interim map JSON stays geometry-only, so the
+Phase-5 TMX bridge migrates no story. `object_shown` becomes a declarative `visible_when`
+condition (a query, not a VM run) and `on_step` dispatch is indexed by `(map, cell)` at load
+(plan risk 7: no VM in tight overworld loops). The boolean hook contracts (consume the
+step/warp/interact; null fall-through on visibility) carry over as trigger fields, and the
+dispatcher preserves the two faithfulness rules by construction. (5) **VM semantics:**
+deterministic, coroutine-based over the same await primitives Cutscene uses today; **one event
+active at a time** (`cutscene_active` *is* the mutual exclusion, proven by v1); durable state
+is **flags + variables** (`story_events` generalized plus a saved vars store), event names
+staying **byte-exact** with v1's — they are the save format; events are **atomic w.r.t.
+saves** (the menu cannot open mid-event; the trade journal stays the engine-side exception).
+(6) **Command library only on demand:** plan §4.3's list plus what the beat inventory adds
+(walk/walk_together choreography, emotes, pic show/slide/clear, fades, wait/wait_button,
+ask_name + presets, give_mon + the nickname offer, static-encounter battles, set_block,
+show/hide_object, sfx/music cues, the ceremony natives) — each command lands with the beat
+that demands it, never ahead of one. (7) **Authored events live in-repo; the extractor
+byte-copies them into the emitted project** (the interim-maps pattern): events cannot be
+extracted from the asm, and ADR-017 D6's "one tool" holds — no second path ever exists.
+(8) **Strangler-fig migration with a tracer bullet first** — one real adapter + one Cutscene
+beat through the full pipeline (schema → authored record → trigger → VM), that map's `--flag`
+selftest green, before any mass migration; every migrated map keeps its selftest green and
+the four `--battledettest` md5s never move.
+**Consequences:** Phase 3 decomposes into sub-issues cut from this ADR (Core schemas + the VM
++ the trigger dispatcher, carrying the tracer; adapter migration in waves by mechanism family;
+Cutscene beats by questline; extractor emission + event-data lints — `audit_chokepoints`
+learns to read event data, since data can seal a path as easily as code; the phase gate: the
+bot NEW GAME → HALL OF FAME on the fully event-driven build, seeds 1+2, the audits, the four
+md5s, the link suites, cross-OS determinism). The command definitions in Core are exactly what
+Phase 4's Studio forms and Phase 5's command-list editor consume.
+
 ## ADR-018 — The ruleset seam: interface modules in Core, gen1 native, expressions proven beside it (2026-07-20)
 
 **Context:** v2 Phase 2 (gh #16, ADR-013, plan §4.2) puts battle / catch / types / formulas /
