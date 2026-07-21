@@ -100,6 +100,28 @@ func _oak_come_see_me() -> void:
 	say("OAK: Come see me\nsometimes.\fI want to know how\nyour POKéDEX is\ncoming along.")
 
 
+## The line _oak_talk would open with — a pure preview for the test harness (gh #45:
+## --oaktest/--parceltest log it; keep the branch order in sync with _oak_talk).
+func _oak_text() -> String:
+	main._sync_owned()
+	if has_event("PALLET_AFTER_GETTING_POKEBALLS") \
+			or (main.pokedex_owned.size() >= 2 and has_event("GOT_POKEDEX")):
+		return "OAK: Good to see\nyou! How is your\nPOKéDEX coming?\nHere, let me take\na look!"
+	if int(main.player_bag.get("POKé BALL", 0)) > 0:
+		return "OAK: Come see me\nsometimes.\fI want to know how\nyour POKéDEX is\ncoming along."
+	if has_event("BEAT_ROUTE22_RIVAL_1"):
+		if has_event("GOT_POKEBALLS_FROM_OAK"):
+			return "OAK: Come see me\nsometimes.\fI want to know how\nyour POKéDEX is\ncoming along."
+		return "OAK: You can't get\ndetailed data on\nPOKéMON by just\nseeing them."
+	if has_event("GOT_POKEDEX"):
+		return "POKéMON around the\nworld wait for\nyou, %s!" % main.player_name
+	if has_event("BEAT_RIVAL1"):
+		return "OAK: %s,\nraise your young\nPOKéMON by making\nit fight!" % main.player_name
+	if has_event("GOT_STARTER"):
+		return "OAK: If a wild\nPOKéMON appears,\nyour POKéMON can\nfight against it!"
+	return "OAK: Now, %s,\nwhich POKéMON do\nyou want?" % main.player_name
+
+
 ## .give_poke_balls — 5 POKé BALLs once (EVENT_GOT_POKEBALLS_FROM_OAK), the get-key-item
 ## fanfare on the "got" line, then the catching explanation.
 func _oak_give_balls() -> void:
