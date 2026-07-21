@@ -1,0 +1,15 @@
+{
+ "$comment": "scripts/SilphCo9F.asm — the sheltering nurse heals the party.",
+ "id": "event:silph_co9f_nurse",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:SilphCo9F",
+  "object": "SPRITE_NURSE@3,14"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "silph_co9f_nurse"
+  }
+ ]
+}

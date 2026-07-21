@@ -1,0 +1,16 @@
+{
+ "$comment": "scripts/SilphCo7F.asm SilphCo7FDefaultScript — the rival ambushes you in the corridor (coords (3,2)/(3,3)).",
+ "id": "event:silph_co7f_rival_ambush",
+ "trigger": {
+  "kind": "step",
+  "map": "map:SilphCo7F",
+  "cells": [[3, 2], [3, 3]],
+  "when": "not BEAT_SILPH_CO_RIVAL"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "silph_rival"
+  }
+ ]
+}

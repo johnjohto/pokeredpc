@@ -1,0 +1,10 @@
+{
+ "$comment": "scripts/SilphCo7F.asm — the rival leaves after the fight.",
+ "id": "event:silph_co7f_rival_shown",
+ "trigger": {
+  "kind": "visible",
+  "map": "map:SilphCo7F",
+  "object": "SPRITE_BLUE@3,7",
+  "visible_when": "not BEAT_SILPH_CO_RIVAL"
+ }
+}

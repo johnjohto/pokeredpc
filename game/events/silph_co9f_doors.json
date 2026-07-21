@@ -1,0 +1,30 @@
+{
+ "$comment": "scripts/SilphCo9F.asm GateCallbackScript — lay the floor's still-locked card-key door blocks on load (the static .blk ships them open).",
+ "id": "event:silph_co9f_doors",
+ "trigger": {
+  "kind": "enter",
+  "map": "map:SilphCo9F"
+ },
+ "commands": [
+  {
+   "cmd": "if",
+   "cond": "not SILPH_DOOR_SilphCo9F_1_4",
+   "then": [{"cmd": "set_block", "x": 1, "y": 4, "block": 95}]
+  },
+  {
+   "cmd": "if",
+   "cond": "not SILPH_DOOR_SilphCo9F_9_2",
+   "then": [{"cmd": "set_block", "x": 9, "y": 2, "block": 84}]
+  },
+  {
+   "cmd": "if",
+   "cond": "not SILPH_DOOR_SilphCo9F_9_5",
+   "then": [{"cmd": "set_block", "x": 9, "y": 5, "block": 84}]
+  },
+  {
+   "cmd": "if",
+   "cond": "not SILPH_DOOR_SilphCo9F_5_6",
+   "then": [{"cmd": "set_block", "x": 5, "y": 6, "block": 95}]
+  }
+ ]
+}

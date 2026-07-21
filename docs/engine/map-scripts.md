@@ -56,9 +56,11 @@ fire — check each migrated map against its asm (the family's `--flag` selftest
 
 ## The script vocabulary (base helpers)
 
-`has_event / set_event / clear_event`, `say`, `set_block`, `sfx`, `bounce_back(cell)` (guards
-pushing you back), `face_player(npc)` (call before NPC dialogue — the generic flow's `face_to`
+`has_event / set_event / clear_event`, `say`, `set_block`, `sfx`,
+`face_player(npc)` (call before NPC dialogue — the generic flow's `face_to`
 doesn't run when an adapter handles the interaction), `defeated(x, y)` (trainer's home cell),
+(`bounce_back` / `step_back_down` / `thirsty_guard` are gone — they migrated into the Event
+VM's command vocabulary with their maps, gh #40),
 `show_object(k)` / `hide_object(k)` (pokered's `ShowObject`/`HideObject` predefs — flip a
 toggleable object's visibility mid-map, where `object_shown` only decides it at load),
 and shared gimmick mechanisms (`place_silph_doors`, `silph_door_interact`). Adapters also hold
@@ -75,6 +77,19 @@ documented idiom, not a wall.
 5. Run the map's `--flag` selftest; add one for new story beats.
 
 ## Migration status
+
+**Adapters are dissolving into authored events (gh #40, ADR-019).** Maps whose story is
+authored event records (`game/events/*.json`, byte-copied into the project) are served by the
+generic `EventMapScript` — `map_script()` returns it when the project carries events for the
+label and no hand-written `.gd` exists (a leftover `.gd` wins, with a warning: that's a
+half-finished wave). Migrated so far, by mechanism family: the LAST_MAP connectors
+(UndergroundPath*/DiglettsCave*), Cycling Road's forced bike (Route16/17/18 + both gate
+houses), the interact→beat forwarders (aides, rod gurus, gift NPCs, Daycare, BikeShop,
+prize/vending counters, VermilionDock's departure, …), the Saffron thirsty guards
+(Route5–8 gates, fully authored — no native mechanism left), the badge/bag bounce-backs
+(Route22Gate, Route23's seven checkpoints, ViridianCity, CinnabarIsland), and the Silph Co
+card-key doors + story floors (SilphCo1F–11F; the elevator remains an adapter). The sections
+below describe the adapters that remain.
 
 **Complete** (gh #53): all ~80 scripted maps live behind the seam; Main's dispatchers are one
 adapter call each, and every remaining `center_label ==` in Main.gd is a test-harness assertion.

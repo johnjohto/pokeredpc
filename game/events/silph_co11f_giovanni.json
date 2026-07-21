@@ -1,0 +1,16 @@
+{
+ "$comment": "scripts/SilphCo11F.asm — Giovanni #2 guards the president's office.",
+ "id": "event:silph_co11f_giovanni",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:SilphCo11F",
+  "object": "SPRITE_GIOVANNI@6,9",
+  "when": "not BEAT_SILPH_CO_GIOVANNI"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "giovanni_silph"
+  }
+ ]
+}

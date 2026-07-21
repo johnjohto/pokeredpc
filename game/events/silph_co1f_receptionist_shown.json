@@ -1,0 +1,10 @@
+{
+ "$comment": "scripts/SilphCo1F.asm — the receptionist arrives once Silph is freed.",
+ "id": "event:silph_co1f_receptionist_shown",
+ "trigger": {
+  "kind": "visible",
+  "map": "map:SilphCo1F",
+  "object": "SPRITE_LINK_RECEPTIONIST@4,2",
+  "visible_when": "BEAT_SILPH_CO_GIOVANNI"
+ }
+}

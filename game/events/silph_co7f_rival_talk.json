@@ -1,0 +1,16 @@
+{
+ "$comment": "scripts/SilphCo7F.asm — talking to the waiting rival starts the same fight.",
+ "id": "event:silph_co7f_rival_talk",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:SilphCo7F",
+  "object": "SPRITE_BLUE@3,7",
+  "when": "not BEAT_SILPH_CO_RIVAL"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "silph_rival"
+  }
+ ]
+}

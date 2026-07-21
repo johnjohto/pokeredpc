@@ -1,0 +1,15 @@
+{
+ "$comment": "scripts/SilphCo7F.asm — the grateful worker's Lapras.",
+ "id": "event:silph_co7f_lapras",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:SilphCo7F",
+  "object": "SPRITE_SILPH_WORKER_M@1,5"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "silph_lapras"
+  }
+ ]
+}

@@ -1,0 +1,25 @@
+{
+ "$comment": "scripts/SilphCo9F.asm — facing this card-key door block (9,5): the CARD KEY opens it for good (the event is saved), else refused. Once open the record's gate fails and the press falls through.",
+ "id": "event:silph_co9f_door_9_5",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:SilphCo9F",
+  "front": [[18, 10], [19, 10], [18, 11], [19, 11]],
+  "when": "not SILPH_DOOR_SilphCo9F_9_5"
+ },
+ "commands": [
+  {
+   "cmd": "if",
+   "cond": "item_card_key > 0",
+   "then": [
+    {"cmd": "set_flag", "flag": "SILPH_DOOR_SilphCo9F_9_5"},
+    {"cmd": "set_block", "x": 9, "y": 5, "block": 14},
+    {"cmd": "sfx", "key": "go_inside"},
+    {"cmd": "notice", "text": "Bingo!\fThe CARD KEY\nopened the door!"}
+   ],
+   "else": [
+    {"cmd": "notice", "text": "Darn! It needs a\nCARD KEY!"}
+   ]
+  }
+ ]
+}

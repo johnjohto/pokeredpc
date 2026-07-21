@@ -1,0 +1,16 @@
+{
+ "$comment": "scripts/SilphCo11F.asm — the freed president's MASTER BALL.",
+ "id": "event:silph_co11f_president",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:SilphCo11F",
+  "object": "SPRITE_SILPH_PRESIDENT@7,5",
+  "when": "BEAT_SILPH_CO_GIOVANNI"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "silph_president"
+  }
+ ]
+}
