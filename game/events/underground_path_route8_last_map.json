@@ -1,0 +1,14 @@
+{
+ "$comment": "scripts/UndergroundPathRoute8.asm — sets wLastMap = ROUTE_8 on load, so this connector's LAST_MAP exits go back to Route 8 regardless of which side you entered from (gh #114).",
+ "id": "event:underground_path_route8_last_map",
+ "trigger": {
+  "kind": "enter",
+  "map": "map:UndergroundPathRoute8"
+ },
+ "commands": [
+  {
+   "cmd": "set_last_map",
+   "map": "map:Route8"
+  }
+ ]
+}

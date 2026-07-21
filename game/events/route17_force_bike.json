@@ -1,0 +1,14 @@
+{
+ "$comment": "engine/overworld/player_state.asm CheckForceBikeOrSurf — BIT_ALWAYS_ON_BIKE persists while Cycling Road rebases onto Route 17.",
+ "id": "event:route17_force_bike",
+ "trigger": {
+  "kind": "enter",
+  "map": "map:Route17",
+  "when": "force_bike"
+ },
+ "commands": [
+  {
+   "cmd": "mount_bike"
+  }
+ ]
+}

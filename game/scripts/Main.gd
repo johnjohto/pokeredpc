@@ -18409,6 +18409,7 @@ func _catchnicktest() -> void:
 
 func _exitwarptest() -> void:
 	# Exit the player's house, then confirm the door above is still an armed warp (issue #1).
+	battle.fast_hp = true                    # skip the warp fade so _do_warp completes synchronously
 	load_world("RedsHouse1F")
 	last_outside_map = "PalletTown"                      # house doors exit via LAST_MAP
 	var exit_w = null

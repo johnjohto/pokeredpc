@@ -1,0 +1,14 @@
+{
+ "$comment": "scripts/UndergroundPathRoute6.asm — sets wLastMap = ROUTE_6 on every load, so the building's two LAST_MAP exit mats go back to Route 6 no matter which underground path you walked in from (gh #114).",
+ "id": "event:underground_path_route6_last_map",
+ "trigger": {
+  "kind": "enter",
+  "map": "map:UndergroundPathRoute6"
+ },
+ "commands": [
+  {
+   "cmd": "set_last_map",
+   "map": "map:Route6"
+  }
+ ]
+}

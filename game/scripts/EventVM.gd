@@ -1,6 +1,6 @@
 extends RefCounted
 class_name EventVM
-## The Event VM (ADR-019, gh #39): interprets a project's authored event records —
+## The Event VM (ADR-019, gh #39/#40): interprets a project's authored event records —
 ## a declarative trigger + a nested-block command list (core/schemas/event.schema.json,
 ## the Core "Event-VM defs") — over the same await primitives Cutscene beats use, so one
 ## event runs at a time behind `cutscene_active` and events stay atomic w.r.t. saves.
@@ -11,72 +11,220 @@ class_name EventVM
 ## condition it cannot execute — the schema's enums and this interpreter move together
 ## (ADR-019 §6: each command lands with the Kanto beat that demands it, never ahead).
 ## `visible` triggers are load-time queries (`visible_for`), never command runs
-## (plan §6 risk 7: no VM in per-frame surfaces).
+## (plan §6 risk 7: no VM in per-frame surfaces); `step` dispatch is indexed by
+## `(map, cell)` at load, so the overworld loop only ever hashes the stepped cell.
 
 var main
 
 var maps := {}           # map label -> true (any event targets this map)
-var _by_interact := {}   # "<label>|<object key>" -> event record
+var _by_interact := {}   # "<label>|<object key>" -> [records] (id order)
+var _by_front := {}      # "<label>|<x>,<y>"      -> [records] (faced-cell interactions)
 var _by_visible := {}    # "<label>|<object key>" -> event record
+var _by_step := {}       # "<label>|<x>,<y>"      -> [records]
+var _by_enter := {}      # "<label>"              -> [records]
+var _by_battle_end := {} # "<label>"              -> [records]
 
-const KINDS := ["interact", "visible"]
-const CMDS := ["say", "if", "give_item", "set_flag", "clear_flag", "sfx"]
+const KINDS := ["interact", "visible", "enter", "step", "battle_end"]
+const CMDS := ["say", "if", "give_item", "take_item", "set_flag", "clear_flag", "sfx",
+	"beat", "set_last_map", "set_block", "set_force_bike", "mount_bike",
+	"bounce_back", "step_back_down", "walk_player", "vending"]
+
+## Player facing indices (Player.facing) by direction word.
+const DIRS := {"down": 0, "up": 1, "left": 2, "right": 3}
+const _FACING_VEC := [Vector2i(0, 1), Vector2i(0, -1), Vector2i(-1, 0), Vector2i(1, 0)]
+
+## `beat` invokes a native Cutscene beat by name (the strangler-fig seam: wave C dissolves
+## story beats into commands; ceremonies stay native forever). Validated against the
+## script, not the instance — load_all may run before Main builds its Cutscene.
+const _CUTSCENE_SCRIPT := preload("res://scripts/Cutscene.gd")
+static var _beat_names := {}
 
 
 ## Index every record (basename -> record, from ProjectData.events()). Returns "" or the
 ## boot-fatal error naming the record — a project asking for semantics this build lacks
 ## must refuse loudly at load, the ADR-017 refuse-newer pattern applied to events.
 func load_all(records: Dictionary) -> String:
-	for key in records.keys():
+	if _beat_names.is_empty():
+		var cs: Script = _CUTSCENE_SCRIPT
+		for m in cs.get_script_method_list():
+			_beat_names[str(m["name"])] = true
+	var keys := records.keys()
+	keys.sort()                              # record-id order is the dispatch order
+	for key in keys:
 		var r: Dictionary = records[key]
 		var t: Dictionary = r.get("trigger", {})
 		var kind := str(t.get("kind", ""))
 		if not KINDS.has(kind):
 			return "event '%s': unknown trigger kind '%s' (this build knows %s)" % [key, kind, str(KINDS)]
 		var label := _bare(str(t.get("map", "")))
-		var obj := str(t.get("object", ""))
+		var err := ""
+		if t.has("when"):
+			var w = _compile_cond(str(t["when"]))
+			if w == null:
+				return "event '%s': when '%s' does not parse" % [key, str(t["when"])]
+			r["_when"] = w
+		if t.has("facing") and not DIRS.has(str(t["facing"])):
+			return "event '%s': unknown facing '%s'" % [key, str(t["facing"])]
 		match kind:
 			"interact":
-				var err := _compile_block(r.get("commands", []), key)
+				err = _compile_block(r.get("commands", []), key)
 				if err != "":
 					return err
-				_by_interact["%s|%s" % [label, obj]] = r
+				if t.has("object"):
+					_push(_by_interact, "%s|%s" % [label, str(t["object"])], r)
+				elif t.has("front"):
+					var fc = _trigger_cells(t, key)
+					if fc is String:
+						return fc
+					for c in fc:
+						_push(_by_front, "%s|%d,%d" % [label, c.x, c.y], r)
+				else:
+					return "event '%s': interact trigger needs an object or front cells" % key
 			"visible":
 				var src := str(t.get("visible_when", ""))
 				var e = _compile_cond(src)
 				if e == null:
 					return "event '%s': visible_when '%s' does not parse" % [key, src]
-				r["_when"] = e
-				_by_visible["%s|%s" % [label, obj]] = r
+				r["_vis"] = e
+				_by_visible["%s|%s" % [label, str(t.get("object", ""))]] = r
+			"step":
+				err = _compile_block(r.get("commands", []), key)
+				if err != "":
+					return err
+				var cells = _trigger_cells(t, key)
+				if cells is String:
+					return cells
+				if (cells as Array).is_empty():
+					return "event '%s': step trigger needs cells or a region" % key
+				for c in cells:
+					_push(_by_step, "%s|%d,%d" % [label, c.x, c.y], r)
+			"enter":
+				err = _compile_block(r.get("commands", []), key)
+				if err != "":
+					return err
+				var ec = _trigger_cells(t, key)
+				if ec is String:
+					return ec
+				_push(_by_enter, label, r)
+			"battle_end":
+				err = _compile_block(r.get("commands", []), key)
+				if err != "":
+					return err
+				_push(_by_battle_end, label, r)
 		maps[label] = true
 	return ""
 
 
-## The interact event for this object on this map, or null.
-func interact_event(label: String, object_key: String):
-	return _by_interact.get("%s|%s" % [label, object_key])
+func _push(index: Dictionary, key: String, r: Dictionary) -> void:
+	if not index.has(key):
+		index[key] = []
+	index[key].append(r)
 
+
+## The trigger's cell set: explicit `cells`/`front` cells plus an inclusive `region`
+## [x0,y0,x1,y1]. Returns an Array of Vector2i, or a String error. Cached on the record.
+func _trigger_cells(t: Dictionary, key: String):
+	if t.has("_cells"):
+		return t["_cells"]
+	var out: Array = []
+	for c in t.get("cells", []) + t.get("front", []):
+		out.append(Vector2i(int(c[0]), int(c[1])))
+	if t.has("region"):
+		var rg: Array = t["region"]
+		if rg.size() != 4 or int(rg[2]) < int(rg[0]) or int(rg[3]) < int(rg[1]):
+			return "event '%s': region must be [x0, y0, x1, y1]" % key
+		for y in range(int(rg[1]), int(rg[3]) + 1):
+			for x in range(int(rg[0]), int(rg[2]) + 1):
+				out.append(Vector2i(x, y))
+	t["_cells"] = out
+	return out
+
+
+# ---- hook-side dispatch (called by EventMapScript) ----------------------------------
 
 ## The `visible` query for object_shown: true/false, or null to fall through (no event).
 func visible_for(label: String, object_key: String):
 	var r = _by_visible.get("%s|%s" % [label, object_key])
 	if r == null:
 		return null
-	return _truthy(r["_when"])
+	return _truthy(r["_vis"])
+
+
+## A pressed on this map: object-keyed records for the faced NPC first, then faced-cell
+## records. The first record whose gate (`when`/`facing`) passes runs and consumes the
+## press; none passing falls through to the generic flow (hidden items, Cut, NPC text).
+func interact_fire(label: String, front: Vector2i, npc) -> bool:
+	if npc != null:
+		for r in _by_interact.get("%s|%s" % [label, str(npc.key)], []):
+			if _gate(r):
+				npc.face_to(main.player.cell)
+				run(r, {"npc": npc, "cell": front})
+				return true
+	for r in _by_front.get("%s|%d,%d" % [label, front.x, front.y], []):
+		if _gate(r):
+			run(r, {"npc": npc, "cell": front})
+			return true
+	return false
+
+
+## A completed player step: non-consuming records all run (state pokes); the first
+## consuming record whose gate passes runs and consumes the step (no warp/sight/
+## poison/encounter), mirroring pokered running the map script before trainer sight.
+func step_fire(label: String, cell: Vector2i) -> bool:
+	for r in _by_step.get("%s|%d,%d" % [label, cell.x, cell.y], []):
+		if not _gate(r):
+			continue
+		if bool(r["trigger"].get("consume", true)):
+			run(r, {"cell": cell})
+			return true
+		run(r, {"cell": cell})
+	return false
+
+
+## Map load: the map's `enter` records in id order, one coroutine (a record with `cells`
+## only fires when the player arrived on one of them — the arrival-warp idiom).
+func run_enter(label: String) -> void:
+	var recs: Array = _by_enter.get(label, [])
+	for r in recs:
+		var cells: Array = r["trigger"].get("_cells", [])
+		if not cells.is_empty() and not (main.player.cell in cells):
+			continue
+		if _gate(r):
+			await run(r, {"cell": main.player.cell})
+
+
+## A won trainer battle on the map (pokered's EndTrainerBattle re-runs the load callback).
+func run_battle_end(label: String) -> void:
+	for r in _by_battle_end.get(label, []):
+		if _gate(r):
+			await run(r, {})
+
+
+func _gate(r: Dictionary) -> bool:
+	var t: Dictionary = r["trigger"]
+	if t.has("facing") and main.player.facing != DIRS[str(t["facing"])]:
+		return false
+	if r.has("_when") and not _truthy(r["_when"]):
+		return false
+	return true
 
 
 ## Run an event's command list as the active cutscene. Fire-and-forget from a hook (the
 ## hook returns `handled` immediately, exactly as adapters call Cutscene beats today).
-func run(rec: Dictionary) -> void:
+## `cutscene_active` is saved/restored, not cleared — battle_end records fire inside the
+## trainer-battle beat, which still owns the flag.
+func run(rec: Dictionary, ctx: Dictionary = {}) -> void:
+	var prev: bool = main.cutscene_active
 	main.cutscene_active = true
-	main.modal = null
-	await _run_block(rec.get("commands", []))
-	main.cutscene_active = false
+	if not prev:
+		main.modal = null
+	await _run_block(rec.get("commands", []), ctx)
+	main.cutscene_active = prev
 
 
 ## Execute one block; false = the event aborted (a refused give_item stops the list,
 ## faithful to Cutscene._gift's early return).
-func _run_block(cmds: Array) -> bool:
+func _run_block(cmds: Array, ctx: Dictionary) -> bool:
 	for c_v in cmds:
 		var c: Dictionary = c_v
 		match str(c["cmd"]):
@@ -84,13 +232,19 @@ func _run_block(cmds: Array) -> bool:
 				await main.cutscene.say(_interp(str(c["text"])))
 			"if":
 				var branch: Array = c.get("then", []) if _truthy(c["_cond"]) else c.get("else", [])
-				if not await _run_block(branch):
+				if not await _run_block(branch, ctx):
 					return false
 			"give_item":
 				var display := _item_display(str(c["item"]))
 				if not main.add_item(display):
 					await main.cutscene.say("You don't have\nroom for this!")
 					return false
+			"take_item":
+				var tdisp := _item_display(str(c["item"]))
+				if main.player_bag.has(tdisp):
+					main.player_bag[tdisp] = int(main.player_bag[tdisp]) - 1
+					if int(main.player_bag[tdisp]) <= 0:
+						main.player_bag.erase(tdisp)
 			"set_flag":
 				main.set_event(str(c["flag"]))
 			"clear_flag":
@@ -98,6 +252,38 @@ func _run_block(cmds: Array) -> bool:
 			"sfx":
 				if main.audio:
 					main.audio.play_sfx(str(c["key"]))
+			"beat":
+				var argv: Array = []
+				for a in c.get("args", []):
+					argv.append(ctx.get("npc") if str(a) == "@npc" else a)
+				await main.cutscene.callv(str(c["name"]), argv)
+				main.cutscene_active = true    # a beat drops the flag at its end; re-arm for the rest
+			"set_last_map":
+				main.last_outside_map = _bare(str(c["map"]))
+			"set_block":
+				main.set_block(int(c["x"]), int(c["y"]), int(c["block"]))
+			"set_force_bike":
+				main.force_bike = bool(c["value"])
+			"mount_bike":
+				main._mount_forced_bike()
+			"bounce_back":
+				# The guard pushes you back the way you came (one cell against your facing).
+				var fd: Vector2i = _FACING_VEC[main.player.facing]
+				main.player.place(Vector2i(ctx["cell"]) - fd)
+			"step_back_down":
+				# pokered's *MovePlayerDownScript: face DOWN + one simulated PAD_DOWN — a step,
+				# not a teleport, so a down-ledge hops two cells and a wall leaves you put (gh #86).
+				main.player.facing = 0
+				var cell: Vector2i = ctx["cell"]
+				var d := Vector2i(0, 1)
+				if main.ledge_match(cell, "down", d):
+					main.player.place(cell + d * 2)
+				elif main.player_can_enter(cell + d):
+					main.player.place(cell + d)
+			"walk_player":
+				await main.player.step(DIRS[str(c["dir"])])
+			"vending":
+				main._vending_enter()
 	return true
 
 
@@ -112,15 +298,22 @@ func _compile_block(cmds, key: String) -> String:
 		var cmd := str(c.get("cmd", ""))
 		if not CMDS.has(cmd):
 			return "event '%s': unknown command '%s' (this build knows %s)" % [key, cmd, str(CMDS)]
-		if cmd == "if":
-			var e = _compile_cond(str(c.get("cond", "")))
-			if e == null:
-				return "event '%s': condition '%s' does not parse" % [key, str(c.get("cond", ""))]
-			c["_cond"] = e
-			for b in ["then", "else"]:
-				var err := _compile_block(c.get(b, []), key)
-				if err != "":
-					return err
+		match cmd:
+			"if":
+				var e = _compile_cond(str(c.get("cond", "")))
+				if e == null:
+					return "event '%s': condition '%s' does not parse" % [key, str(c.get("cond", ""))]
+				c["_cond"] = e
+				for b in ["then", "else"]:
+					var err := _compile_block(c.get(b, []), key)
+					if err != "":
+						return err
+			"beat":
+				if not _beat_names.has(str(c.get("name", ""))):
+					return "event '%s': unknown beat '%s' (not a Cutscene method)" % [key, str(c.get("name", ""))]
+			"walk_player":
+				if not DIRS.has(str(c.get("dir", ""))):
+					return "event '%s': unknown walk_player dir '%s'" % [key, str(c.get("dir", ""))]
 	return ""
 
 
@@ -141,11 +334,25 @@ func _compile_cond(src: String):
 func _truthy(cond: Dictionary) -> bool:
 	var vars := {}
 	for ident in cond["idents"]:
-		if main.event_vars.has(ident):
-			vars[ident] = main.event_vars[ident]
-		else:
-			vars[ident] = 1 if main.has_event(str(ident)) else 0
+		vars[ident] = _ident_value(str(ident))
 	return bool(cond["expr"].eval(vars))
+
+
+## Condition vocabulary: event vars win, then the engine-state prefixes, else a story
+## flag (1/0). `item_<id>` is the bag count, `badge_<name>`/`badge_count` the badge
+## case, `force_bike` Cycling Road's BIT_ALWAYS_ON_BIKE.
+func _ident_value(ident: String):
+	if main.event_vars.has(ident):
+		return main.event_vars[ident]
+	if ident.begins_with("item_"):
+		return int(main.player_bag.get(_item_display(ident.substr(5)), 0))
+	if ident == "badge_count":
+		return main.badges.size()
+	if ident.begins_with("badge_"):
+		return 1 if main.badges.has(ident.substr(6).to_upper()) else 0
+	if ident == "force_bike":
+		return 1 if main.force_bike else 0
+	return 1 if main.has_event(ident) else 0
 
 
 # ---- helpers ------------------------------------------------------------------------

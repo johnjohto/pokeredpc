@@ -1,0 +1,16 @@
+{
+ "$comment": "engine/overworld/player_state.asm CheckForceBikeOrSurf + data/maps/force_bike_surf.asm ForcedBikeOrSurfMaps — these Route 18 coordinates silently set BIT_ALWAYS_ON_BIKE and mount. Non-consuming: the step itself proceeds.",
+ "id": "event:route18_force_bike",
+ "trigger": {
+  "kind": "step",
+  "map": "map:Route18",
+  "cells": [[33, 8], [33, 9]],
+  "when": "not force_bike",
+  "consume": false
+ },
+ "commands": [
+  {
+   "cmd": "mount_bike"
+  }
+ ]
+}

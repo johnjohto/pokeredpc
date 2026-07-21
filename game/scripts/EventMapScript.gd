@@ -1,5 +1,5 @@
 extends "res://scripts/MapScripts.gd"
-## The generic adapter for maps whose story is AUTHORED EVENTS (ADR-019, gh #39):
+## The generic adapter for maps whose story is AUTHORED EVENTS (ADR-019, gh #39/#40):
 ## Main.map_script() returns this — instead of a hand-written scripts/maps/<Label>.gd —
 ## when the project carries events for the label. The eight hooks stay Main's contract,
 ## so the dispatch order (and map-scripts.md's two faithfulness rules) hold by
@@ -9,15 +9,20 @@ extends "res://scripts/MapScripts.gd"
 var label := ""
 
 
-func on_interact(_front: Vector2i, npc) -> bool:
-	if npc == null:
-		return false
-	var rec = main.event_vm.interact_event(label, str(npc.key))
-	if rec == null:
-		return false
-	face_player(npc)
-	main.event_vm.run(rec)
-	return true
+func on_enter() -> void:
+	main.event_vm.run_enter(label)
+
+
+func on_step(cell: Vector2i) -> bool:
+	return main.event_vm.step_fire(label, cell)
+
+
+func on_interact(front: Vector2i, npc) -> bool:
+	return main.event_vm.interact_fire(label, front, npc)
+
+
+func on_battle_end() -> void:
+	main.event_vm.run_battle_end(label)
 
 
 func object_shown(k: String) -> Variant:

@@ -1,7 +1,7 @@
 {
  "$schema": "https://json-schema.org/draft/2020-12/schema",
  "$id": "schema:event",
- "$comment": "An authored event record (ADR-019, gh #39): a declarative trigger + a nested-block command list. The trigger-kind and command enums are extended wave by wave — each kind/command lands with the Kanto beat that demands it (ADR-019 §6), and the runtime VM refuses at boot any kind, command, or condition it cannot execute, so this schema and the interpreter move together. `visible` triggers are load-time QUERIES (visible_when decides a map object's visibility), never command runs. Conditions (`visible_when`, `if.cond`) are FormulaExpr strings whose bare identifiers read story flags (1/0) and event vars. `say` text may hold {player}/{rival} placeholders; \\n is a line break, \\f a page break, as v1's text engine reads them.",
+ "$comment": "An authored event record (ADR-019, gh #39/#40): a declarative trigger + a nested-block command list. The trigger-kind and command enums are extended wave by wave — each kind/command lands with the Kanto beat that demands it (ADR-019 §6), and the runtime VM refuses at boot any kind, command, or condition it cannot execute, so this schema and the interpreter move together. `visible` triggers are load-time QUERIES (visible_when decides a map object's visibility), never command runs; `step` dispatch is (map, cell)-indexed at load. Conditions (`visible_when`, `when`, `if.cond`) are FormulaExpr strings whose bare identifiers read story flags (1/0) and event vars, plus the engine-state vocabulary `item_<id>` (bag count), `badge_<name>`, `badge_count`, and `force_bike`. `say` text may hold {player}/{rival} placeholders; \\n is a line break, \\f a page break, as v1's text engine reads them. `beat` invokes a native Cutscene beat by name (the strangler-fig seam while wave C dissolves story beats; ceremonies stay native forever); the arg \"@npc\" resolves to the triggering NPC.",
  "type": "object",
  "required": [
   "id",
@@ -25,7 +25,10 @@
     "kind": {
      "enum": [
       "interact",
-      "visible"
+      "visible",
+      "enter",
+      "step",
+      "battle_end"
      ]
     },
     "map": {
@@ -37,6 +40,40 @@
     },
     "visible_when": {
      "type": "string"
+    },
+    "when": {
+     "type": "string"
+    },
+    "front": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/cell"
+     }
+    },
+    "cells": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/cell"
+     }
+    },
+    "region": {
+     "type": "array",
+     "items": {
+      "type": "integer"
+     },
+     "minItems": 4,
+     "maxItems": 4
+    },
+    "facing": {
+     "enum": [
+      "down",
+      "up",
+      "left",
+      "right"
+     ]
+    },
+    "consume": {
+     "type": "boolean"
     }
    },
    "additionalProperties": false
@@ -50,6 +87,14 @@
  },
  "additionalProperties": false,
  "$defs": {
+  "cell": {
+   "type": "array",
+   "items": {
+    "type": "integer"
+   },
+   "minItems": 2,
+   "maxItems": 2
+  },
   "block": {
    "type": "array",
    "items": {
@@ -114,6 +159,23 @@
       "type": "object",
       "required": [
        "cmd",
+       "item"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "take_item"
+       },
+       "item": {
+        "type": "string",
+        "x-ref": "item"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
        "flag"
       ],
       "properties": {
@@ -154,6 +216,164 @@
        },
        "key": {
         "type": "string"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "name"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "beat"
+       },
+       "name": {
+        "type": "string"
+       },
+       "args": {
+        "type": "array",
+        "items": {
+         "anyOf": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "integer"
+          },
+          {
+           "type": "boolean"
+          }
+         ]
+        }
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "map"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "set_last_map"
+       },
+       "map": {
+        "type": "string",
+        "x-ref": "map"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "x",
+       "y",
+       "block"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "set_block"
+       },
+       "x": {
+        "type": "integer"
+       },
+       "y": {
+        "type": "integer"
+       },
+       "block": {
+        "type": "integer"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "value"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "set_force_bike"
+       },
+       "value": {
+        "type": "boolean"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "mount_bike"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "bounce_back"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "step_back_down"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "dir"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "walk_player"
+       },
+       "dir": {
+        "enum": [
+         "down",
+         "up",
+         "left",
+         "right"
+        ]
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "vending"
        }
       },
       "additionalProperties": false

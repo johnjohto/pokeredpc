@@ -1,0 +1,14 @@
+{
+ "$comment": "scripts/DiglettsCaveRoute11.asm — sets wLastMap = ROUTE_11 on load, so this connector's LAST_MAP exits go back to Route 11 regardless of which side you entered from (gh #114).",
+ "id": "event:digletts_cave_route11_last_map",
+ "trigger": {
+  "kind": "enter",
+  "map": "map:DiglettsCaveRoute11"
+ },
+ "commands": [
+  {
+   "cmd": "set_last_map",
+   "map": "map:Route11"
+  }
+ ]
+}
