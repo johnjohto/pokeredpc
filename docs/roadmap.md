@@ -74,11 +74,13 @@ FAME** in one unbroken process — all 21 checkpoints in order, `validate_gate.p
 GREEN** on both (Champion at L70/L73) — *the bot beats the game through the seam*; the three
 audits report 0 findings; all four `--battledettest` md5s **byte-identical to the pre-phase
 baseline at every step and at the end**; `linktest`/`linksoak`/`linkdrop` ALL GREEN (a
-`linkdrop` red herring traced to stale test-slot journals — gh #36); and the cross-OS
+`linkdrop` red herring traced to stale test-slot journals — gh #36, fixed 2026-07-21: the
+suites' scenario slots now self-isolate); and the cross-OS
 `determinism` workflow: Linux + macOS both reproduce the four md5s byte-for-byte with
 `linksoak` 8/8 in sync (one macOS-runner `linktest` colosseum failure **bisected to
-pre-Phase-2 code** — environmental, gh #37; gh #38 tracks a once-seen silent surge-stage
-wedge in the bot). Kanto's mechanics are now a plug-in: the engine core knows five
+pre-Phase-2 code** — environmental, gh #37; gh #38 tracked a once-seen silent surge-stage
+wedge in the bot — closed 2026-07-21: `--playthrough` now runs a progress watchdog that fails
+loudly on a frozen run, proven on a full seed-1 GATE GREEN). Kanto's mechanics are now a plug-in: the engine core knows five
 interfaces, `gen1` implements them asm-faithfully, and the config knobs are live data.
 **Next: Phase 3 — the Event VM (gh #17).**
 **Landed: gh #34** (2026-07-20): Catch + Progression are behind the seam and the
