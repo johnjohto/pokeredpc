@@ -200,6 +200,15 @@ byte-identical and `--erikastage` catching the FIRST growlithe in 3/3 runs. (oak
 diplomatest / flytest headless hangs are the separate frame_post_draw screenshot class —
 wipetest/moveanimtest hang headless the same way on HEAD and pass windowed — and
 route22test's budget stays marginal; those legs remain open on gh #45.)
+**The wave-E two-seed gate is GREEN (2026-07-21, same session, on the fix commit):**
+`--playthrough --seed 1` and `--seed 2` each ran NEW GAME → **HALL OF FAME** in one unbroken
+process on the fully event-driven build (~21/22 min), `validate_gate.py` → **GATE GREEN** on
+both — all 21 checkpoints in order, zero anomaly lines (no `[qrace]` drops, no guard trips,
+no watchdog). Same-commit battery: the four `--battledettest` md5s byte-identical,
+`--validate=project` 0 errors (1541 files, 260 event records), `linktest` ALL GREEN /
+`linksoak` 8/8 / `linkdrop` ALL GREEN, the three audits at zero (the nine EVENT_BACKED doors
+9/9); the cross-OS `determinism` workflow dispatched on the commit. gh #40's remaining item
+is OaksLab.gd alone (leans on wave C, gh #41).
 **Landed: gh #34** (2026-07-20): Catch + Progression are behind the seam and the
 **config-first knobs are real** — `Gen1Catch` (`attempt` over the byte-exact kernel + the
 safari `bait_rate`/`rock_rate` transitions, which moved out of the host's input handler),
