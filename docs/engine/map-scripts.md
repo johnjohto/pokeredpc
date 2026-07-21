@@ -87,9 +87,12 @@ half-finished wave). Migrated so far, by mechanism family: the LAST_MAP connecto
 houses), the interact→beat forwarders (aides, rod gurus, gift NPCs, Daycare, BikeShop,
 prize/vending counters, VermilionDock's departure, …), the Saffron thirsty guards
 (Route5–8 gates, fully authored — no native mechanism left), the badge/bag bounce-backs
-(Route22Gate, Route23's seven checkpoints, ViridianCity, CinnabarIsland), and the Silph Co
-card-key doors + story floors (SilphCo1F–11F; the elevator remains an adapter). The sections
-below describe the adapters that remain.
+(Route22Gate, Route23's seven checkpoints, ViridianCity, CinnabarIsland), the Silph Co
+card-key doors + story floors (SilphCo1F–11F), the Pokémon Mansion switch doors + 3F's
+balcony holes, Cinnabar Gym's quiz gates, and all three elevators (`elevator_retarget`/
+`elevator_panel` are VM commands now). The sections below describe the adapters that remain;
+the retired base helpers (`thirsty_guard`, `bounce_back`, `step_back_down`, `mansion_*`,
+`elevator_*`, the Silph door pair) are gone with their last users.
 
 **Complete** (gh #53): all ~80 scripted maps live behind the seam; Main's dispatchers are one
 adapter call each, and every remaining `center_label ==` in Main.gd is a test-harness assertion.

@@ -129,25 +129,6 @@ func e4_exit(member: Vector2i, blocks: Array, warps: Array) -> void:
 			main._blocked_cells[wc] = true
 
 
-## Pokémon Mansion switch-door blocks (scripts/PokemonMansion*.asm): swap each row between its
-## OFF and ON layout per the shared MANSION_SWITCH_ON flag. rows = [[bx, by, off, on], ...].
-func mansion_blocks(rows: Array) -> void:
-	var on := has_event("MANSION_SWITCH_ON")
-	for e in rows:
-		set_block(int(e[0]), int(e[1]), int(e[3]) if on else int(e[2]))
-
-
-## Press a Mansion switch: toggle the shared flag + re-lay this floor's blocks.
-func mansion_switch(rows: Array) -> void:
-	if has_event("MANSION_SWITCH_ON"):
-		clear_event("MANSION_SWITCH_ON")
-	else:
-		set_event("MANSION_SWITCH_ON")
-	mansion_blocks(rows)
-	sfx("go_inside")
-	say("A big switch!\fYou flipped the\nswitch!")
-
-
 ## Victory Road floor switches: re-open already-switched doors on load. rows = [{sw, ev, blk}].
 func switch_doors_enter(rows: Array) -> void:
 	for s in rows:
@@ -198,40 +179,6 @@ func guard_door(blk: Array, need: Array, unlock_ev := "") -> void:
 	set_block(int(blk[0]), int(blk[1]), int(blk[3] if open_it else blk[2]))
 
 
-## The elevator system (engine/events/elevator.asm + overworld/elevator.asm ShakeElevator).
-## On entry the two door warps lead back to the boarding floor (StoreWarpEntries); call from
-## on_enter.
-func elevator_enter() -> void:
-	var from: Dictionary = main.warped_from
-	if from.is_empty() or int(from.get("warp", 0)) <= 0:
-		return
-	for w in main.map["warps"]:
-		w["dest_map"] = str(from["map"])
-		w["dest_warp"] = int(from["warp"])
-
-
-## The elevator panel (DisplayElevatorFloorMenu): pick a floor from the list, retarget the
-## door warps, and shake the car. floors = [[label, dest_map, dest_warp(1-based)], ...];
-## B keeps the current destination.
-func elevator_panel(floors: Array) -> void:
-	main._say_keep("Which floor do\nyou want? ")
-	main.menu_mode = "cutscene"
-	main.modal = main.menu
-	var labels: Array = []
-	for f in floors:
-		labels.append(str(f[0]))
-	main.menu.open(labels, Vector2(32, 16))
-	var idx: int = await main.menu.chosen
-	main.modal = null
-	main.textbox.visible = false
-	if idx < 0 or idx >= floors.size():
-		return
-	for w in main.map["warps"]:
-		w["dest_map"] = str(floors[idx][1])
-		w["dest_warp"] = int(floors[idx][2])
-	await main.shake_elevator()
-
-
 ## Gen-1 **dungeon warp**: stepping on a hole drops you to the floor below. The holes are *not* tiles —
 ## each map's script carries an explicit coord list and picks the destination floor from the matched
 ## index (`IsPlayerOnDungeonWarp` + `wWhichDungeonWarp`; e.g. `PokemonMansion3FDefaultScript`), and the
@@ -247,32 +194,6 @@ func dungeon_hole(cell: Vector2i, holes: Array) -> bool:
 	return false
 
 
-## Silph Co card-key doors (scripts/SilphCo*.asm GateCallbackScript): lay the floor's locked door
-## blocks on load unless already unlocked. rows = [[block_x, block_y, locked_block], ...].
-func place_silph_doors(rows: Array) -> void:
-	for d in rows:
-		if not has_event("SILPH_DOOR_%s_%d_%d" % [main.center_label, d[0], d[1]]):
-			set_block(int(d[0]), int(d[1]), int(d[2]))
-
-
-## Facing a Silph door block: the CARD KEY opens it for good (the event is saved), else refused.
-## Returns true if the faced block was a still-locked door.
-func silph_door_interact(front: Vector2i, rows: Array, open_block: int) -> bool:
-	var bx := front.x / 2
-	var by := front.y / 2
-	var is_door := false
-	for d in rows:
-		if int(d[0]) == bx and int(d[1]) == by:
-			is_door = true
-			break
-	var dev := "SILPH_DOOR_%s_%d_%d" % [main.center_label, bx, by]
-	if not is_door or has_event(dev):
-		return false
-	if main.player_bag.has("CARD KEY"):
-		set_event(dev)
-		set_block(bx, by, open_block)
-		sfx("go_inside")
-		say("Bingo!\fThe CARD KEY\nopened the door!")
-	else:
-		say("Darn! It needs a\nCARD KEY!")
-	return true
+# (mansion_blocks/mansion_switch, elevator_enter/elevator_panel, and the Silph card-key door
+# helpers migrated into authored events + the Event VM's command vocabulary with their maps,
+# gh #40.)

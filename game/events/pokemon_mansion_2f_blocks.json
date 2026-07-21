@@ -1,0 +1,70 @@
+{
+ "$comment": "scripts/PokemonMansion2F.asm — the switch-door blocks: swap each row between its OFF and ON layout per the shared MANSION_SWITCH_ON flag on every load.",
+ "id": "event:pokemon_mansion_2f_blocks",
+ "trigger": {
+  "kind": "enter",
+  "map": "map:PokemonMansion2F"
+ },
+ "commands": [
+  {
+   "cmd": "if",
+   "cond": "MANSION_SWITCH_ON",
+   "then": [
+    {
+     "cmd": "set_block",
+     "x": 4,
+     "y": 2,
+     "block": 95
+    }
+   ],
+   "else": [
+    {
+     "cmd": "set_block",
+     "x": 4,
+     "y": 2,
+     "block": 14
+    }
+   ]
+  },
+  {
+   "cmd": "if",
+   "cond": "MANSION_SWITCH_ON",
+   "then": [
+    {
+     "cmd": "set_block",
+     "x": 9,
+     "y": 4,
+     "block": 14
+    }
+   ],
+   "else": [
+    {
+     "cmd": "set_block",
+     "x": 9,
+     "y": 4,
+     "block": 84
+    }
+   ]
+  },
+  {
+   "cmd": "if",
+   "cond": "MANSION_SWITCH_ON",
+   "then": [
+    {
+     "cmd": "set_block",
+     "x": 3,
+     "y": 11,
+     "block": 14
+    }
+   ],
+   "else": [
+    {
+     "cmd": "set_block",
+     "x": 3,
+     "y": 11,
+     "block": 95
+    }
+   ]
+  }
+ ]
+}

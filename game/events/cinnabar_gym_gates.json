@@ -1,0 +1,130 @@
+{
+ "$comment": "scripts/CinnabarGym.asm + engine/events/hidden_events/cinnabar_gym_quiz.asm CinnabarGymGateCoords — close unanswered quiz gates on load, open the answered ones. The quiz machines themselves are HIDDEN_EVENTS (generic) firing Cutscene.cinnabar_quiz.",
+ "id": "event:cinnabar_gym_gates",
+ "trigger": {
+  "kind": "enter",
+  "map": "map:CinnabarGym"
+ },
+ "commands": [
+  {
+   "cmd": "if",
+   "cond": "CINNABAR_GATE_1",
+   "then": [
+    {
+     "cmd": "set_block",
+     "x": 9,
+     "y": 3,
+     "block": 14
+    }
+   ],
+   "else": [
+    {
+     "cmd": "set_block",
+     "x": 9,
+     "y": 3,
+     "block": 84
+    }
+   ]
+  },
+  {
+   "cmd": "if",
+   "cond": "CINNABAR_GATE_2",
+   "then": [
+    {
+     "cmd": "set_block",
+     "x": 6,
+     "y": 3,
+     "block": 14
+    }
+   ],
+   "else": [
+    {
+     "cmd": "set_block",
+     "x": 6,
+     "y": 3,
+     "block": 84
+    }
+   ]
+  },
+  {
+   "cmd": "if",
+   "cond": "CINNABAR_GATE_3",
+   "then": [
+    {
+     "cmd": "set_block",
+     "x": 6,
+     "y": 6,
+     "block": 14
+    }
+   ],
+   "else": [
+    {
+     "cmd": "set_block",
+     "x": 6,
+     "y": 6,
+     "block": 84
+    }
+   ]
+  },
+  {
+   "cmd": "if",
+   "cond": "CINNABAR_GATE_4",
+   "then": [
+    {
+     "cmd": "set_block",
+     "x": 3,
+     "y": 8,
+     "block": 14
+    }
+   ],
+   "else": [
+    {
+     "cmd": "set_block",
+     "x": 3,
+     "y": 8,
+     "block": 95
+    }
+   ]
+  },
+  {
+   "cmd": "if",
+   "cond": "CINNABAR_GATE_5",
+   "then": [
+    {
+     "cmd": "set_block",
+     "x": 2,
+     "y": 6,
+     "block": 14
+    }
+   ],
+   "else": [
+    {
+     "cmd": "set_block",
+     "x": 2,
+     "y": 6,
+     "block": 84
+    }
+   ]
+  },
+  {
+   "cmd": "if",
+   "cond": "CINNABAR_GATE_6",
+   "then": [
+    {
+     "cmd": "set_block",
+     "x": 2,
+     "y": 3,
+     "block": 14
+    }
+   ],
+   "else": [
+    {
+     "cmd": "set_block",
+     "x": 2,
+     "y": 3,
+     "block": 84
+    }
+   ]
+  }
+ ]
+}

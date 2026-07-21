@@ -1,0 +1,24 @@
+{
+ "$comment": "scripts/PokemonMansion3F.asm .holeCoords — coord 3 (cp $3) drops to 2F (18,14).",
+ "id": "event:pokemon_mansion_3f_hole_east",
+ "trigger": {
+  "kind": "step",
+  "map": "map:PokemonMansion3F",
+  "cells": [
+   [
+    19,
+    14
+   ]
+  ]
+ },
+ "commands": [
+  {
+   "cmd": "fall_hole",
+   "map": "map:PokemonMansion2F",
+   "to": [
+    18,
+    14
+   ]
+  }
+ ]
+}

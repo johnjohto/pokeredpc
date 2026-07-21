@@ -1,0 +1,11 @@
+{
+ "$comment": "scripts/RocketHideoutElevator.asm + engine/events/elevator.asm StoreWarpEntries — on entry the door warps lead back to the boarding floor.",
+ "id": "event:rocket_hideout_elevator_enter",
+ "trigger": {
+  "kind": "enter",
+  "map": "map:RocketHideoutElevator"
+ },
+ "commands": [
+  {"cmd": "elevator_retarget"}
+ ]
+}

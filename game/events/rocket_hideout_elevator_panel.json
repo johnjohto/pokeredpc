@@ -1,0 +1,24 @@
+{
+ "$comment": "scripts/RocketHideoutElevator.asm — the LIFT-KEY elevator panel at (1,1) (TEXT_ROCKETHIDEOUTELEVATOR): needs the LIFT KEY, floors B1F/B2F/B4F (RocketHideoutElevatorFloors/WarpMaps; the asm warp numbers are 0-based, +1 here).",
+ "id": "event:rocket_hideout_elevator_panel",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:RocketHideoutElevator",
+  "front": [[1, 1]]
+ },
+ "commands": [
+  {
+   "cmd": "if",
+   "cond": "item_lift_key > 0",
+   "then": [
+    {
+     "cmd": "elevator_panel",
+     "floors": [["B1F", "map:RocketHideoutB1F", 5], ["B2F", "map:RocketHideoutB2F", 5], ["B4F", "map:RocketHideoutB4F", 3]]
+    }
+   ],
+   "else": [
+    {"cmd": "notice", "text": "It appears to\nneed a key."}
+   ]
+  }
+ ]
+}

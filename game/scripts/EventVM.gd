@@ -27,7 +27,8 @@ var _by_battle_end := {} # "<label>"              -> [records]
 const KINDS := ["interact", "visible", "enter", "step", "battle_end"]
 const CMDS := ["say", "notice", "if", "give_item", "take_item", "set_flag", "clear_flag", "sfx",
 	"beat", "set_last_map", "set_block", "set_force_bike", "mount_bike",
-	"bounce_back", "step_back_down", "walk_player", "vending"]
+	"bounce_back", "step_back_down", "walk_player", "vending", "fall_hole",
+	"elevator_retarget", "elevator_panel"]
 
 ## Player facing indices (Player.facing) by direction word.
 const DIRS := {"down": 0, "up": 1, "left": 2, "right": 3}
@@ -289,7 +290,45 @@ func _run_block(cmds: Array, ctx: Dictionary) -> bool:
 				await main.player.step(DIRS[str(c["dir"])])
 			"vending":
 				main._vending_enter()
+			"fall_hole":
+				# The Gen-1 dungeon warp (IsPlayerOnDungeonWarp): drop to the named floor,
+				# landing on the DungeonWarpData cell. The fall ceremony stays native.
+				var to: Array = c["to"]
+				main.cutscene.fall_down_hole(_bare(str(c["map"])), Vector2i(int(to[0]), int(to[1])))
+			"elevator_retarget":
+				# engine/events/elevator.asm StoreWarpEntries: on entry the door warps lead
+				# back to the boarding floor. Call from an `enter` record.
+				var from: Dictionary = main.warped_from
+				if not from.is_empty() and int(from.get("warp", 0)) > 0:
+					for w in main.map["warps"]:
+						w["dest_map"] = str(from["map"])
+						w["dest_warp"] = int(from["warp"])
+			"elevator_panel":
+				await _elevator_panel(c["floors"])
 	return true
+
+
+## The elevator panel (DisplayElevatorFloorMenu): pick a floor from the list, retarget the
+## door warps, and shake the car. floors = [[label, map ref, dest_warp(1-based)], ...];
+## B keeps the current destination. (overworld/elevator.asm ShakeElevator; the asm floor
+## tables' warp numbers are 0-based, +1 in the records.)
+func _elevator_panel(floors: Array) -> void:
+	main._say_keep("Which floor do\nyou want? ")
+	main.menu_mode = "cutscene"
+	main.modal = main.menu
+	var labels: Array = []
+	for f in floors:
+		labels.append(str(f[0]))
+	main.menu.open(labels, Vector2(32, 16))
+	var idx: int = await main.menu.chosen
+	main.modal = null
+	main.textbox.visible = false
+	if idx < 0 or idx >= floors.size():
+		return
+	for w in main.map["warps"]:
+		w["dest_map"] = _bare(str(floors[idx][1]))
+		w["dest_warp"] = int(floors[idx][2])
+	await main.shake_elevator()
 
 
 # ---- compilation (load-time, so a bad record refuses at boot, not mid-story) --------

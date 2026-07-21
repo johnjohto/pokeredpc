@@ -393,6 +393,72 @@
        }
       },
       "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "map",
+       "to"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "fall_hole"
+       },
+       "map": {
+        "type": "string",
+        "x-ref": "map"
+       },
+       "to": {
+        "$ref": "#/$defs/cell"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "elevator_retarget"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "floors"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "elevator_panel"
+       },
+       "floors": {
+        "type": "array",
+        "items": {
+         "type": "array",
+         "prefixItems": [
+          {
+           "type": "string"
+          },
+          {
+           "type": "string",
+           "x-ref": "map"
+          },
+          {
+           "type": "integer"
+          }
+         ],
+         "minItems": 3,
+         "maxItems": 3
+        }
+       }
+      },
+      "additionalProperties": false
      }
     ]
    }

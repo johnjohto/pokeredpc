@@ -1,0 +1,15 @@
+{
+ "$comment": "scripts/CeladonMartElevator.asm — the department store elevator panel (TEXT_CELADONMARTELEVATOR): no key, floors 1F-5F (CeladonMartElevatorFloors/WarpMaps; the asm warp numbers are 0-based, +1 here).",
+ "id": "event:celadon_mart_elevator_panel",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:CeladonMartElevator",
+  "front": [[3, 0]]
+ },
+ "commands": [
+  {
+   "cmd": "elevator_panel",
+   "floors": [["1F", "map:CeladonMart1F", 6], ["2F", "map:CeladonMart2F", 3], ["3F", "map:CeladonMart3F", 3], ["4F", "map:CeladonMart4F", 3], ["5F", "map:CeladonMart5F", 3]]
+  }
+ ]
+}

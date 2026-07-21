@@ -1,0 +1,65 @@
+{
+ "$comment": "scripts/PokemonMansion3F.asm — the wall-panel switch: you stand below it and press A facing UP (pokered keys it off the faced tile — every switch cell is solid, gh #83). Toggling re-lays this floor's blocks; the flag is shared by all four floors.",
+ "id": "event:pokemon_mansion_3f_switch",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:PokemonMansion3F",
+  "front": [
+   [
+    10,
+    5
+   ]
+  ],
+  "facing": "up"
+ },
+ "commands": [
+  {
+   "cmd": "if",
+   "cond": "MANSION_SWITCH_ON",
+   "then": [
+    {
+     "cmd": "clear_flag",
+     "flag": "MANSION_SWITCH_ON"
+    },
+    {
+     "cmd": "set_block",
+     "x": 7,
+     "y": 2,
+     "block": 14
+    },
+    {
+     "cmd": "set_block",
+     "x": 7,
+     "y": 5,
+     "block": 95
+    }
+   ],
+   "else": [
+    {
+     "cmd": "set_flag",
+     "flag": "MANSION_SWITCH_ON"
+    },
+    {
+     "cmd": "set_block",
+     "x": 7,
+     "y": 2,
+     "block": 95
+    },
+    {
+     "cmd": "set_block",
+     "x": 7,
+     "y": 5,
+     "block": 14
+    }
+   ]
+  },
+  {
+   "cmd": "sfx",
+   "key": "go_inside"
+  },
+  {
+   "cmd": "notice",
+   "text": "A big switch!\fYou flipped the\nswitch!"
+  }
+ ]
+}

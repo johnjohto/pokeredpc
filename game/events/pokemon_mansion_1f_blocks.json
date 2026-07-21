@@ -1,0 +1,90 @@
+{
+ "$comment": "scripts/PokemonMansion1F.asm — the switch-door blocks: swap each row between its OFF and ON layout per the shared MANSION_SWITCH_ON flag on every load.",
+ "id": "event:pokemon_mansion_1f_blocks",
+ "trigger": {
+  "kind": "enter",
+  "map": "map:PokemonMansion1F"
+ },
+ "commands": [
+  {
+   "cmd": "if",
+   "cond": "MANSION_SWITCH_ON",
+   "then": [
+    {
+     "cmd": "set_block",
+     "x": 12,
+     "y": 6,
+     "block": 45
+    }
+   ],
+   "else": [
+    {
+     "cmd": "set_block",
+     "x": 12,
+     "y": 6,
+     "block": 14
+    }
+   ]
+  },
+  {
+   "cmd": "if",
+   "cond": "MANSION_SWITCH_ON",
+   "then": [
+    {
+     "cmd": "set_block",
+     "x": 8,
+     "y": 3,
+     "block": 14
+    }
+   ],
+   "else": [
+    {
+     "cmd": "set_block",
+     "x": 8,
+     "y": 3,
+     "block": 45
+    }
+   ]
+  },
+  {
+   "cmd": "if",
+   "cond": "MANSION_SWITCH_ON",
+   "then": [
+    {
+     "cmd": "set_block",
+     "x": 10,
+     "y": 8,
+     "block": 14
+    }
+   ],
+   "else": [
+    {
+     "cmd": "set_block",
+     "x": 10,
+     "y": 8,
+     "block": 45
+    }
+   ]
+  },
+  {
+   "cmd": "if",
+   "cond": "MANSION_SWITCH_ON",
+   "then": [
+    {
+     "cmd": "set_block",
+     "x": 13,
+     "y": 13,
+     "block": 14
+    }
+   ],
+   "else": [
+    {
+     "cmd": "set_block",
+     "x": 13,
+     "y": 13,
+     "block": 45
+    }
+   ]
+  }
+ ]
+}

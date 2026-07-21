@@ -1,0 +1,28 @@
+{
+ "$comment": "scripts/PokemonMansion3F.asm PokemonMansion3FDefaultScript .holeCoords — the two western balcony drops fall to 1F (16,14), the only way into 1F's southern half and so to the SECRET KEY (gh #85). Landing cells from DungeonWarpData (data/maps/special_warps.asm).",
+ "id": "event:pokemon_mansion_3f_hole_west",
+ "trigger": {
+  "kind": "step",
+  "map": "map:PokemonMansion3F",
+  "cells": [
+   [
+    16,
+    14
+   ],
+   [
+    17,
+    14
+   ]
+  ]
+ },
+ "commands": [
+  {
+   "cmd": "fall_hole",
+   "map": "map:PokemonMansion1F",
+   "to": [
+    16,
+    14
+   ]
+  }
+ ]
+}

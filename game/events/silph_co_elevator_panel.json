@@ -1,0 +1,15 @@
+{
+ "$comment": "scripts/SilphCoElevator.asm — the Silph Co elevator panel (TEXT_SILPHCOELEVATOR_ELEVATOR): no key, floors 1F-11F (SilphCoElevatorFloors/WarpMaps; the asm warp numbers are 0-based, +1 here).",
+ "id": "event:silph_co_elevator_panel",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:SilphCoElevator",
+  "front": [[3, 0]]
+ },
+ "commands": [
+  {
+   "cmd": "elevator_panel",
+   "floors": [["1F", "map:SilphCo1F", 4], ["2F", "map:SilphCo2F", 3], ["3F", "map:SilphCo3F", 3], ["4F", "map:SilphCo4F", 3], ["5F", "map:SilphCo5F", 3], ["6F", "map:SilphCo6F", 3], ["7F", "map:SilphCo7F", 3], ["8F", "map:SilphCo8F", 3], ["9F", "map:SilphCo9F", 3], ["10F", "map:SilphCo10F", 3], ["11F", "map:SilphCo11F", 2]]
+  }
+ ]
+}

@@ -1,0 +1,11 @@
+{
+ "$comment": "scripts/SilphCoElevator.asm — the static map data ships its door warps pointing at UNUSED_MAP_ED; pokered relies on the runtime retarget (StoreWarpEntries), so this record is what makes the doors work at all.",
+ "id": "event:silph_co_elevator_enter",
+ "trigger": {
+  "kind": "enter",
+  "map": "map:SilphCoElevator"
+ },
+ "commands": [
+  {"cmd": "elevator_retarget"}
+ ]
+}

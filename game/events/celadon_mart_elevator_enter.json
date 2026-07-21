@@ -1,0 +1,11 @@
+{
+ "$comment": "scripts/CeladonMartElevator.asm + engine/events/elevator.asm StoreWarpEntries — on entry the two door warps lead back to the boarding floor.",
+ "id": "event:celadon_mart_elevator_enter",
+ "trigger": {
+  "kind": "enter",
+  "map": "map:CeladonMartElevator"
+ },
+ "commands": [
+  {"cmd": "elevator_retarget"}
+ ]
+}

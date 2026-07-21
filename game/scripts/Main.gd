@@ -16529,6 +16529,7 @@ func _towerghosttest() -> void:
 
 func _hideouttest() -> void:
 	await get_tree().process_frame
+	battle.fast_hp = true                # skip warp fades + the elevator ride so _do_warp is synchronous
 	story_events = {}
 	player_party = [make_mon("charmander", 30, [])]
 	load_world("GameCorner")

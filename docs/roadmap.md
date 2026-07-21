@@ -108,7 +108,37 @@ the `visible` query), `--blueshousetest`/`--townmaptest`/`--selftest` green thro
 generic adapter, `--schematest` grew event fixtures (valid + `broken_bad_command`),
 `--validate` 0 errors (1284 files, 3 event ids), double extraction byte-identical, and all
 four `--battledettest` md5s **byte-identical to the Phase-2 baseline** (f426d037 / bd9ec91d /
-36c598d7 / 25fcd316). Next: **wave B (gh #40)** — the adapter migration.
+36c598d7 / 25fcd316 — but see gh #44: on the wave-B machine the same commit reproduces
+018610cf / bd9ec91d / 86180e61 / 25fcd316, stable and replay-identical; wave B gates against
+that locally reproduced baseline).
+**In progress: wave B (gh #40)** — the adapter migration, five family waves landed 2026-07-21
+(**62 of the 98 adapter files deleted; 36 remain**): the trigger grammar grew `enter` / `step`
+((map, cell)-indexed, `when` gates, non-consuming pokes, regions) / `battle_end` / front-cell
++ facing interacts, and the command library grew exactly what each family demanded
+(`set_last_map`, `mount_bike`/`set_force_bike`, `beat` — the strangler-fig call into a native
+Cutscene beat, validated at boot — `notice` vs `say` (the non-blocking one-shot vs the
+dialogue page; a blocking say in a guard record held `cutscene_active` and swallowed the next
+trigger — caught by three suites), `take_item`, `bounce_back`/`step_back_down`/`walk_player`,
+`set_block`, `vending`, `fall_hole`, `elevator_retarget`/`elevator_panel`; conditions grew
+`item_<id>`/`badge_<name>`/`badge_count`/`force_bike`). Migrated so far: **B1** the LAST_MAP
+connectors + Cycling Road (10 maps); **B2** the interact→beat forwarders (23 maps: aides, rod
+gurus, gift balls, Daycare, BikeShop + FanClub, prize/vending counters, VermilionDock's
+departure, Tower 7F + Fuji's house…); **B3** the guards (the four Saffron thirsty gates FULLY
+authored — the native mechanism is deleted — both Cycling gate houses, Route22Gate's gh #87
+re-pick, Route23's seven badge checkpoints, ViridianCity, CinnabarIsland); **B4** Silph Co
+(all 11 floors: per-door card-key records + the story beats); **B5** the Mansion switch doors
++ 3F holes, Cinnabar Gym's quiz gates, and the three elevators (as VM ceremony commands). The
+per-wave gate held throughout: family `--flag` suites green, `--eventtest` grown per wave
+(16 checks), audits at zero, `--validate` 0 errors, double extraction byte-identical, the four
+`--battledettest` md5s never moved. Fallout tracked honestly: gh #44 (the md5 baseline
+discrepancy above) and gh #45 (pre-existing test drift found by baselining every failure
+against HEAD: fishtest/towertest/snorlaxtest crash on a 'species' key, flytest hangs headless,
+exitwarptest + hideouttest never awaited `_do_warp` — the latter two now fixed with the
+documented `battle.fast_hp` idiom, which also revived the only elevator gate). Remaining for
+wave B: the E4 rooms + Indigo lobby, the boulder/hole family (Seafoam, Victory Road), trainers-
+as-doors (GameCorner, MtMoonB2F, LancesRoom), the link-room pair, and the story-heavy city/lab
+maps that lean on wave C's beat dissolution (OaksLab, PalletTown, Cerulean/Pewter/Vermilion,
+BillsHouse, Museum1F, VermilionGym's transient trash-can state, SafariZoneGate's warp trigger).
 **Landed: gh #34** (2026-07-20): Catch + Progression are behind the seam and the
 **config-first knobs are real** — `Gen1Catch` (`attempt` over the byte-exact kernel + the
 safari `bait_rate`/`rock_rate` transitions, which moved out of the host's input handler),

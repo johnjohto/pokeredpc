@@ -3391,6 +3391,11 @@ func pewter_gym_guy(npc) -> void:
 	main.cutscene_active = false
 
 
+# The six gates' block coords (cinnabar_gym_quiz.asm CinnabarGymGateCoords; the load-time
+# lay is the CinnabarGym enter event record — this table is the mid-map slide on a right
+# answer, which the record's next load then honours via CINNABAR_GATE_<n>).
+const _QUIZ_GATE_BLOCKS := [[9, 3], [6, 3], [6, 6], [3, 8], [2, 6], [2, 3]]
+
 # The six Cinnabar quiz questions (data/text/text_2.asm _CinnabarQuizQuestionsText1-6) and
 # each gate's room trainer (wOpponentAfterWrongAnswer = gate index + 2 -> the map object).
 const _QUIZ_Q := [
@@ -3420,7 +3425,7 @@ func cinnabar_quiz(gate: int, yes_correct: bool) -> void:
 		await say("You're absolutely\ncorrect!\fGo on through!")
 		if not main.has_event("CINNABAR_GATE_%d" % gate):
 			main.set_event("CINNABAR_GATE_%d" % gate)
-			var gt: Array = main.map_script("CinnabarGym").GATES[gate - 1]
+			var gt: Array = _QUIZ_GATE_BLOCKS[gate - 1]
 			main.set_block(int(gt[0]), int(gt[1]), 0xE)
 			if main.audio:
 				main.audio.play_sfx("go_inside")       # SFX_GO_INSIDE as the gate opens
