@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/OaksLab.asm — the BULBASAUR ball: 'those are POKé BALLs' before the choose-mon speech (OaksLabThoseArePokeBallsText), the pick menu after it (OaksLabMonChoiceMenu via the choose_starter beat), the untaken leftover once picked (OaksLabLastMonScript).",
+ "$comment": "scripts/OaksLab.asm — the BULBASAUR ball: 'those are POKé BALLs' before the choose-mon speech (OaksLabThoseArePokeBallsText), the FULLY AUTHORED pick after it (wave C: OaksLabMonChoiceMenu — StarterDex, the pose, the confirm; declining leaves the ball), the untaken leftover once picked (OaksLabLastMonScript). On YES the flag lands just before give_mon (the beat set it between the append and the nickname offer — nothing reads it in that window, and the event is atomic). Then OaksLabRivalChoosesStarterScript: the rival walks to the type-advantage counterpart's ball and takes CHARMANDER.",
  "id": "event:oaks_lab_ball_bulbasaur",
  "trigger": {
   "kind": "interact",
@@ -18,7 +18,31 @@
      "cmd": "if",
      "cond": "not GOT_STARTER",
      "then": [
-      {"cmd": "beat", "name": "choose_starter", "args": ["@npc"]}
+      {"cmd": "show_dex_entry", "species": "species:bulbasaur"},
+      {"cmd": "pic", "species": "species:bulbasaur"},
+      {
+       "cmd": "ask",
+       "text": "So! You want the\nplant POKéMON,\nBULBASAUR?",
+       "then": [
+        {"cmd": "set_starter", "species": "species:bulbasaur"},
+        {"cmd": "hide_object", "object": "SPRITE_POKE_BALL@8,3"},
+        {"cmd": "say", "text": "This POKéMON is\nreally energetic!"},
+        {"cmd": "sfx", "key": "get_key_item"},
+        {"cmd": "say", "text": "{player} received\na BULBASAUR!"},
+        {"cmd": "clear_pic"},
+        {"cmd": "set_flag", "flag": "GOT_STARTER"},
+        {"cmd": "give_mon", "species": "species:bulbasaur", "level": 5, "nickname_offer": true},
+        {"cmd": "set_rival_starter", "species": "species:charmander"},
+        {"cmd": "walk_object_to", "object": "SPRITE_BLUE@4,3", "to": [6, 4]},
+        {"cmd": "face_object", "object": "SPRITE_BLUE@4,3", "dir": "up"},
+        {"cmd": "say", "text": "{rival}: I'll take\nthis one, then!"},
+        {"cmd": "hide_object", "object": "SPRITE_POKE_BALL@6,3"},
+        {"cmd": "say", "text": "{rival} received\na CHARMANDER!"}
+       ],
+       "else": [
+        {"cmd": "clear_pic"}
+       ]
+      }
      ],
      "else": [
       {"cmd": "notice", "text": "That's PROF.OAK's\nlast POKéMON!"}

@@ -553,6 +553,134 @@
      {
       "type": "object",
       "required": [
+       "cmd",
+       "text",
+       "then"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "ask"
+       },
+       "text": {
+        "type": "string"
+       },
+       "then": {
+        "$ref": "#/$defs/block"
+       },
+       "else": {
+        "$ref": "#/$defs/block"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "species"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "show_dex_entry"
+       },
+       "species": {
+        "type": "string",
+        "x-ref": "species"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "species"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "pic"
+       },
+       "species": {
+        "type": "string",
+        "x-ref": "species"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "clear_pic"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "species"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "set_starter"
+       },
+       "species": {
+        "type": "string",
+        "x-ref": "species"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "species"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "set_rival_starter"
+       },
+       "species": {
+        "type": "string",
+        "x-ref": "species"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "species",
+       "level"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "give_mon"
+       },
+       "species": {
+        "type": "string",
+        "x-ref": "species"
+       },
+       "level": {
+        "type": "integer",
+        "minimum": 1
+       },
+       "nickname_offer": {
+        "type": "boolean"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
        "cmd"
       ],
       "properties": {

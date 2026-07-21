@@ -573,40 +573,7 @@ func lab_intro() -> void:
 	main.cutscene_active = false
 
 
-# Starter ball key -> [species id, "kind", "DISPLAY"] (data/maps/objects/OaksLab.asm).
-const _STARTERS := {
-	"SPRITE_POKE_BALL@6,3": ["charmander", "fire", "CHARMANDER"],
-	"SPRITE_POKE_BALL@7,3": ["squirtle", "water", "SQUIRTLE"],
-	"SPRITE_POKE_BALL@8,3": ["bulbasaur", "plant", "BULBASAUR"],
-}
-
-
-## Pick a starter from a Poké Ball (scripts/OaksLab.asm OaksLabMonChoiceMenu): confirm, then
-## receive the level-5 mon into the party. Returns true if a starter was taken.
-func choose_starter(ball) -> bool:
-	var s: Array = _STARTERS[ball.key]
-	main.cutscene_active = true
-	await main.show_dex_entry(s[0])                     # StarterDex: the Pokédex data screen (#5)
-	var tex: Texture2D = load("res://assets/pokemon/front/%s.png" % s[0])
-	if tex:
-		pic(tex)
-	if not await ask("So! You want the\n%s POKéMON,\n%s?" % [s[1], s[2]]):
-		clear_pic()
-		main.cutscene_active = false
-		return false
-	main.player_starter = s[0]
-	ball.set_shown(false)
-	await say("This POKéMON is\nreally energetic!")
-	if main.audio:
-		main.audio.play_sfx("get_key_item")
-	await say("%s received\na %s!" % [main.player_name, s[2]])
-	clear_pic()
-	main.player_party.append(main.make_mon(s[0], 5, []))
-	main.set_event("GOT_STARTER")
-	await offer_nickname(main.player_party[-1])   # "Do you want to give a nickname to CHARMANDER?"
-	await rival_takes_starter()                   # rival grabs the counterpart, then control returns
-	main.cutscene_active = false                  # the challenge battle waits until you head out (Y==6)
-	return true
+# (choose_starter + rival_takes_starter dissolved into the ball records — wave C, gh #41.)
 
 
 ## Oak's dex-rating chat (OaksLabOak1Text .HowIsYourPokedexComingText): the preamble ends in
@@ -615,14 +582,6 @@ func choose_starter(ball) -> bool:
 func oak_dex_rating() -> void:
 	main.oaks_dex_rating("OAK: Good to see\nyou! How is your\nPOKéDEX coming?\nHere, let me take\na look!\f")
 
-
-# Player starter -> [rival species, "RIVAL DISPLAY", rival's ball key, OPP_RIVAL1 party number].
-# The rival always takes the type-advantage counterpart (scripts/OaksLab.asm).
-const _RIVAL_PICK := {
-	"charmander": ["squirtle", "SQUIRTLE", "SPRITE_POKE_BALL@7,3", 1],
-	"squirtle":   ["bulbasaur", "BULBASAUR", "SPRITE_POKE_BALL@8,3", 2],
-	"bulbasaur":  ["charmander", "CHARMANDER", "SPRITE_POKE_BALL@6,3", 3],
-}
 
 # The rival's starter is the type-advantage counterpart of the player's.
 const _COUNTERPART := {"charmander": "squirtle", "squirtle": "bulbasaur", "bulbasaur": "charmander"}
@@ -633,21 +592,6 @@ func _rival_st() -> String:
 	return main.rival_starter if main.rival_starter != "" else str(_COUNTERPART.get(main.player_starter, "squirtle"))
 
 
-## The rival grabs the type-advantage counterpart right after the player's pick
-## (scripts/OaksLab.asm OaksLabRivalChoosesStarterScript). Assumes cutscene_active is set.
-func rival_takes_starter() -> void:
-	var rn: String = main.rival_name
-	var r: Array = _RIVAL_PICK[main.player_starter]
-	main.rival_starter = r[0]
-	var rival = main._npc_by_key("SPRITE_BLUE@4,3")
-	var rball = main._npc_by_key(r[2])
-	if rival and rball:                            # walk over to his ball before taking it (#14)
-		await walk(rival, main.find_path(rival.cell, rball.cell + Vector2i(0, 1)))
-		rival.face_to(rball.cell)
-	await say("%s: I'll take\nthis one, then!" % rn)
-	if rball:
-		rball.set_shown(false)
-	await say("%s received\na %s!" % [rn, r[1]])
 
 
 ## The rival challenges the player to the first battle once they head for the exit

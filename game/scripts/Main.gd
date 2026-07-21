@@ -9286,7 +9286,9 @@ func _oaktest() -> void:
 			await RenderingServer.frame_post_draw
 			get_viewport().get_texture().get_image().save_png("res://oak_choosemon.png")
 			inlab_shot = true
-			cutscene.choose_starter(_npc_by_key("SPRITE_POKE_BALL@7,3"))   # pick SQUIRTLE
+			player.place(Vector2i(7, 4))
+			player.facing = 1                     # UP -> the SQUIRTLE ball; the authored pick (wave C)
+			interact(player)
 			picked = true
 		# Starter taken, control returned -> verify no immediate battle, then head to the exit (Y==6).
 		if picked and not challenged and has_event("GOT_STARTER") and not cutscene_active \
@@ -10178,7 +10180,9 @@ func _pt_stage_opening() -> bool:
 		elif modal == battle:
 			await _press("ui_accept")              # minimal battle policy: FIGHT -> first move
 		if not picked and has_event("OAK_ASKED_TO_CHOOSE_MON") and not cutscene_active and modal == null:
-			cutscene.choose_starter(_npc_by_key("SPRITE_POKE_BALL@7,3"))
+			player.place(Vector2i(7, 4))
+			player.facing = 1                      # UP -> the SQUIRTLE ball; the authored pick (wave C)
+			interact(player)
 			picked = true
 			print("[playthrough] chose the first starter ball")
 		if picked and not challenged and has_event("GOT_STARTER") and not cutscene_active and modal == null:

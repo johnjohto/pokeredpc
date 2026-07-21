@@ -36,7 +36,8 @@ const CMDS := ["say", "notice", "if", "give_item", "take_item", "set_flag", "cle
 	"trainer_battle", "reset_elite4", "boulder_fall", "walk_forward",
 	"set_var", "set_npc_text", "hide_object", "show_object", "lucky_slot", "play_slots",
 	"club_enter", "club_leave", "trash_reset", "trash_can", "face_object",
-	"face_player", "play_song", "wait", "walk_object_to", "class_battle", "heal_party"]
+	"face_player", "play_song", "wait", "walk_object_to", "class_battle", "heal_party",
+	"ask", "show_dex_entry", "pic", "clear_pic", "set_starter", "set_rival_starter", "give_mon"]
 
 ## Player facing indices (Player.facing) by direction word.
 const DIRS := {"down": 0, "up": 1, "left": 2, "right": 3}
@@ -317,6 +318,36 @@ func _run_block(cmds: Array, ctx: Dictionary) -> bool:
 					else c.get("else", [])
 				if not await _run_block(branch, ctx):
 					return false
+			"ask":
+				# The Gen-1 yes/no box: `then` on YES, `else` on NO (choose_starter's confirm).
+				var abr: Array = c.get("then", []) if await main.cutscene.ask(_interp(str(c["text"]))) \
+					else c.get("else", [])
+				if not await _run_block(abr, ctx):
+					return false
+			"show_dex_entry":
+				# The Pokédex data screen as a ceremony native (StarterDex).
+				await main.show_dex_entry(_bare(str(c["species"])))
+			"pic":
+				# The full-size front pic overlay the ask floats over (choose_starter's pose).
+				var ptex: Texture2D = load("res://assets/pokemon/front/%s.png" % _bare(str(c["species"])))
+				if ptex:
+					main.cutscene.pic(ptex)
+			"clear_pic":
+				main.cutscene.clear_pic()
+			"set_starter":
+				main.player_starter = _bare(str(c["species"]))
+			"set_rival_starter":
+				main.rival_starter = _bare(str(c["species"]))
+			"give_mon":
+				# A story-gifted mon joins the party (the starter; later the Eevee/fossil
+				# gifts) — the box takes the overflow, as everywhere else in the port.
+				var gm: Dictionary = main.make_mon(_bare(str(c["species"])), int(c["level"]), [])
+				if main.player_party.size() < 6:
+					main.player_party.append(gm)
+					if bool(c.get("nickname_offer", false)):
+						await main.cutscene.offer_nickname(gm)
+				else:
+					main.pc_box.append(gm)
 			"give_item":
 				var display := _item_display(str(c["item"]))
 				if not main.add_item(display, int(c.get("count", 1))):
@@ -566,6 +597,12 @@ func _compile_block(cmds, key: String) -> String:
 					var err := _compile_block(c.get(b, []), key)
 					if err != "":
 						return err
+			"ask":
+				# The yes/no prompt branches like `if`, on the player's answer (wave C).
+				for b in ["then", "else"]:
+					var aerr := _compile_block(c.get(b, []), key)
+					if aerr != "":
+						return aerr
 			"beat":
 				if not _beat_names.has(str(c.get("name", ""))):
 					return "event '%s': unknown beat '%s' (not a Cutscene method)" % [key, str(c.get("name", ""))]
