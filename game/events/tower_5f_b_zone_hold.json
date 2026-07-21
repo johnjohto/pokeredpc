@@ -1,0 +1,28 @@
+{
+ "$comment": "scripts/PokemonTower5F.asm — while in the zone every step consumes (BIT_NO_BATTLES: no dungeon-floor encounter roll).",
+ "id": "event:tower_5f_b_zone_hold",
+ "trigger": {
+  "kind": "step",
+  "map": "map:PokemonTower5F",
+  "cells": [
+   [
+    10,
+    8
+   ],
+   [
+    11,
+    8
+   ],
+   [
+    10,
+    9
+   ],
+   [
+    11,
+    9
+   ]
+  ],
+  "when": "IN_PURIFIED_ZONE"
+ },
+ "commands": []
+}

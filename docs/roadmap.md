@@ -111,8 +111,8 @@ four `--battledettest` md5s **byte-identical to the Phase-2 baseline** (f426d037
 36c598d7 / 25fcd316 — but see gh #44: on the wave-B machine the same commit reproduces
 018610cf / bd9ec91d / 86180e61 / 25fcd316, stable and replay-identical; wave B gates against
 that locally reproduced baseline).
-**In progress: wave B (gh #40)** — the adapter migration, eight family waves landed 2026-07-21
-(**90 of the 98 adapter files deleted; 8 remain**): the trigger grammar grew `enter` / `step`
+**In progress: wave B (gh #40)** — the adapter migration, nine family waves landed 2026-07-21
+(**97 of the 98 adapter files deleted; only OaksLab.gd remains**): the trigger grammar grew `enter` / `step`
 ((map, cell)-indexed, `when` gates, non-consuming pokes, regions) / `battle_end` / front-cell
 + facing interacts, and the command library grew exactly what each family demanded
 (`set_last_map`, `mount_bike`/`set_force_bike`, `beat` — the strangler-fig call into a native
@@ -147,12 +147,24 @@ against HEAD: fishtest/towertest/snorlaxtest/crivaltest crash on a 'species' key
 hangs headless, oaktest/diplomatest hang, route22test's 400-frame budget is marginal,
 parceltest calls an `_oak_text()` that no adapter ever had, and exitwarptest + hideouttest
 never awaited `_do_warp` — those two now fixed with the documented `battle.fast_hp` idiom,
-which also revived the only elevator gate). Remaining for wave B: **eight adapters** —
-OaksLab (blocked on the gh #45 `_oak_text` harness fix), GameCorner + VermilionGym (transient
-RAM-like state: the lucky slot, the trash-can pair), MtMoonB2F (needs npc battle-text wiring),
-PokemonTower5F (the purified-zone re-arm), SafariZoneGate (a `warp` trigger kind), and the
-Cable Club room pair (Colosseum/TradeCenter, dynamic step consumption) — plus wave D's
-extractor lints and the wave-E full-playthrough gate before gh #40 closes.
+which also revived the only elevator gate; gymtest's gh #109 leg, surgetest's post-puzzle
+section, and mtmoontest's `party_shift` battle wedge joined the list, all byte-identical on
+HEAD — and the whole 'species'/party_shift/md5 family looks like ONE battle-data-shape drift
+worth chasing together). Wave B9 (2026-07-21, same session) took the last mechanism maps:
+the `warp` trigger kind (SafariZoneGate, with `@warp_dest_label`/`@warp_index0` beat args +
+the `in_safari` condition), `at` interact cells (the player's own cell — slot seats),
+`set_var` (the saved vars store's first use: Tower 5F's purified-zone re-arm, with four
+complement-region leave records), `set_npc_text` (the Mt. Moon nerd's map-script lines),
+`show_object`/`hide_object`, `lucky_slot`/`play_slots` (GameCorner; the machine stays a
+native modal), `club_enter`/`club_leave` (the Cable Club room pair's doormat rows), and
+`trash_reset`/`trash_can` (Vermilion Gym; the random switch pair moved to Main as transient
+RAM-like state, the `--surgetest` harness rewired). A real VM bug was caught by
+`--fossilguardtest`: an UNAWAITED async native inside run() (trainer_battle, fall_hole) let
+the wrapper's cutscene_active restore trample the beat's own flag on the same frame — both
+are awaited now. Remaining for wave B: **OaksLab.gd alone** (blocked on the gh #45
+`_oak_text` harness fix + starter-identity conditions; it leans on wave C's beat
+dissolution) — plus wave D's extractor lints and the wave-E full-playthrough gate before
+gh #40 closes.
 **Landed: gh #34** (2026-07-20): Catch + Progression are behind the seam and the
 **config-first knobs are real** — `Gen1Catch` (`attempt` over the byte-exact kernel + the
 safari `bait_rate`/`rock_rate` transitions, which moved out of the host's input handler),

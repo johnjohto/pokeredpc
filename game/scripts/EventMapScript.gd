@@ -25,6 +25,10 @@ func on_battle_end() -> void:
 	main.event_vm.run_battle_end(label)
 
 
+func on_warp(w: Dictionary, _dest_const: String, dest_label: String) -> bool:
+	return main.event_vm.warp_fire(label, w, dest_label)
+
+
 func boulder_hole(cell: Vector2i) -> bool:
 	return main.event_vm.boulder_hole_at(label, cell)
 

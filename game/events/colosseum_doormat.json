@@ -1,0 +1,19 @@
+{
+ "$comment": "engine/link/cable_club.asm — walking onto the doormat row leaves the club: the link closes and the player is back beside the attendant.",
+ "id": "event:colosseum_doormat",
+ "trigger": {
+  "kind": "step",
+  "map": "map:Colosseum",
+  "region": [
+   0,
+   6,
+   9,
+   7
+  ]
+ },
+ "commands": [
+  {
+   "cmd": "club_leave"
+  }
+ ]
+}

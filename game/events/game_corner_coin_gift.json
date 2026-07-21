@@ -1,0 +1,15 @@
+{
+ "$comment": "scripts/GameCorner.asm — the fishing guru's 10 free coins (once).",
+ "id": "event:game_corner_coin_gift",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:GameCorner",
+  "object": "SPRITE_FISHING_GURU@5,11"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "coin_gift"
+  }
+ ]
+}

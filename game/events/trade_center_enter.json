@@ -1,0 +1,13 @@
+{
+ "$comment": "scripts/TradeCenter.asm + engine/link/cable_club.asm — the shared room behavior: the partner's avatar sits in the opposite chair (the *_Script repositions the OPPONENT object).",
+ "id": "event:trade_center_enter",
+ "trigger": {
+  "kind": "enter",
+  "map": "map:TradeCenter"
+ },
+ "commands": [
+  {
+   "cmd": "club_enter"
+  }
+ ]
+}

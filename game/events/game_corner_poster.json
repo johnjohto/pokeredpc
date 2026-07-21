@@ -1,0 +1,40 @@
+{
+ "$comment": "scripts/GameCorner.asm — the poster at (9,4): a hidden switch opens the staircase to the Rocket Hideout.",
+ "id": "event:game_corner_poster",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:GameCorner",
+  "front": [
+   [
+    9,
+    4
+   ]
+  ],
+  "when": "not FOUND_ROCKET_HIDEOUT"
+ },
+ "commands": [
+  {
+   "cmd": "sfx",
+   "key": "go_inside"
+  },
+  {
+   "cmd": "set_flag",
+   "flag": "FOUND_ROCKET_HIDEOUT"
+  },
+  {
+   "cmd": "set_block",
+   "x": 8,
+   "y": 2,
+   "block": 67
+  },
+  {
+   "cmd": "unblock_cell",
+   "x": 17,
+   "y": 4
+  },
+  {
+   "cmd": "notice",
+   "text": "Hey!\fA switch behind\nthe poster!?\nLet's push it!"
+  }
+ ]
+}

@@ -1,0 +1,10 @@
+{
+ "$comment": "scripts/MtMoonB2F.asm — both fossils stand until either is taken.",
+ "id": "event:mtmoon_b2f_helix_shown",
+ "trigger": {
+  "kind": "visible",
+  "map": "map:MtMoonB2F",
+  "object": "SPRITE_FOSSIL@13,6",
+  "visible_when": "not (GOT_DOME_FOSSIL or GOT_HELIX_FOSSIL)"
+ }
+}

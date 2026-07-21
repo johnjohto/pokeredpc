@@ -1,0 +1,24 @@
+{
+ "$comment": "scripts/TradeCenter.asm — pressing A into the table's two center cells opens the flow.",
+ "id": "event:trade_center_table",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:TradeCenter",
+  "front": [
+   [
+    4,
+    4
+   ],
+   [
+    5,
+    4
+   ]
+  ]
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "trade_center_table"
+  }
+ ]
+}

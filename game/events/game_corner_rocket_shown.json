@@ -1,0 +1,10 @@
+{
+ "$comment": "gh #89 — the poster ROCKET leaves after his battle and never returns.",
+ "id": "event:game_corner_rocket_shown",
+ "trigger": {
+  "kind": "visible",
+  "map": "map:GameCorner",
+  "object": "SPRITE_ROCKET@9,5",
+  "visible_when": "not defeated_9_5"
+ }
+}

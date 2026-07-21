@@ -1,0 +1,21 @@
+{
+ "$comment": "scripts/MtMoonB2F.asm MtMoonB2FDefaultScript — the nerd has NO sight cone: (13,8) is the sole gateway into the fossil alcove, and standing on it force-runs his fight (gh #107). The script rets early once he's beaten.",
+ "id": "event:mtmoon_b2f_nerd_guard",
+ "trigger": {
+  "kind": "step",
+  "map": "map:MtMoonB2F",
+  "cells": [
+   [
+    13,
+    8
+   ]
+  ],
+  "when": "not defeated_12_8"
+ },
+ "commands": [
+  {
+   "cmd": "trainer_battle",
+   "object": "SPRITE_SUPER_NERD@12,8"
+  }
+ ]
+}

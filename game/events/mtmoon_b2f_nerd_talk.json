@@ -1,0 +1,28 @@
+{
+ "$comment": "scripts/MtMoonB2F.asm — the beaten nerd's parting line depends on whether a fossil has been taken. Undefeated, the gate fails and the generic trainer path battles him.",
+ "id": "event:mtmoon_b2f_nerd_talk",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:MtMoonB2F",
+  "object": "SPRITE_SUPER_NERD@12,8",
+  "when": "defeated_12_8"
+ },
+ "commands": [
+  {
+   "cmd": "if",
+   "cond": "GOT_DOME_FOSSIL or GOT_HELIX_FOSSIL",
+   "then": [
+    {
+     "cmd": "notice",
+     "text": "Far away, on\nCINNABAR ISLAND,\nthere's a POKéMON\nLAB.\fThey do research\non regenerating\nfossils."
+    }
+   ],
+   "else": [
+    {
+     "cmd": "notice",
+     "text": "We'll each take\none!\nNo being greedy!"
+    }
+   ]
+  }
+ ]
+}

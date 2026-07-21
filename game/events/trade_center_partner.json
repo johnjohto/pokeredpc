@@ -1,0 +1,15 @@
+{
+ "$comment": "scripts/TradeCenter.asm — pressing A at the partner's avatar opens the same flow.",
+ "id": "event:trade_center_partner",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:TradeCenter",
+  "object": "SPRITE_RED@2,2"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "trade_center_table"
+  }
+ ]
+}

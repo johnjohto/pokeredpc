@@ -1,0 +1,15 @@
+{
+ "$comment": "gh #89 — GameCornerRocketExitScript: losing sends the poster ROCKET walking off and HideObjects him for good. The walk is animation; what matters is that (9,5) — the one cell the poster is read from — is freed the instant he loses.",
+ "id": "event:game_corner_rocket_leaves",
+ "trigger": {
+  "kind": "battle_end",
+  "map": "map:GameCorner",
+  "when": "defeated_9_5"
+ },
+ "commands": [
+  {
+   "cmd": "hide_object",
+   "object": "SPRITE_ROCKET@9,5"
+  }
+ ]
+}

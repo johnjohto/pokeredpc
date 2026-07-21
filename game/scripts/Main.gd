@@ -256,6 +256,47 @@ var rival_starter := ""          # the counterpart the rival took
 var badges: Array = []           # gym badges earned (e.g. "BOULDERBADGE"), in order
 var _trash_first := 0            # Vermilion Gym puzzle: can index holding the 1st switch
 var _trash_second := 0           # ...and the 2nd switch (picked once the 1st is found)
+
+# Which cans may hold the 2nd switch given the 1st (GymTrashCans table). Cans index
+# col*3+row over a 5x3 grid. (Moved from the retired VermilionGym adapter, gh #40 — the
+# gym's trigger is an authored event; the random pair is transient RAM-like state here.)
+const _TRASH_NEIGHBORS := [
+	[1, 3], [0, 2, 4], [1, 5], [0, 4, 6], [1, 3, 5, 7], [2, 4, 8], [3, 7, 9],
+	[4, 6, 8, 10], [5, 7, 11], [6, 10, 12], [7, 9, 11, 13], [8, 10, 14], [9, 13],
+	[10, 12, 14], [11, 13]]
+
+
+## Trash-can index for a faced gym tile (x in {1,3,5,7,9}, y in {7,9,11}), or -1 if not a can.
+func _trash_can_index(cell: Vector2i) -> int:
+	if cell.x in [1, 3, 5, 7, 9] and cell.y in [7, 9, 11]:
+		return int((cell.x - 1) / 2) * 3 + int((cell.y - 7) / 2)
+	return -1
+
+
+## Check a trash can (GymTrashScript): find the two hidden switches in sequence to open the
+## motorized door to Lt. Surge; a wrong 2nd guess resets them.
+func _trash_check(ci: int) -> void:
+	if not has_event("VERMILION_1ST_LOCK"):
+		if ci == _trash_first:
+			set_event("VERMILION_1ST_LOCK")
+			_trash_second = _TRASH_NEIGHBORS[ci][randi() % _TRASH_NEIGHBORS[ci].size()]
+			if audio:
+				audio.play_sfx("switch")
+			_say("Hey! There's a\nswitch under the\ntrash!\nTurn it on!\fThe 1st electric\nlock opened!")
+		else:
+			_say("Nope, there's\nonly trash here.")
+	elif ci == _trash_second:
+		set_event("VERMILION_2ND_LOCK")
+		set_block(2, 2, 0x05)                  # the motorized door opens
+		if audio:
+			audio.play_sfx("go_inside")
+		_say("The 2nd electric\nlock opened!\fThe motorized door\nopened!")
+	else:
+		story_events.erase("VERMILION_1ST_LOCK")
+		_trash_first = randi() % 15
+		if audio:
+			audio.play_sfx("denied")
+		_say("Nope! There's\nonly trash here.\nHey! The electric\nlocks were reset!")
 var cutscene_active := false     # a scripted cutscene is driving the player/NPCs (no free input)
 var cutscene                     # the Cutscene runner (Control on the ui layer)
 var _map_scripts := {}           # label -> MapScript adapter (stateless; no-op base if unscripted)
@@ -17985,20 +18026,20 @@ func _surgetest() -> void:
 	load_world("VermilionGym")
 	var door_closed: bool = not is_walkable(Vector2i(4, 4))   # top tile of the door block (2,2)
 	print("[surgetest] can_index (1,7)=%d (9,11)=%d (2,2)=%d | door_closed=%s" % [
-		map_script("VermilionGym")._trash_can_index(Vector2i(1, 7)), map_script("VermilionGym")._trash_can_index(Vector2i(9, 11)),
-		map_script("VermilionGym")._trash_can_index(Vector2i(2, 2)), door_closed])
+		_trash_can_index(Vector2i(1, 7)), _trash_can_index(Vector2i(9, 11)),
+		_trash_can_index(Vector2i(2, 2)), door_closed])
 	# Wrong first can -> just trash, no lock.
-	map_script("VermilionGym")._trash_check((_trash_first + 1) % 15); modal = null; textbox.visible = false
+	_trash_check((_trash_first + 1) % 15); modal = null; textbox.visible = false
 	var no_lock := not has_event("VERMILION_1ST_LOCK")
 	# Correct first switch.
-	map_script("VermilionGym")._trash_check(_trash_first); modal = null; textbox.visible = false
+	_trash_check(_trash_first); modal = null; textbox.visible = false
 	var first_ok := has_event("VERMILION_1ST_LOCK")
 	# Wrong second can -> reset.
-	map_script("VermilionGym")._trash_check((_trash_second + 1) % 15); modal = null; textbox.visible = false
+	_trash_check((_trash_second + 1) % 15); modal = null; textbox.visible = false
 	var reset_ok := not has_event("VERMILION_1ST_LOCK")
 	# Redo first (was re-randomized on reset), then solve with the fresh second.
-	map_script("VermilionGym")._trash_check(_trash_first); modal = null; textbox.visible = false
-	map_script("VermilionGym")._trash_check(_trash_second); modal = null; textbox.visible = false
+	_trash_check(_trash_first); modal = null; textbox.visible = false
+	_trash_check(_trash_second); modal = null; textbox.visible = false
 	var solved: bool = has_event("VERMILION_2ND_LOCK")
 	var door_open: bool = is_walkable(Vector2i(4, 4))
 	print("[surgetest] puzzle: no_lock_on_wrong=%s first_ok=%s reset_on_wrong2=%s solved=%s door_open=%s" % [

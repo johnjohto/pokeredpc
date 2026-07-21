@@ -1,0 +1,20 @@
+{
+ "$comment": "scripts/SafariZoneGate.asm — pay the 500 fee before entering the park: the warp into the center is consumed and the attendant beat decides (the beat re-runs the warp itself once paid).",
+ "id": "event:safari_gate_fee",
+ "trigger": {
+  "kind": "warp",
+  "map": "map:SafariZoneGate",
+  "dest": "map:SafariZoneCenter",
+  "when": "not in_safari"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "safari_gate",
+   "args": [
+    "@warp_dest_label",
+    "@warp_index0"
+   ]
+  }
+ ]
+}

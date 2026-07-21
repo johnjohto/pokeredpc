@@ -25,13 +25,17 @@ var _by_enter := {}      # "<label>"              -> [records]
 var _by_battle_end := {} # "<label>"              -> [records]
 var _by_bhole := {}      # "<label>|<x>,<y>"      -> true (a boulder may be shoved in)
 var _by_boulder := {}    # "<label>|<x>,<y>"      -> [records] (a boulder landed here)
+var _by_at := {}         # "<label>|<x>,<y>"      -> [records] (player-cell interactions: slot seats)
+var _by_warp := {}       # "<label>"              -> [records] (warp gates/replacements)
 
-const KINDS := ["interact", "visible", "enter", "step", "battle_end", "boulder_hole", "boulder"]
+const KINDS := ["interact", "visible", "enter", "step", "battle_end", "boulder_hole", "boulder", "warp"]
 const CMDS := ["say", "notice", "if", "give_item", "take_item", "set_flag", "clear_flag", "sfx",
 	"beat", "set_last_map", "set_block", "set_force_bike", "mount_bike",
 	"bounce_back", "step_back_down", "walk_player", "vending", "fall_hole",
 	"elevator_retarget", "elevator_panel", "block_cell", "unblock_cell",
-	"trainer_battle", "reset_elite4", "boulder_fall", "walk_forward"]
+	"trainer_battle", "reset_elite4", "boulder_fall", "walk_forward",
+	"set_var", "set_npc_text", "hide_object", "show_object", "lucky_slot", "play_slots",
+	"club_enter", "club_leave", "trash_reset", "trash_can"]
 
 ## Player facing indices (Player.facing) by direction word.
 const DIRS := {"down": 0, "up": 1, "left": 2, "right": 3}
@@ -82,8 +86,13 @@ func load_all(records: Dictionary) -> String:
 						return fc
 					for c in fc:
 						_push(_by_front, "%s|%d,%d" % [label, c.x, c.y], r)
+				elif t.has("at"):
+					# `at` cells match the PLAYER's own cell (a slot-machine seat: you stand
+					# on it and press A, whatever you face).
+					for c in t["at"]:
+						_push(_by_at, "%s|%d,%d" % [label, int(c[0]), int(c[1])], r)
 				else:
-					return "event '%s': interact trigger needs an object or front cells" % key
+					return "event '%s': interact trigger needs an object, front, or at cells" % key
 			"visible":
 				var src := str(t.get("visible_when", ""))
 				var e = _compile_cond(src)
@@ -134,6 +143,13 @@ func load_all(records: Dictionary) -> String:
 					return "event '%s': boulder trigger needs cells" % key
 				for c in bc:
 					_push(_by_boulder, "%s|%d,%d" % [label, c.x, c.y], r)
+			"warp":
+				err = _compile_block(r.get("commands", []), key)
+				if err != "":
+					return err
+				if not t.has("dest"):
+					return "event '%s': warp trigger needs a dest map" % key
+				_push(_by_warp, label, r)
 		maps[label] = true
 	return ""
 
@@ -186,6 +202,23 @@ func interact_fire(label: String, front: Vector2i, npc) -> bool:
 	for r in _by_front.get("%s|%d,%d" % [label, front.x, front.y], []):
 		if _gate(r):
 			run(r, {"npc": npc, "cell": front})
+			return true
+	var pc: Vector2i = main.player.cell
+	for r in _by_at.get("%s|%d,%d" % [label, pc.x, pc.y], []):
+		if _gate(r):
+			run(r, {"npc": npc, "cell": pc})
+			return true
+	return false
+
+
+## A warp the player stepped on, before the fade + load: the first record whose dest map
+## and gate match consumes the warp (blocked, or replaced by a beat — SafariZoneGate).
+func warp_fire(label: String, w: Dictionary, dest_label: String) -> bool:
+	for r in _by_warp.get(label, []):
+		if _bare(str(r["trigger"]["dest"])) != dest_label:
+			continue
+		if _gate(r):
+			run(r, {"warp": w, "dest_label": dest_label})
 			return true
 	return false
 
@@ -306,6 +339,10 @@ func _run_block(cmds: Array, ctx: Dictionary) -> bool:
 				for a in c.get("args", []):
 					if str(a) == "@npc":
 						argv.append(ctx.get("npc"))       # the triggering NPC
+					elif str(a) == "@warp_dest_label":
+						argv.append(ctx.get("dest_label"))
+					elif str(a) == "@warp_index0":
+						argv.append(int(ctx.get("warp", {}).get("dest_warp", 1)) - 1)
 					elif str(a).begins_with("@object:"):
 						argv.append(main._npc_by_key(str(a).substr(8)))   # a named map object
 					else:
@@ -340,9 +377,11 @@ func _run_block(cmds: Array, ctx: Dictionary) -> bool:
 				main._vending_enter()
 			"fall_hole":
 				# The Gen-1 dungeon warp (IsPlayerOnDungeonWarp): drop to the named floor,
-				# landing on the DungeonWarpData cell. The fall ceremony stays native.
+				# landing on the DungeonWarpData cell. The fall ceremony stays native and is
+				# awaited so run()'s cutscene_active restore cannot trample its flag.
 				var to: Array = c["to"]
-				main.cutscene.fall_down_hole(_bare(str(c["map"])), Vector2i(int(to[0]), int(to[1])))
+				await main.cutscene.fall_down_hole(_bare(str(c["map"])), Vector2i(int(to[0]), int(to[1])))
+				main.cutscene_active = true
 			"block_cell":
 				# Make a walkable cell impassable outside the block grid (an E4 exit seal's
 				# warp squares) — cleared per load; the enter record re-lays it.
@@ -351,12 +390,14 @@ func _run_block(cmds: Array, ctx: Dictionary) -> bool:
 				main._blocked_cells.erase(Vector2i(int(c["x"]), int(c["y"])))
 			"trainer_battle":
 				# Engage a map trainer outside the sight system (a coordinate trigger:
-				# LANCE, the Mt. Moon fossil nerd). Fire-and-forget, exactly as the retired
-				# adapters called it; no-op if the object is absent or hidden.
+				# LANCE, the Mt. Moon fossil nerd). Awaited — an unawaited call would let
+				# run()'s cutscene_active restore trample the beat's own flag on the same
+				# frame. No-op if the object is absent or hidden.
 				var tnpc = main._npc_by_key(str(c["object"]))
 				if tnpc != null and tnpc.shown:
 					tnpc.face_to(main.player.cell)
-					main.cutscene.trainer_battle(tnpc, false)
+					await main.cutscene.trainer_battle(tnpc, false)
+					main.cutscene_active = true    # re-arm for the rest of the event (as beat does)
 			"boulder_fall":
 				# The shoved boulder drops through the hole for good: the floor event + the
 				# generic FELL_<object> visibility rule (base boulder_falls, verbatim).
@@ -375,6 +416,57 @@ func _run_block(cmds: Array, ctx: Dictionary) -> bool:
 				# IndigoPlateauLobby's gauntlet reset (ResetEventRange INDIGO_PLATEAU_EVENTS);
 				# the ceremony stays native.
 				main.reset_elite4_gauntlet()
+			"set_var":
+				# The saved vars store (ADR-019 §5): the first non-boolean durable state.
+				main.event_vars[str(c["name"])] = int(c["value"])
+			"set_npc_text":
+				# Lines that live in a map script, not a trainer header (the Mt. Moon fossil
+				# nerd) — wire them onto the object so the forced fight reads right.
+				var tnpc2 = main._npc_by_key(str(c["object"]))
+				if tnpc2 != null:
+					if c.has("battle_text"):
+						tnpc2.battle_text = str(c["battle_text"])
+					if c.has("end_text"):
+						tnpc2.end_text = str(c["end_text"])
+			"hide_object":
+				# pokered's HideObject predef: flip a toggleable object's visibility right now.
+				var h = main._npc_by_key(str(c["object"]))
+				if h != null:
+					h.set_shown(false)
+			"show_object":
+				# pokered's ShowObject predef. A collected item ball never comes back: a save
+				# made before the show-event existed can reach here holding the item.
+				var s = main._npc_by_key(str(c["object"]))
+				if s != null and not (s.item != "" and main.picked_items.has(
+						"%s:%d,%d" % [main.center_label, s.cell.x, s.cell.y])):
+					s.set_shown(true)
+			"lucky_slot":
+				# GameCornerSelectLuckySlotMachine: transient RAM-like state, re-rolled each
+				# visit (the overworld RNG — never the battle stream).
+				var seats: Array = c["seats"]
+				var pick: Array = seats[randi() % seats.size()]
+				main._lucky_slot = Vector2i(int(pick[0]), int(pick[1]))
+			"play_slots":
+				# StartSlotMachine (AbleToPlaySlotsCheck first); the machine itself stays a
+				# native modal.
+				if not main.player_bag.has("COIN CASE"):
+					main._say("A COIN CASE is\nrequired!")
+				elif main.player_coins <= 0:
+					main._say("You don't have\nany coins!")
+				else:
+					main.modal = main.slots
+					main.slots.start(main.player.cell == main._lucky_slot)
+			"club_enter":
+				main.club_room_enter()
+			"club_leave":
+				main.club_room_leave()
+			"trash_reset":
+				main._trash_first = randi() % 15
+			"trash_can":
+				# A faced Vermilion Gym trash can (GymTrashScript): the two-switch hunt.
+				var ci: int = main._trash_can_index(Vector2i(ctx["cell"]))
+				if ci >= 0:
+					main._trash_check(ci)
 			"elevator_retarget":
 				# engine/events/elevator.asm StoreWarpEntries: on entry the door warps lead
 				# back to the boarding floor. Call from an `enter` record.
@@ -481,6 +573,8 @@ func _ident_value(ident: String, label: String):
 		return 1 if main.force_bike else 0
 	if ident == "surfing":
 		return 1 if main.surfing else 0
+	if ident == "in_safari":
+		return 1 if main.in_safari else 0
 	if ident == "player_x":
 		return main.player.cell.x
 	if ident == "player_y":

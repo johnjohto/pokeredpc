@@ -1,0 +1,29 @@
+{
+ "$comment": "scripts/VermilionGym.asm VermilionGymSetDoorTile — close the motorized door (the .blk ships it open) and reset the trash-can puzzle until it's solved; the random switch pair is transient RAM-like state on Main.",
+ "id": "event:vermilion_gym_a_enter",
+ "trigger": {
+  "kind": "enter",
+  "map": "map:VermilionGym"
+ },
+ "commands": [
+  {
+   "cmd": "if",
+   "cond": "not VERMILION_2ND_LOCK",
+   "then": [
+    {
+     "cmd": "clear_flag",
+     "flag": "VERMILION_1ST_LOCK"
+    },
+    {
+     "cmd": "trash_reset"
+    },
+    {
+     "cmd": "set_block",
+     "x": 2,
+     "y": 2,
+     "block": 36
+    }
+   ]
+  }
+ ]
+}

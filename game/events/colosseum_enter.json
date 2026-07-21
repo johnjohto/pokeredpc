@@ -1,0 +1,13 @@
+{
+ "$comment": "scripts/Colosseum.asm + engine/link/cable_club.asm — the shared room behavior: the partner's avatar sits in the opposite chair (the *_Script repositions the OPPONENT object).",
+ "id": "event:colosseum_enter",
+ "trigger": {
+  "kind": "enter",
+  "map": "map:Colosseum"
+ },
+ "commands": [
+  {
+   "cmd": "club_enter"
+  }
+ ]
+}

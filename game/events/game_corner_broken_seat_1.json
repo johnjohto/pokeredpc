@@ -1,0 +1,20 @@
+{
+ "$comment": "scripts/GameCorner.asm — an unplayable machine.",
+ "id": "event:game_corner_broken_seat_1",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:GameCorner",
+  "at": [
+   [
+    6,
+    12
+   ]
+  ]
+ },
+ "commands": [
+  {
+   "cmd": "notice",
+   "text": "OUT OF ORDER\nThis is broken."
+  }
+ ]
+}

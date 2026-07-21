@@ -1,0 +1,38 @@
+{
+ "$comment": "scripts/PokemonTower5F.asm PokemonTower5FDefaultScript — stepping into the four-tile purified zone fires the heal beat once; the IN_PURIFIED_ZONE var re-arms when you step off (the four leave records).",
+ "id": "event:tower_5f_a_zone_enter",
+ "trigger": {
+  "kind": "step",
+  "map": "map:PokemonTower5F",
+  "cells": [
+   [
+    10,
+    8
+   ],
+   [
+    11,
+    8
+   ],
+   [
+    10,
+    9
+   ],
+   [
+    11,
+    9
+   ]
+  ],
+  "when": "not IN_PURIFIED_ZONE"
+ },
+ "commands": [
+  {
+   "cmd": "set_var",
+   "name": "IN_PURIFIED_ZONE",
+   "value": 1
+  },
+  {
+   "cmd": "beat",
+   "name": "tower_purified_zone"
+  }
+ ]
+}

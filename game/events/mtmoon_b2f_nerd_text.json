@@ -1,0 +1,16 @@
+{
+ "$comment": "scripts/MtMoonB2F.asm MtMoonB2FSuperNerdText — the nerd's lines live in the map script, not a trainer header, so the extractor gave him no before/end text; wire it on load so the forced fight (and a plain talk-to) both read right.",
+ "id": "event:mtmoon_b2f_nerd_text",
+ "trigger": {
+  "kind": "enter",
+  "map": "map:MtMoonB2F"
+ },
+ "commands": [
+  {
+   "cmd": "set_npc_text",
+   "object": "SPRITE_SUPER_NERD@12,8",
+   "battle_text": "Hey, stop!\fI found these\nfossils! They're\nboth mine!",
+   "end_text": "OK!\nI'll share!"
+  }
+ ]
+}

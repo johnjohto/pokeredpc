@@ -1,0 +1,15 @@
+{
+ "$comment": "scripts/Colosseum.asm — pressing A at the partner's avatar opens the same flow.",
+ "id": "event:colosseum_partner",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:Colosseum",
+  "object": "SPRITE_RED@2,2"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "colosseum_table"
+  }
+ ]
+}

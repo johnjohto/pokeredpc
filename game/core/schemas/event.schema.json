@@ -30,8 +30,19 @@
       "step",
       "battle_end",
       "boulder_hole",
-      "boulder"
+      "boulder",
+      "warp"
      ]
+    },
+    "dest": {
+     "type": "string",
+     "x-ref": "map"
+    },
+    "at": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/cell"
+     }
     },
     "map": {
      "type": "string",
@@ -500,6 +511,159 @@
        },
        "flag": {
         "type": "string"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "name",
+       "value"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "set_var"
+       },
+       "name": {
+        "type": "string"
+       },
+       "value": {
+        "type": "integer"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "object"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "set_npc_text"
+       },
+       "object": {
+        "type": "string"
+       },
+       "battle_text": {
+        "type": "string"
+       },
+       "end_text": {
+        "type": "string"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "object"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "hide_object"
+       },
+       "object": {
+        "type": "string"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "object"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "show_object"
+       },
+       "object": {
+        "type": "string"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "seats"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "lucky_slot"
+       },
+       "seats": {
+        "type": "array",
+        "items": {
+         "$ref": "#/$defs/cell"
+        }
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "play_slots"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "club_enter"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "club_leave"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "trash_reset"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "trash_can"
        }
       },
       "additionalProperties": false

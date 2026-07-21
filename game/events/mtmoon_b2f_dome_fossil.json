@@ -1,0 +1,21 @@
+{
+ "$comment": "scripts/MtMoonB2F.asm — picking the DOME FOSSIL; the other is lost.",
+ "id": "event:mtmoon_b2f_dome_fossil",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:MtMoonB2F",
+  "object": "SPRITE_FOSSIL@12,6"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "mtmoon_fossil",
+   "args": [
+    "DOME FOSSIL",
+    "GOT_DOME_FOSSIL",
+    "@npc",
+    "SPRITE_FOSSIL@13,6"
+   ]
+  }
+ ]
+}

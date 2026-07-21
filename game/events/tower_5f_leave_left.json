@@ -1,0 +1,23 @@
+{
+ "$comment": "scripts/PokemonTower5F.asm — leaving the purified zone re-arms it (one of four rectangles covering the zone's complement).",
+ "id": "event:tower_5f_leave_left",
+ "trigger": {
+  "kind": "step",
+  "map": "map:PokemonTower5F",
+  "region": [
+   0,
+   8,
+   9,
+   9
+  ],
+  "when": "IN_PURIFIED_ZONE",
+  "consume": false
+ },
+ "commands": [
+  {
+   "cmd": "set_var",
+   "name": "IN_PURIFIED_ZONE",
+   "value": 0
+  }
+ ]
+}

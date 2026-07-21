@@ -95,11 +95,16 @@ conditions, `block_cell`, the `rerun_enter` battle_end field carrying the post-b
 declaratively, `trainer_battle` for LANCE's coordinate trigger, `reset_elite4`), the
 boulder/hole family (Seafoam B1–B4F incl. the currents as `walk_forward` runs, Victory Road
 1F–3F — the `boulder_hole`/`boulder` trigger kinds + `boulder_fall`), the Rocket Hideout
-guard doors, and the story/city maps (PalletTown, Pewter, Cerulean, Vermilion's sailor,
+guard doors, the story/city maps (PalletTown, Pewter, Cerulean, Vermilion's sailor,
 Saffron's occupation visibles, Route22, the Tower 2F/6F beats, S.S. Anne's deck, Bill's
-house, Museum 1F, Celadon Mansion 3F's diploma, Viridian Mart). Every retired base helper
-went with its last user — the base keeps only the hook contract and the thin say/set_block/
-face_player vocabulary the last nine adapters still use.
+house, Museum 1F, Celadon Mansion 3F's diploma, Viridian Mart), and the last mechanism maps
+(Mt. Moon B2F's fossil guard via `set_npc_text` + `trainer_battle`, Tower 5F's purified zone
+via the saved vars store, SafariZoneGate through the `warp` trigger kind, GameCorner —
+`lucky_slot`/`play_slots`/`at` seats — the Cable Club room pair, and Vermilion Gym, whose
+transient trash-can pair moved to Main). Every retired base helper went with its last user —
+the base keeps only the hook contract and the thin say/set_block/face_player vocabulary.
+**One adapter remains: OaksLab.gd** (blocked on the gh #45 `_oak_text` harness fix; it
+dissolves with wave C's beats).
 
 **Complete** (gh #53): all ~80 scripted maps live behind the seam; Main's dispatchers are one
 adapter call each, and every remaining `center_label ==` in Main.gd is a test-harness assertion.

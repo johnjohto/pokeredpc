@@ -1,0 +1,76 @@
+{
+ "$comment": "engine/events/hidden_events/vermilion_gym_trash.asm GymTrashScript — a faced trash can (x in 1,3,5,7,9; y in 7,9,11), until the door is open: find the two hidden switches in sequence; a wrong 2nd guess resets them.",
+ "id": "event:vermilion_gym_cans",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:VermilionGym",
+  "front": [
+   [
+    1,
+    7
+   ],
+   [
+    1,
+    9
+   ],
+   [
+    1,
+    11
+   ],
+   [
+    3,
+    7
+   ],
+   [
+    3,
+    9
+   ],
+   [
+    3,
+    11
+   ],
+   [
+    5,
+    7
+   ],
+   [
+    5,
+    9
+   ],
+   [
+    5,
+    11
+   ],
+   [
+    7,
+    7
+   ],
+   [
+    7,
+    9
+   ],
+   [
+    7,
+    11
+   ],
+   [
+    9,
+    7
+   ],
+   [
+    9,
+    9
+   ],
+   [
+    9,
+    11
+   ]
+  ],
+  "when": "not VERMILION_2ND_LOCK"
+ },
+ "commands": [
+  {
+   "cmd": "trash_can"
+  }
+ ]
+}
