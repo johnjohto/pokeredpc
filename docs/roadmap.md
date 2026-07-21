@@ -170,6 +170,21 @@ cross-check of the whole migration), `--schematest` grew two broken-event fixtur
 and `audit_chokepoints` gates on the nine EVENT_BACKED doors (a record must name both the
 map and the object; a hidden record fails the audit loud — proven by a negative test). What
 remains before gh #40 closes: OaksLab + the wave-E (gh #43) two-seed playthrough gate.
+**Wave E probing (2026-07-21, same session):** four full seed-1 attempts against the fully
+event-driven build. The migration held everywhere the bot went — a checkpoint-resume chain
+ran erika → blaine → three E4 gauntlet loops (the lobby-reset/LANCE-door/Champion records
+under real fire) → **beat the CHAMPION**, and `--elite4stage` completes the Hall of Fame end
+to end. Three latent bot-driver gaps fell out and are fixed (all reproduce on the gh #39
+commit): the BATTLE STYLE SHIFT prompt was never handled (the fallback pressed A into
+party_shift forever — the mtmoontest wedge), THE END's held credits screen was never pressed
+(the run died at HallOfFame (4,2) with the game beaten), and the catch loop could force a new
+encounter over an unsettled battle — `battle.start()` reuses the battle object, so the
+half-done ceremony smeared onto the new enemy and caught mons landed in the party as the NEXT
+encounter's species (very likely the root of gh #45's 'species'-crash family; the bot now
+guards + retries instead of corrupting). The single-process gate stays blocked on the
+remaining root cause: an intermittent battle-ceremony race under the 25× clock (a completed
+catch leaves the battle at its action menu with caught=true; same seed, different leg each
+run) — the gh #43/#45 trail has the full diagnosis.
 **Landed: gh #34** (2026-07-20): Catch + Progression are behind the seam and the
 **config-first knobs are real** — `Gen1Catch` (`attempt` over the byte-exact kernel + the
 safari `bait_rate`/`rock_rate` transitions, which moved out of the host's input handler),
