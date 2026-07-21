@@ -15097,6 +15097,39 @@ func _eventtest() -> void:
 		has_event("EVT_BE") and cutscene_active) and ok
 	cutscene_active = false
 
+	# 10 — wave C (gh #41): the first DISSOLVED beat — OaksLab's don't-go-away is pure
+	# commands now (face_object + say + walk_player). Stepping onto row 6 mid-choose
+	# turns Oak south and walks the player back up.
+	story_events = {"FOLLOWED_OAK_INTO_LAB": true, "OAK_ASKED_TO_CHOOSE_MON": true}
+	player_party = [make_mon("squirtle", 5, [])]
+	load_world("OaksLab")
+	player.place(Vector2i(5, 7))
+	player.place(Vector2i(5, 6))
+	_on_player_moved(Vector2i(5, 6))
+	await _drive_until(func() -> bool: return not cutscene_active and modal == null, 600)
+	ok = _ev_check("wave C dont_go_away: pushed back up + Oak faces down",
+		player.cell == Vector2i(5, 5) and _npc_by_key("SPRITE_OAK@5,2").facing == 0) and ok
+
+	# 11 — wave C: the dissolved 5-ball gift (give_item count 5 + the flag AFTER the give),
+	# then the re-talk takes the come-see-me branch and gives nothing more.
+	story_events = {"FOLLOWED_OAK_INTO_LAB": true, "GOT_STARTER": true, "BEAT_RIVAL1": true,
+		"RIVAL_LEFT_LAB": true, "GOT_POKEDEX": true, "BEAT_ROUTE22_RIVAL_1": true}
+	player_bag = {}
+	pokedex_owned = {}
+	pokedex_seen = {}
+	player_party = []
+	load_world("OaksLab")
+	player.place(Vector2i(5, 3))
+	player.facing = 1                                  # UP -> Oak at (5,2)
+	interact(player)
+	await _drive_until(func() -> bool: return not cutscene_active and modal == null, 600)
+	ok = _ev_check("wave C 5-ball gift: 5 POKé BALLs + GOT_POKEBALLS_FROM_OAK",
+		int(player_bag.get("POKé BALL", 0)) == 5 and has_event("GOT_POKEBALLS_FROM_OAK")) and ok
+	interact(player)
+	await _drive_until(func() -> bool: return not cutscene_active and modal == null, 600)
+	ok = _ev_check("wave C gift re-talk: still exactly 5 balls",
+		int(player_bag.get("POKé BALL", 0)) == 5) and ok
+
 	print("[eventtest] %s" % ("ALL GREEN" if ok else "FAIL"))
 	get_tree().quit(0 if ok else 1)
 

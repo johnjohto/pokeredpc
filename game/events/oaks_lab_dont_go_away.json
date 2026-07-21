@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/OaksLab.asm OaksLabPlayerDontGoAwayScript — trying to leave (YCoord == 6) between Oak's choose-a-mon speech and taking a starter: Oak stops you and walks you back up.",
+ "$comment": "scripts/OaksLab.asm OaksLabPlayerDontGoAwayScript — trying to leave (YCoord == 6) between Oak's choose-a-mon speech and taking a starter: Oak turns to call after you, then you are walked back up out of the doorway. Fully authored (wave C, gh #41): the first beat dissolved into commands.",
  "id": "event:oaks_lab_dont_go_away",
  "trigger": {
   "kind": "step",
@@ -8,6 +8,8 @@
   "when": "OAK_ASKED_TO_CHOOSE_MON and not GOT_STARTER"
  },
  "commands": [
-  {"cmd": "beat", "name": "oak_dont_go_away"}
+  {"cmd": "face_object", "object": "SPRITE_OAK@5,2", "dir": "down"},
+  {"cmd": "say", "text": "OAK: Hey! Don't go\naway yet!"},
+  {"cmd": "walk_player", "dir": "up"}
  ]
 }

@@ -183,6 +183,10 @@
        "item": {
         "type": "string",
         "x-ref": "item"
+       },
+       "count": {
+        "type": "integer",
+        "minimum": 1
        }
       },
       "additionalProperties": false
@@ -386,6 +390,31 @@
       "properties": {
        "cmd": {
         "const": "walk_player"
+       },
+       "dir": {
+        "enum": [
+         "down",
+         "up",
+         "left",
+         "right"
+        ]
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "object",
+       "dir"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "face_object"
+       },
+       "object": {
+        "type": "string"
        },
        "dir": {
         "enum": [

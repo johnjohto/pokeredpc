@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/OaksLab.asm — Oak himself: parcel delivery first (-> the Pokédex beat), else OaksLabOak1Text's exact branch order — the dex rating once the collection is going (PALLET_AFTER_GETTING_POKEBALLS, or >=2 owned with the dex), then, only with NO POKé BALLs in the bag, the one-time 5-ball gift after the Route 22 rival (.give_poke_balls; the flag sets before the beat, matching the retired adapter's order), else the story-progress lines.",
+ "$comment": "scripts/OaksLab.asm — Oak himself: parcel delivery first (-> the Pokédex beat), else OaksLabOak1Text's exact branch order — the dex rating once the collection is going (PALLET_AFTER_GETTING_POKEBALLS, or >=2 owned with the dex), then, only with NO POKé BALLs in the bag, the one-time 5-ball gift after the Route 22 rival (.give_poke_balls, fully authored — wave C; the gift lands before the flag so a refused give_item leaves the one-time gift claimable, one improvement over the retired beat), else the story-progress lines.",
  "id": "event:oaks_lab_oak",
  "trigger": {
   "kind": "interact",
@@ -39,8 +39,12 @@
             {"cmd": "notice", "text": "OAK: Come see me\nsometimes.\fI want to know how\nyour POKéDEX is\ncoming along."}
            ],
            "else": [
+            {"cmd": "say", "text": "OAK: You can't get\ndetailed data on\nPOKéMON by just\nseeing them.\fYou must catch\nthem! Use these\nto capture wild\nPOKéMON."},
+            {"cmd": "give_item", "item": "item:poke_ball", "count": 5},
             {"cmd": "set_flag", "flag": "GOT_POKEBALLS_FROM_OAK"},
-            {"cmd": "beat", "name": "oak_give_balls"}
+            {"cmd": "sfx", "key": "get_key_item"},
+            {"cmd": "say", "text": "{player} got 5\nPOKé BALLs!"},
+            {"cmd": "say", "text": "When a wild\nPOKéMON appears,\nit's fair game.\fJust throw a POKé\nBALL at it and try\nto catch it!\fThis won't always\nwork, though.\fA healthy POKéMON\ncould escape. You\nhave to be lucky!"}
            ]
           }
          ],

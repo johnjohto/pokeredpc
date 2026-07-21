@@ -581,19 +581,6 @@ const _STARTERS := {
 }
 
 
-## Trying to leave the lab before taking a starter: Oak stops you and walks you back a step
-## (scripts/OaksLab.asm OaksLabPlayerDontGoAwayScript, which fires at YCoord == 6).
-func oak_dont_go_away() -> void:
-	main.cutscene_active = true
-	main.modal = null
-	var oak = main._npc_by_key("SPRITE_OAK@5,2")
-	if oak:
-		oak.face(DOWN)
-	await say("OAK: Hey! Don't go\naway yet!")
-	main.player.step(UP)                          # forced back up, out of the doorway
-	main.cutscene_active = false
-
-
 ## Pick a starter from a Poké Ball (scripts/OaksLab.asm OaksLabMonChoiceMenu): confirm, then
 ## receive the level-5 mon into the party. Returns true if a starter was taken.
 func choose_starter(ball) -> bool:
@@ -627,20 +614,6 @@ func choose_starter(ball) -> bool:
 ## retired OaksLab adapter's call; the rating itself stays on Main).
 func oak_dex_rating() -> void:
 	main.oaks_dex_rating("OAK: Good to see\nyou! How is your\nPOKéDEX coming?\nHere, let me take\na look!\f")
-
-
-## .give_poke_balls — 5 POKé BALLs once (EVENT_GOT_POKEBALLS_FROM_OAK), the get-key-item
-## fanfare on the "got" line, then the catching explanation (moved verbatim from the retired
-## OaksLab adapter; the record sets the flag before invoking, matching the adapter's order).
-func oak_give_balls() -> void:
-	main.cutscene_active = true
-	await say("OAK: You can't get\ndetailed data on\nPOKéMON by just\nseeing them.\fYou must catch\nthem! Use these\nto capture wild\nPOKéMON.")
-	main.add_item("POKé BALL", 5)
-	if main.audio:
-		main.audio.play_sfx("get_key_item")
-	await say("%s got 5\nPOKé BALLs!" % main.player_name)
-	await say("When a wild\nPOKéMON appears,\nit's fair game.\fJust throw a POKé\nBALL at it and try\nto catch it!\fThis won't always\nwork, though.\fA healthy POKéMON\ncould escape. You\nhave to be lucky!")
-	main.cutscene_active = false
 
 
 # Player starter -> [rival species, "RIVAL DISPLAY", rival's ball key, OPP_RIVAL1 party number].

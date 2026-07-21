@@ -35,7 +35,7 @@ const CMDS := ["say", "notice", "if", "give_item", "take_item", "set_flag", "cle
 	"elevator_retarget", "elevator_panel", "block_cell", "unblock_cell",
 	"trainer_battle", "reset_elite4", "boulder_fall", "walk_forward",
 	"set_var", "set_npc_text", "hide_object", "show_object", "lucky_slot", "play_slots",
-	"club_enter", "club_leave", "trash_reset", "trash_can"]
+	"club_enter", "club_leave", "trash_reset", "trash_can", "face_object"]
 
 ## Player facing indices (Player.facing) by direction word.
 const DIRS := {"down": 0, "up": 1, "left": 2, "right": 3}
@@ -318,7 +318,7 @@ func _run_block(cmds: Array, ctx: Dictionary) -> bool:
 					return false
 			"give_item":
 				var display := _item_display(str(c["item"]))
-				if not main.add_item(display):
+				if not main.add_item(display, int(c.get("count", 1))):
 					await main.cutscene.say("You don't have\nroom for this!")
 					return false
 			"take_item":
@@ -428,6 +428,12 @@ func _run_block(cmds: Array, ctx: Dictionary) -> bool:
 						tnpc2.battle_text = str(c["battle_text"])
 					if c.has("end_text"):
 						tnpc2.end_text = str(c["end_text"])
+			"face_object":
+				# Turn a map object in place (wave C: the first choreography primitive —
+				# oak_dont_go_away's Oak turning to call after the player).
+				var fo = main._npc_by_key(str(c["object"]))
+				if fo != null:
+					fo.face(DIRS[str(c["dir"])])
 			"hide_object":
 				# pokered's HideObject predef: flip a toggleable object's visibility right now.
 				var h = main._npc_by_key(str(c["object"]))
