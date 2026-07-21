@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/Route23.asm Route23DefaultScript — the badge checkpoint at cell row 105 needs the RAINBOWBADGE to pass north. Each guard checks its badge once (EVENT_PASSED_<badge>_CHECK, gh #178); refused, a MovePlayerDownScript push-back after the text.",
+ "$comment": "scripts/Route23.asm Route23DefaultScript — the badge checkpoint at cell row 105 needs the RAINBOWBADGE to pass north. Each guard checks its badge once (EVENT_PASSED_<badge>_CHECK, gh #178); refused, the MovePlayerDownScript push-back, then the refusal text (matching the retired adapter's order).",
  "id": "event:route23_gate_rainbowbadge",
  "trigger": {
   "kind": "step",

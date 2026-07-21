@@ -96,13 +96,9 @@ the retired base helpers (`thirsty_guard`, `bounce_back`, `step_back_down`, `man
 
 **Complete** (gh #53): all ~80 scripted maps live behind the seam; Main's dispatchers are one
 adapter call each, and every remaining `center_label ==` in Main.gd is a test-harness assertion.
-Shared mechanisms on the base: `place_silph_doors`/`silph_door_interact`, `guard_door`,
-`thirsty_guard`, `e4_exit`, `mansion_blocks`/`mansion_switch`, `switch_doors_enter`/
-`boulder_switch`, `hole_at`/`boulder_falls`, and `elevator_enter`/`elevator_panel` (the
-three elevators — engine/events/elevator.asm: the door warps lead back to the boarding
-floor until the panel picks a floor, which retargets them live off `main.warped_from` and
-runs `Main.shake_elevator`; the asm floor tables' warp numbers are 0-based, +1 in the
-adapters' `FLOORS`).
+Shared mechanisms still on the base (each dies with its family's wave): `guard_door`,
+`e4_exit`, `switch_doors_enter`/`boulder_switch`, `hole_at`/`boulder_falls`, and
+`dungeon_hole`.
 
 **Stays generic in Main by design** (data-keyed mechanisms, not map scripts): `BENCH_GUY_TEXT` +
 the Pokécenter PC/bench, `GIFT_NPCS` (text-id keyed), `HIDDEN_EVENTS` (kind-dispatched, incl.
