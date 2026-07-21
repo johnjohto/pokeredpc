@@ -26,8 +26,12 @@ suites, since link battles run the seam on both peers). Method signatures are pi
 interfaces *as each mechanic lands*, never speculatively.
 
 **Formulas stay native in gen1** (ADR-018 §3): expressions cannot cheaply reproduce Gen-1's
-integer truncation/overflow quirks under the md5 gate. The expression evaluator (gh #35) is an
-*alternate* provider proven by an equivalence sweep against gen1's native outputs.
+integer truncation/overflow quirks under the md5 gate. The expression evaluator (gh #35 —
+live: `FormulaExpr` in Core, integer-exact, named variables + operators + min/max/floor/ceil/
+sqrt/int/abs/if with comparisons and and/or) powers the *alternate* provider
+`Gen1ExprFormulas`, whose expression-authored stat_calc / growth curves / damage_core are
+proven equal to the native kernels by `--exprtest`'s ~1.3k-vector equivalence sweep — real
+running code, never on gen1's hot path. Exotic math waits for the Phase-6 hatch.
 
 **Config-first knobs** (ADR-018 §4, gh #34 — live): the schema'd `data/ruleset.json` singleton
 (`{base, config}`, additive under `format: 1`; `base` must match the manifest's ruleset)

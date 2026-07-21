@@ -623,6 +623,8 @@ func _ready() -> void:
 		_projparitytest()
 	elif "--rulesettest" in args:
 		_rulesettest()
+	elif "--exprtest" in args:
+		_exprtest()
 	elif _validate_dir_arg(args) != "":
 		_validateproject(_validate_dir_arg(args))
 	elif "--recovertest" in args:
@@ -5206,6 +5208,81 @@ func _rulesettest() -> void:
 
 func _rs_check(name: String, good: bool, detail: String) -> bool:
 	print("[ruleset] %s: %s%s" % [name, "PASS" if good else "FAIL",
+		"" if good or detail == "" else " — " + detail])
+	return good
+
+
+## gh #35 (ADR-018 §3): the formula-expression evaluator — unit semantics (integer
+## exactness, precedence, branching, named errors) plus the EQUIVALENCE SWEEP: the
+## expression-authored Gen-1 kernels (Gen1ExprFormulas) must equal the native
+## Gen1Formulas outputs over a fixed vector matrix, value for value.
+## Run: `pwsh tools/run.ps1 -- --exprtest`. Headless.
+func _exprtest() -> void:
+	await get_tree().process_frame
+	var ok := true
+	# unit semantics
+	ok = _ex_check("precedence: 2 + 3 * 4 == 14",
+		FormulaExpr.parse("2 + 3 * 4").eval({}) == 14, "") and ok
+	ok = _ex_check("int division truncates: 7 / 2 == 3, stays int",
+		FormulaExpr.parse("7 / 2").eval({}) == 3
+		and FormulaExpr.parse("7 / 2").eval({}) is int, "") and ok
+	ok = _ex_check("float promotion: 7 / 2.0 == 3.5",
+		FormulaExpr.parse("7 / 2.0").eval({}) == 3.5, "") and ok
+	ok = _ex_check("if/and/or/comparisons branch",
+		FormulaExpr.parse("if(a > 255 or b > 255, 1, 0)").eval({"a": 999, "b": 1}) == 1
+		and FormulaExpr.parse("if(a > 255 and b > 255, 1, 0)").eval({"a": 999, "b": 1}) == 0,
+		"") and ok
+	ok = _ex_check("functions: min/max/ceil/sqrt/int",
+		FormulaExpr.parse("min(255, ceil(sqrt(65535)))").eval({}) == 255
+		and FormulaExpr.parse("int(min(255, ceil(sqrt(65535)))) / 4").eval({}) == 63, "") and ok
+	ok = _ex_check("parse error is named",
+		FormulaExpr.parse("1 + ").error != "", FormulaExpr.parse("1 + ").error) and ok
+	ok = _ex_check("unknown function is named",
+		FormulaExpr.parse("frob(1)").error.contains("frob"), "") and ok
+	# the equivalence sweep: expression-authored kernels vs native, value for value
+	var native := Gen1Formulas.new()
+	var expr := Gen1ExprFormulas.new()
+	var mism := 0
+	var checked := 0
+	for base in [1, 30, 100, 255]:
+		for level in [1, 5, 50, 100]:
+			for dv in [0, 8, 15]:
+				for sexp in [0, 1, 27, 100, 65535]:
+					for is_hp in [false, true]:
+						checked += 1
+						if native.stat_calc(base, level, dv, is_hp, sexp) \
+								!= expr.stat_calc(base, level, dv, is_hp, sexp):
+							mism += 1
+	ok = _ex_check("stat_calc sweep (%d vectors)" % checked, mism == 0,
+		"%d mismatches" % mism) and ok
+	checked = 0
+	mism = 0
+	for g in ["GROWTH_FAST", "GROWTH_SLOW", "GROWTH_MEDIUM_SLOW", "GROWTH_MEDIUM_FAST"]:
+		for n in range(1, 101):
+			checked += 1
+			if native.exp_for_level(n, g) != expr.exp_for_level(n, g):
+				mism += 1
+	ok = _ex_check("exp-curve sweep (%d vectors)" % checked, mism == 0,
+		"%d mismatches" % mism) and ok
+	checked = 0
+	mism = 0
+	for level in [1, 50, 100]:
+		for crit in [false, true]:
+			for power in [0, 20, 100, 250]:
+				for a in [1, 150, 255, 999]:
+					for d in [1, 100, 255, 999]:
+						checked += 1
+						if native.damage_core(level, crit, power, a, d) \
+								!= expr.damage_core(level, crit, power, a, d):
+							mism += 1
+	ok = _ex_check("damage_core sweep (%d vectors, incl. the /4 overflow branch)" % checked,
+		mism == 0, "%d mismatches" % mism) and ok
+	print("[expr] %s" % ("ALL GREEN" if ok else "FAIL"))
+	get_tree().quit(0 if ok else 1)
+
+
+func _ex_check(name: String, good: bool, detail: String) -> bool:
+	print("[expr] %s: %s%s" % [name, "PASS" if good else "FAIL",
 		"" if good or detail == "" else " — " + detail])
 	return good
 
