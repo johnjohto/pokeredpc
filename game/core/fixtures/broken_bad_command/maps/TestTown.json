@@ -1,0 +1,21 @@
+{
+ "name": "TestTown",
+ "tileset": "overworld",
+ "width": 2,
+ "height": 2,
+ "blocks": [
+  [
+   0,
+   0
+  ],
+  [
+   0,
+   0
+  ]
+ ],
+ "border_block": 0,
+ "warps": [],
+ "connections": [],
+ "bg_events": [],
+ "object_events": []
+}

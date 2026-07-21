@@ -41,6 +41,12 @@
    "bare_id": true
   },
   {
+   "path": "data/events/*.json",
+   "schema": "event",
+   "kind": "record",
+   "id_prefix": "event"
+  },
+  {
    "path": "data/types.json",
    "schema": "types",
    "kind": "table",

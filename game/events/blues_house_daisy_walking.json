@@ -1,0 +1,10 @@
+{
+ "$comment": "scripts/BluesHouse.asm toggleable_objects — after the TOWN MAP she's up and walking around.",
+ "id": "event:blues_house_daisy_walking",
+ "trigger": {
+  "kind": "visible",
+  "map": "map:BluesHouse",
+  "object": "SPRITE_DAISY@6,4",
+  "visible_when": "GOT_TOWN_MAP"
+ }
+}

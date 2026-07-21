@@ -5,6 +5,7 @@ extends Node2D
 
 const Keybinds = preload("res://scripts/Keybinds.gd")   # user-editable key bindings
 const MapScript = preload("res://scripts/MapScripts.gd")  # per-map script adapter base (gh #53)
+const EventAdapter = preload("res://scripts/EventMapScript.gd")  # authored-event maps (gh #39)
 const TILE := 8
 const BLOCK := 32
 const CELL := 16
@@ -246,6 +247,8 @@ const DARK_MAPS := ["RockTunnel1F", "RockTunnelB1F", "SeafoamIslands1F", "Seafoa
 	"CeruleanCave1F", "CeruleanCave2F", "CeruleanCaveB1F"]
 # ---- story scripting -------------------------------------------------------
 var story_events := {}           # set of story EVENT flags (name -> true)
+var event_vars := {}             # the Event VM's variables store (ADR-019 §5; saved)
+var event_vm: EventVM = null     # the project's authored events (gh #39; null pre-boot)
 var player_name := "RED"
 var rival_name := "BLUE"
 var player_starter := ""         # species the player chose at Oak's lab
@@ -340,6 +343,17 @@ func _ready() -> void:
 		# of limping into per-frame nil errors (gh #33).
 		push_error("[ruleset] '%s' configured incompletely (a module script failed to load)" % rs_id)
 		print("[ruleset] FATAL: '%s' configured incompletely (a module script failed to load)" % rs_id)
+		get_tree().quit(1)
+		return
+	# gh #39 (ADR-019): load the project's authored events. A record this build cannot
+	# execute (unknown trigger kind / command / unparseable condition) refuses at boot —
+	# the refuse-newer pattern applied to event semantics.
+	event_vm = EventVM.new()
+	event_vm.main = self
+	var everr := event_vm.load_all(ProjectData.events())
+	if everr != "":
+		push_error("[events] " + everr)
+		print("[events] FATAL: " + everr)
 		get_tree().quit(1)
 		return
 	sprite_index = ProjectData.legacy("sprites/index.json")
@@ -897,6 +911,8 @@ func _ready() -> void:
 		_hiddencuttest()
 	elif "--blueshousetest" in args:
 		_blueshousetest()
+	elif "--eventtest" in args:
+		_eventtest()
 	elif "--pcaccesstest" in args:
 		_pcaccesstest()
 	elif "--starterballtest" in args:
@@ -999,6 +1015,7 @@ func save_game() -> bool:
 		"badges": badges,
 		"options": options,
 		"link_addr": link_last_addr,   # additive (gh #5): a 1.0 save loads unchanged
+		"event_vars": event_vars,      # additive (gh #39, ADR-019 §5): the Event VM's vars
 	}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f == null:
@@ -1060,6 +1077,7 @@ func load_game() -> bool:
 	last_outside_map = str(data["last_outside_map"])
 	respawn_map = str(data.get("respawn_map", "PalletTown"))
 	story_events = data.get("events", {})
+	event_vars = data.get("event_vars", {})
 	player_name = str(data.get("player_name", "RED"))
 	player_id = int(data.get("player_id", 0))
 	var op: Dictionary = data.get("options", {})
@@ -1255,7 +1273,19 @@ func _update_darkness() -> void:
 func map_script(label: String) -> MapScript:
 	if not _map_scripts.has(label):
 		var path := "res://scripts/maps/%s.gd" % label
-		var inst: MapScript = load(path).new() if ResourceLoader.exists(path) else MapScript.new()
+		var inst: MapScript
+		if ResourceLoader.exists(path):
+			# A hand-written adapter wins during a migration wave — but both existing at
+			# once means a half-finished move; say so (gh #39).
+			if event_vm != null and event_vm.maps.has(label):
+				push_warning("[events] %s has BOTH an adapter and authored events — the adapter wins" % label)
+			inst = load(path).new()
+		elif event_vm != null and event_vm.maps.has(label):
+			var ea := EventAdapter.new()
+			ea.label = label
+			inst = ea
+		else:
+			inst = MapScript.new()
 		inst.main = self
 		_map_scripts[label] = inst
 	return _map_scripts[label]
@@ -5095,10 +5125,11 @@ func _schematest() -> void:
 	ok = _schema_check("valid: no errors", (r["errors"] as Array).is_empty() and bool(r["ok"]),
 		"; ".join(PackedStringArray(r["errors"]))) and ok
 	var ids: Dictionary = r["ids"]
-	ok = _schema_check("valid: ids registered (2 species, 1 move, 2 items, 1 trainer, 1 map, 2 types)",
+	ok = _schema_check("valid: ids registered (2 species, 1 move, 2 items, 1 trainer, 1 map, 2 types, 1 event)",
 		int(ids.get("species", 0)) == 2 and int(ids.get("move", 0)) == 1
 		and int(ids.get("item", 0)) == 2 and int(ids.get("trainer", 0)) == 1
-		and int(ids.get("map", 0)) == 1 and int(ids.get("type", 0)) == 2,
+		and int(ids.get("map", 0)) == 1 and int(ids.get("type", 0)) == 2
+		and int(ids.get("event", 0)) == 1,
 		str(ids)) and ok
 	var cases := [
 		["broken_unknown_field", "unknown field 'prise'"],
@@ -5108,6 +5139,7 @@ func _schematest() -> void:
 		["broken_unclaimed", "unclaimed file"],
 		["broken_newer_format", "supports format 1"],
 		["broken_id_mismatch", "does not match its filename"],
+		["broken_bad_command", "matches no anyOf branch"],
 	]
 	for c in cases:
 		var b: Dictionary = ProjectValidator.validate_project("res://core/fixtures/" + str(c[0]))
@@ -14842,6 +14874,83 @@ func _pcaccesstest() -> void:
 	print("[pcaccesstest] reds_item_pc=%s center_top=%s someones_pc=%s" % [reds_ok, top_ok, mon_ok])
 	print("[pcaccesstest] PASS=%s" % pass_all)
 	get_tree().quit()
+
+
+## gh #39 (ADR-019): the Event VM tracer. Proves the pipeline end-to-end on the real
+## project: the loader's boot refusals (unknown command / trigger kind / unparseable
+## condition each name the record), the generic EventMapScript serving BluesHouse (its
+## hand-written adapter is GONE), the `visible` query behind object_shown, and the
+## authored Daisy TOWN MAP beat — pre-dex line, the gift (+ flag + re-talk line), and
+## the full-bag refusal aborting the event with no flag set.
+## Run: `pwsh tools/run.ps1 -- --eventtest`. Headless.
+func _eventtest() -> void:
+	await get_tree().process_frame
+	var ok := true
+
+	# 1 — the loader refuses semantics this build lacks, naming the record
+	var vm := EventVM.new()
+	vm.main = self
+	var e := vm.load_all({"bad": {"trigger": {"kind": "interact", "map": "map:X", "object": "o"},
+		"commands": [{"cmd": "explode"}]}})
+	ok = _ev_check("loader refuses an unknown command", e.contains("unknown command 'explode'"), e) and ok
+	e = vm.load_all({"bad2": {"trigger": {"kind": "on_dance", "map": "map:X"}}})
+	ok = _ev_check("loader refuses an unknown trigger kind", e.contains("unknown trigger kind 'on_dance'"), e) and ok
+	e = vm.load_all({"bad3": {"trigger": {"kind": "visible", "map": "map:X", "object": "o",
+		"visible_when": "GOT_ +"}}})
+	ok = _ev_check("loader refuses an unparseable condition", e.contains("does not parse"), e) and ok
+
+	# 2 — the tracer map is served by the generic event adapter (its .gd is deleted)
+	ok = _ev_check("BluesHouse is served by EventMapScript",
+		map_script("BluesHouse") is EventAdapter) and ok
+
+	# 3 — the pre-dex line: no gift, no flag
+	story_events = {}
+	player_bag = {}
+	player_name = "RED"
+	rival_name = "BLUE"
+	load_world("BluesHouse")
+	player.place(Vector2i(2, 4))
+	player.facing = 1                                  # UP -> sitting Daisy at (2,3)
+	interact(player)
+	await _drive_until(func() -> bool: return not cutscene_active and modal == null, 600)
+	ok = _ev_check("pre-dex: no TOWN MAP, no flag",
+		not player_bag.has("TOWN MAP") and not has_event("GOT_TOWN_MAP")) and ok
+
+	# 4 — the gift: item + sfx + flag, then the re-talk line changes and gives nothing
+	story_events = {"GOT_POKEDEX": true}
+	interact(player)
+	await _drive_until(func() -> bool: return not cutscene_active and modal == null, 600)
+	ok = _ev_check("gift: TOWN MAP in the bag + GOT_TOWN_MAP set",
+		player_bag.has("TOWN MAP") and has_event("GOT_TOWN_MAP")) and ok
+	interact(player)
+	await _drive_until(func() -> bool: return not cutscene_active and modal == null, 600)
+	ok = _ev_check("re-talk: still exactly one TOWN MAP",
+		int(player_bag.get("TOWN MAP", 0)) == 1) and ok
+
+	# 5 — a full bag refuses the gift and ABORTS the event (no flag, faithful to _gift)
+	story_events = {"GOT_POKEDEX": true}
+	player_bag = {}
+	for i in BAG_CAPACITY:
+		player_bag["FILLER %d" % i] = 1
+	interact(player)
+	await _drive_until(func() -> bool: return not cutscene_active and modal == null, 600)
+	ok = _ev_check("full bag: refused, event aborted, no flag",
+		not player_bag.has("TOWN MAP") and not has_event("GOT_TOWN_MAP")) and ok
+
+	# 6 — the `visible` query drives object_shown on a fresh load
+	story_events = {"GOT_TOWN_MAP": true}
+	load_world("BluesHouse")
+	ok = _ev_check("visible_when: walking Daisy shown once GOT_TOWN_MAP",
+		not _npc_by_key("SPRITE_DAISY@2,3").shown and _npc_by_key("SPRITE_DAISY@6,4").shown) and ok
+
+	print("[eventtest] %s" % ("ALL GREEN" if ok else "FAIL"))
+	get_tree().quit(0 if ok else 1)
+
+
+func _ev_check(name: String, good: bool, detail := "") -> bool:
+	print("[eventtest] %s: %s%s" % [name, "PASS" if good else "FAIL",
+		"" if good or detail == "" else " — " + detail])
+	return good
 
 
 func _blueshousetest() -> void:

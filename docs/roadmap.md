@@ -93,6 +93,22 @@ commands only on a beat's demand; the extractor byte-copies authored events into
 strangler-fig with a tracer bullet. Sub-issues **gh #39–#43** (Core schemas + VM + dispatcher +
 tracer → adapter waves by mechanism family → Cutscene beats by questline → extractor emission +
 event lints → the phase gate).
+**Landed: gh #39** (2026-07-21): **the Event VM exists and the tracer bullet is through it** —
+`core/schemas/event.schema.json` (trigger + nested-block command grammar as anyOf branches,
+recursion via `$defs`; `data/events/*.json` joins the format-1 layout, additive), `EventVM`
+(load-time compilation: unknown trigger kinds/commands and unparseable conditions refuse at
+BOOT naming the record; FormulaExpr is the condition language, bare identifiers reading story
+flags + the new saved `event_vars` store), and the generic `EventMapScript` adapter that
+`map_script()` serves for event-carrying maps — Main's eight hook touchpoints unchanged, so
+the map-scripts.md ordering rules hold by construction. The tracer: **BluesHouse.gd is
+deleted**; Daisy's TOWN MAP beat + both `visible` toggles are authored records in
+`game/events/`, byte-copied into the project by the extractor (identity: **15 parts** now).
+Gate: the new `--eventtest` ALL GREEN (boot refusals, the gift flow incl. the full-bag abort,
+the `visible` query), `--blueshousetest`/`--townmaptest`/`--selftest` green through the
+generic adapter, `--schematest` grew event fixtures (valid + `broken_bad_command`),
+`--validate` 0 errors (1284 files, 3 event ids), double extraction byte-identical, and all
+four `--battledettest` md5s **byte-identical to the Phase-2 baseline** (f426d037 / bd9ec91d /
+36c598d7 / 25fcd316). Next: **wave B (gh #40)** — the adapter migration.
 **Landed: gh #34** (2026-07-20): Catch + Progression are behind the seam and the
 **config-first knobs are real** — `Gen1Catch` (`attempt` over the byte-exact kernel + the
 safari `bait_rate`/`rock_rate` transitions, which moved out of the host's input handler),

@@ -1,0 +1,10 @@
+{
+ "$comment": "scripts/BluesHouse.asm toggleable_objects — only one Daisy at a time: sitting at the table until the TOWN MAP is given away.",
+ "id": "event:blues_house_daisy_sitting",
+ "trigger": {
+  "kind": "visible",
+  "map": "map:BluesHouse",
+  "object": "SPRITE_DAISY@2,3",
+  "visible_when": "not GOT_TOWN_MAP"
+ }
+}

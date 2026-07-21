@@ -1,0 +1,59 @@
+{
+ "$comment": "scripts/BluesHouse.asm — Daisy hands over the TOWN MAP (the gh #39 tracer bullet: the first Kanto beat authored as an event; text verbatim from the retired Cutscene.daisy_town_map).",
+ "id": "event:blues_house_daisy",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:BluesHouse",
+  "object": "SPRITE_DAISY@2,3"
+ },
+ "commands": [
+  {
+   "cmd": "if",
+   "cond": "GOT_TOWN_MAP",
+   "then": [
+    {
+     "cmd": "say",
+     "text": "Use the TOWN MAP\nto find out where\nyou are."
+    }
+   ],
+   "else": [
+    {
+     "cmd": "if",
+     "cond": "not GOT_POKEDEX",
+     "then": [
+      {
+       "cmd": "say",
+       "text": "Hi {player}!\n{rival} is out at\nGrandpa's lab."
+      }
+     ],
+     "else": [
+      {
+       "cmd": "say",
+       "text": "Grandpa asked you\nto run an errand?\nHere, this will\nhelp you!"
+      },
+      {
+       "cmd": "give_item",
+       "item": "item:town_map"
+      },
+      {
+       "cmd": "sfx",
+       "key": "get_item1"
+      },
+      {
+       "cmd": "say",
+       "text": "{player} got the\nTOWN MAP!"
+      },
+      {
+       "cmd": "set_flag",
+       "flag": "GOT_TOWN_MAP"
+      },
+      {
+       "cmd": "say",
+       "text": "Use the TOWN MAP\nto find out where\nyou are."
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

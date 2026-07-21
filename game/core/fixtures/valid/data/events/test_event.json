@@ -1,0 +1,42 @@
+{
+ "id": "event:test_event",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:TestTown",
+  "object": "SPRITE_TESTER@1,1"
+ },
+ "commands": [
+  {
+   "cmd": "if",
+   "cond": "not TEST_FLAG",
+   "then": [
+    {
+     "cmd": "say",
+     "text": "Hello {player}!"
+    },
+    {
+     "cmd": "give_item",
+     "item": "item:potion"
+    },
+    {
+     "cmd": "sfx",
+     "key": "get_item1"
+    },
+    {
+     "cmd": "set_flag",
+     "flag": "TEST_FLAG"
+    }
+   ],
+   "else": [
+    {
+     "cmd": "say",
+     "text": "Again?"
+    },
+    {
+     "cmd": "clear_flag",
+     "flag": "TEST_FLAG"
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,165 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "schema:event",
+ "$comment": "An authored event record (ADR-019, gh #39): a declarative trigger + a nested-block command list. The trigger-kind and command enums are extended wave by wave — each kind/command lands with the Kanto beat that demands it (ADR-019 §6), and the runtime VM refuses at boot any kind, command, or condition it cannot execute, so this schema and the interpreter move together. `visible` triggers are load-time QUERIES (visible_when decides a map object's visibility), never command runs. Conditions (`visible_when`, `if.cond`) are FormulaExpr strings whose bare identifiers read story flags (1/0) and event vars. `say` text may hold {player}/{rival} placeholders; \\n is a line break, \\f a page break, as v1's text engine reads them.",
+ "type": "object",
+ "required": [
+  "id",
+  "trigger"
+ ],
+ "properties": {
+  "$comment": {
+   "type": "string"
+  },
+  "id": {
+   "type": "string",
+   "pattern": "^event:[a-z0-9_]+$"
+  },
+  "trigger": {
+   "type": "object",
+   "required": [
+    "kind",
+    "map"
+   ],
+   "properties": {
+    "kind": {
+     "enum": [
+      "interact",
+      "visible"
+     ]
+    },
+    "map": {
+     "type": "string",
+     "x-ref": "map"
+    },
+    "object": {
+     "type": "string"
+    },
+    "visible_when": {
+     "type": "string"
+    }
+   },
+   "additionalProperties": false
+  },
+  "commands": {
+   "$ref": "#/$defs/block"
+  },
+  "custom": {
+   "type": "object"
+  }
+ },
+ "additionalProperties": false,
+ "$defs": {
+  "block": {
+   "type": "array",
+   "items": {
+    "anyOf": [
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "text"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "say"
+       },
+       "text": {
+        "type": "string"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "cond",
+       "then"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "if"
+       },
+       "cond": {
+        "type": "string"
+       },
+       "then": {
+        "$ref": "#/$defs/block"
+       },
+       "else": {
+        "$ref": "#/$defs/block"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "item"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "give_item"
+       },
+       "item": {
+        "type": "string",
+        "x-ref": "item"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "flag"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "set_flag"
+       },
+       "flag": {
+        "type": "string"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "flag"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "clear_flag"
+       },
+       "flag": {
+        "type": "string"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "key"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "sfx"
+       },
+       "key": {
+        "type": "string"
+       }
+      },
+      "additionalProperties": false
+     }
+    ]
+   }
+  }
+ }
+}

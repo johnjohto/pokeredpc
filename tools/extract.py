@@ -2385,6 +2385,15 @@ def build_project():
     if extra_cries:
         _pj_write("presentation/cries_extra.json", extra_cries)
 
+    # authored events (ADR-019 d7, gh #39): events cannot be extracted from the asm —
+    # they are authored in-repo (game/events/) and byte-copied into the project, the
+    # same pattern as the interim maps. One tool, no second path.
+    events_src = ROOT / "game" / "events"
+    if events_src.is_dir():
+        (PROJ / "data" / "events").mkdir(parents=True, exist_ok=True)
+        for f in sorted(events_src.glob("*.json")):
+            shutil.copyfile(f, PROJ / "data" / "events" / f.name)
+
     # interim maps + presentation blobs: verbatim byte-copies (deterministic, and the
     # map shape is explicitly the v1 interim format per ADR-017 d5)
     for f in sorted((OUT / "maps").glob("*.json")):
@@ -2428,7 +2437,9 @@ def build_project():
         rel = f.relative_to(PROJ).as_posix()
         if rel == "manifest.json":
             continue
-        if rel.startswith("data/species/"):
+        if rel.startswith("data/events/"):
+            g = "events"
+        elif rel.startswith("data/species/"):
             g = "species"
         elif rel.startswith("data/moves/"):
             g = "moves"

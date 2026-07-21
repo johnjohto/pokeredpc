@@ -30,6 +30,16 @@ project/
     marts.json           table — map ref -> item list
     hidden_items.json    table — map ref -> placements
     trades.json          table — the in-game trades
+    events/<key>.json    one record per file  (id: "event:<key>") — an AUTHORED
+                         event (ADR-019, gh #39): a declarative trigger {kind, map,
+                         object|cell, …} + a nested-block command list; `visible`
+                         triggers carry `visible_when` (a FormulaExpr over story
+                         flags/vars) and are load-time queries, never command runs.
+                         Authored in-repo (game/events/), byte-copied in by the
+                         extractor — events cannot be extracted from the asm. The
+                         trigger-kind and command enums grow wave by wave with the
+                         beats that demand them; the runtime VM refuses at boot any
+                         record it cannot execute (see event.schema.json)
     ruleset.json         table — the ruleset config record (ADR-018 §4, gh #34):
                          {base, config} — base must match the manifest's ruleset;
                          config carries ONLY knobs that were already data (badge

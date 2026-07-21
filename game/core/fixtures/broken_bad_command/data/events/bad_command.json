@@ -1,0 +1,14 @@
+{
+ "id": "event:bad_command",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:TestTown",
+  "object": "SPRITE_TESTER@1,1"
+ },
+ "commands": [
+  {
+   "cmd": "explode",
+   "text": "not a command"
+  }
+ ]
+}

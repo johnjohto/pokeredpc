@@ -57,6 +57,15 @@ static func ruleset_config() -> Dictionary:
 	return rc if rc is Dictionary else {}
 
 
+static func events() -> Dictionary:
+	## The authored event records (ADR-019, gh #39): data/events/*.json as
+	## {basename: record}. A project with no events dir is simply event-free — older
+	## projects stay loadable (additive under format 1), so no error on absence.
+	if not DirAccess.dir_exists_absolute(dir.path_join("data/events")):
+		return {}
+	return _read_records("data/events")
+
+
 static func map_exists(label: String) -> bool:
 	return FileAccess.file_exists(dir.path_join("maps/%s.json" % label))
 
