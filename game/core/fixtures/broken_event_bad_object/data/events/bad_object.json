@@ -1,0 +1,9 @@
+{
+ "id": "event:bad_object",
+ "trigger": {
+  "kind": "visible",
+  "map": "map:TestTown",
+  "object": "SPRITE_GHOST@0,0",
+  "visible_when": "1"
+ }
+}

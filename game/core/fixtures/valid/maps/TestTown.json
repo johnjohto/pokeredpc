@@ -17,5 +17,11 @@
  "warps": [],
  "connections": [],
  "bg_events": [],
- "object_events": []
+ "object_events": [
+  {
+   "x": 1,
+   "y": 1,
+   "sprite": "SPRITE_TESTER"
+  }
+ ]
 }

@@ -37,19 +37,19 @@ TILESETS = os.path.join(ROOT, "game", "assets", "tilesets")
 # Reviewed hits: "<Map>:<sprite_x>,<sprite_y>" -> why it is not a bug.
 EXPECTED = {
     "GameCorner:9,5":
-        "gh #89: the ROCKET is the poster's door; GameCorner.gd hides him once beaten",
+        "gh #89: the ROCKET is the poster's door; the game_corner event records hide him once beaten",
     "SaffronCity:18,22":
-        "gh #79: ROCKET8 is Silph Co's door; the Pokemon Tower rescue clears him",
+        "gh #79: ROCKET8 is Silph Co's door; the saffron visible records clear him on the Tower rescue",
     "SaffronCity:34,4":
-        "gh #79: ROCKET3 is Saffron Gym's door; beating Silph Co's Giovanni clears him",
+        "gh #79: ROCKET3 is Saffron Gym's door; the saffron records clear every grunt on Giovanni",
     "PokemonTower6F:6,8":
         "the RARE CANDY ball is the passage's door -- taking it is the key (faithful to pokered)",
     "CeruleanCity:27,12":
-        "GUARD2 blocks the trashed house until GOT_SS_TICKET (BillsHouse.asm hides him)",
+        "GUARD2 blocks the trashed house until GOT_SS_TICKET (the cerulean guard-swap records)",
     "CeruleanCity:4,12":
-        "gh #90: SUPER_NERD3 is Cerulean Cave's door; HallOfFame.asm hides him once CHAMPION",
+        "gh #90: SUPER_NERD3 is Cerulean Cave's door; hidden once CHAMPION (cerulean_cave_guy_shown)",
     "SaffronCity:7,6":
-        "a takeover ROCKET on Copycat's door; SaffronCity.gd clears every grunt on Giovanni",
+        "a takeover ROCKET on Copycat's door; the saffron records clear every grunt on Giovanni",
     "SaffronCity:13,12":
         "a takeover ROCKET on the Pidgey house door; cleared with the rest on Giovanni",
     "WardensHouse:8,4":
@@ -74,6 +74,44 @@ EXPECTED = {
     "VictoryRoad2F:5,5": "a STRENGTH boulder; shoving it onto the floor switch is the puzzle",
     "VictoryRoad3F:24,10": "the other STRENGTH boulder",
 }
+
+# gh #42 (ADR-019): reviewed blockers whose "door opens" claim rests on AUTHORED EVENTS,
+# not engine code -- a deleted or mistyped record would seal the game as silently as dead
+# code once did (gh #79/#89/#90 were exactly this shape). For each, some record in
+# game/events/ must reference BOTH the map and the object; the audit gates on it.
+EVENT_BACKED = {
+    "GameCorner:9,5": "SPRITE_ROCKET@9,5",
+    "SaffronCity:18,22": "SPRITE_ROCKET@18,22",
+    "SaffronCity:34,4": "SPRITE_ROCKET@34,4",
+    "SaffronCity:7,6": "SPRITE_ROCKET@7,6",
+    "SaffronCity:13,12": "SPRITE_ROCKET@13,12",
+    "CeruleanCity:27,12": "SPRITE_GUARD@27,12",
+    "CeruleanCity:4,12": "SPRITE_SUPER_NERD@4,12",
+    "MtMoonB2F:12,6": "SPRITE_FOSSIL@12,6",
+    "MtMoonB2F:13,6": "SPRITE_FOSSIL@13,6",
+}
+
+EVENTS_DIR = os.path.join(ROOT, "game", "events")
+
+
+def verify_event_doors():
+    """Each EVENT_BACKED blocker must be named (map + object) by some authored record."""
+    texts = {}
+    if os.path.isdir(EVENTS_DIR):
+        for fn in sorted(os.listdir(EVENTS_DIR)):
+            if fn.endswith(".json"):
+                with open(os.path.join(EVENTS_DIR, fn), encoding="utf-8") as f:
+                    texts[fn] = f.read()
+    missing = []
+    for key, obj in EVENT_BACKED.items():
+        label = key.split(":")[0]
+        if not any('"map:%s"' % label in t and obj in t for t in texts.values()):
+            missing.append((key, obj))
+    print("event-backed doors verified: %d/%d" % (len(EVENT_BACKED) - len(missing), len(EVENT_BACKED)))
+    for key, obj in missing:
+        print("  %-22s no authored record names %s -- the door may never open" % (key, obj))
+    return missing
+
 
 _cache = {}
 
@@ -214,7 +252,8 @@ def main():
     if show_all and silenced:
         print("\nreviewed / expected (%d):" % len(silenced))
         show(silenced)
-    return 1 if hits else 0
+    unbacked = verify_event_doors()
+    return 1 if hits or unbacked else 0
 
 
 if __name__ == "__main__":

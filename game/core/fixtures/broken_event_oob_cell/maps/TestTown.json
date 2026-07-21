@@ -3,25 +3,10 @@
  "tileset": "overworld",
  "width": 2,
  "height": 2,
- "blocks": [
-  [
-   0,
-   0
-  ],
-  [
-   0,
-   0
-  ]
- ],
+ "blocks": [[0, 0], [0, 0]],
  "border_block": 0,
  "warps": [],
  "connections": [],
  "bg_events": [],
- "object_events": [
-  {
-   "x": 1,
-   "y": 1,
-   "sprite": "SPRITE_TESTER"
-  }
- ]
+ "object_events": []
 }

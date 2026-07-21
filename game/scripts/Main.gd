@@ -5181,6 +5181,8 @@ func _schematest() -> void:
 		["broken_newer_format", "supports format 1"],
 		["broken_id_mismatch", "does not match its filename"],
 		["broken_bad_command", "matches no anyOf branch"],
+		["broken_event_bad_object", "names object 'SPRITE_GHOST@0,0', which is not on map"],
+		["broken_event_oob_cell", "cell (9,9) is outside map"],
 	]
 	for c in cases:
 		var b: Dictionary = ProjectValidator.validate_project("res://core/fixtures/" + str(c[0]))

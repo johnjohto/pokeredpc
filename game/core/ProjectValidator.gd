@@ -17,6 +17,9 @@ class_name ProjectValidator
 ##    declares `type:` ids this way).
 ##  - after the walk, every `x-ref`/`x-ref-keys` reference must resolve to a
 ##    registered id ("dangling reference" errors name the ref and its file).
+##  - event records (gh #42, ADR-019): every object a trigger or command names must
+##    exist on the record's map, and every declared cell/region must lie inside it —
+##    a dangling trigger seals a path as silently as dead code would.
 
 const SUPPORTED_FORMAT := 1
 const SCHEMA_DIR := "res://core/schemas/"
@@ -41,6 +44,7 @@ static func validate_project(dir: String) -> Dictionary:
 	var files := _walk(dir, "")
 	var ids := {}                       # prefix -> {full_id: true}
 	var refs: Array = []                # {prefix, value, path(file-qualified)}
+	var events: Array = []              # event records, for the semantic pass (gh #42)
 
 	# The manifest gates everything: read it first so a format refusal leads the report.
 	if files.has("manifest.json"):
@@ -80,8 +84,12 @@ static func validate_project(dir: String) -> Dictionary:
 				"path": "%s: %s" % [rel, r["path"]]})
 		if kind == "record" and inst is Dictionary:
 			_register_record(entry, rel, inst, ids, errors)
+			if str(entry.get("id_prefix", "")) == "event":
+				events.append({"rel": rel, "inst": inst})
 		if kind == "table" and entry.has("declares") and inst is Dictionary:
 			_register_declared(entry["declares"], inst, ids)
+
+	_check_events(dir, events, errors)
 
 	for r in refs:
 		var prefix := str(r["prefix"])
@@ -94,6 +102,83 @@ static func validate_project(dir: String) -> Dictionary:
 	for prefix in ids:
 		counts[prefix] = (ids[prefix] as Dictionary).size()
 	return {"ok": errors.is_empty(), "errors": errors, "files": files.size(), "ids": counts}
+
+
+# ---- event semantics (gh #42, ADR-019 consequences) ---------------------------------
+
+## Commands that name a map object.
+const _OBJECT_CMDS := ["trainer_battle", "set_npc_text", "hide_object", "show_object"]
+
+
+## Every object an event names must exist on its map; every cell must lie inside it.
+static func _check_events(dir: String, events: Array, errors: Array) -> void:
+	var maps := {}                      # label -> {objects, w, h} or null (missing)
+	for ev in events:
+		var rel: String = ev["rel"]
+		var inst: Dictionary = ev["inst"]
+		var t: Dictionary = inst.get("trigger", {})
+		var label := _bare_id(str(t.get("map", "")))
+		var m = _map_info(dir, label, maps)
+		if m == null:
+			continue                    # the x-ref pass reports the dangling map itself
+		var objs: Array = []
+		if t.has("object"):
+			objs.append(str(t["object"]))
+		_collect_cmd_objects(inst.get("commands", []), objs)
+		for o in objs:
+			if not (m["objects"] as Dictionary).has(str(o)):
+				errors.append("%s — names object '%s', which is not on map '%s'" % [rel, o, label])
+		var cw: int = int(m["w"]) * 2
+		var ch: int = int(m["h"]) * 2
+		for c in t.get("cells", []) + t.get("front", []) + t.get("at", []):
+			if int(c[0]) < 0 or int(c[1]) < 0 or int(c[0]) >= cw or int(c[1]) >= ch:
+				errors.append("%s — cell (%d,%d) is outside map '%s' (%dx%d cells)"
+					% [rel, int(c[0]), int(c[1]), label, cw, ch])
+		if t.has("region"):
+			var rg: Array = t["region"]
+			if rg.size() == 4 and (int(rg[0]) < 0 or int(rg[1]) < 0
+					or int(rg[2]) >= cw or int(rg[3]) >= ch):
+				errors.append("%s — region %s exceeds map '%s' (%dx%d cells)"
+					% [rel, str(rg), label, cw, ch])
+
+
+static func _collect_cmd_objects(cmds, objs: Array) -> void:
+	if not (cmds is Array):
+		return
+	for c in cmds:
+		if not (c is Dictionary):
+			continue
+		if _OBJECT_CMDS.has(str(c.get("cmd", ""))) and c.has("object"):
+			objs.append(str(c["object"]))
+		if str(c.get("cmd", "")) == "if":
+			_collect_cmd_objects(c.get("then", []), objs)
+			_collect_cmd_objects(c.get("else", []), objs)
+
+
+## The map's object keys + cell dimensions, cached; null when the map file is absent.
+static func _map_info(dir: String, label: String, cache: Dictionary):
+	if cache.has(label):
+		return cache[label]
+	var path := dir.path_join("maps/%s.json" % label)
+	if not FileAccess.file_exists(path):
+		cache[label] = null
+		return null
+	var errs: Array = []
+	var m = _load_json_file(path, errs)
+	if not errs.is_empty() or not (m is Dictionary):
+		cache[label] = null
+		return null
+	var objects := {}
+	for o in m.get("object_events", []):
+		if o is Dictionary:
+			objects["%s@%d,%d" % [str(o.get("sprite", "")), int(o.get("x", -1)), int(o.get("y", -1))]] = true
+	var info := {"objects": objects, "w": int(m.get("width", 0)), "h": int(m.get("height", 0))}
+	cache[label] = info
+	return info
+
+
+static func _bare_id(id: String) -> String:
+	return id.substr(id.find(":") + 1)
 
 
 static func _register_record(entry: Dictionary, rel: String, inst: Dictionary,

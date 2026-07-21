@@ -1,0 +1,9 @@
+{
+ "id": "event:oob_cell",
+ "trigger": {
+  "kind": "step",
+  "map": "map:TestTown",
+  "cells": [[9, 9]]
+ },
+ "commands": []
+}
