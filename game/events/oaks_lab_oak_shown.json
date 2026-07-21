@@ -1,0 +1,10 @@
+{
+ "$comment": "scripts/OaksLab.asm — front Oak (the choose-mon host) appears once he has led you into the lab.",
+ "id": "event:oaks_lab_oak_shown",
+ "trigger": {
+  "kind": "visible",
+  "map": "map:OaksLab",
+  "object": "SPRITE_OAK@5,2",
+  "visible_when": "FOLLOWED_OAK_INTO_LAB"
+ }
+}

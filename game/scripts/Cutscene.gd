@@ -622,6 +622,27 @@ func choose_starter(ball) -> bool:
 	return true
 
 
+## Oak's dex-rating chat (OaksLabOak1Text .HowIsYourPokedexComingText): the preamble ends in
+## `prompt` and the rating prints straight after it — one flowing text (the beat form of the
+## retired OaksLab adapter's call; the rating itself stays on Main).
+func oak_dex_rating() -> void:
+	main.oaks_dex_rating("OAK: Good to see\nyou! How is your\nPOKéDEX coming?\nHere, let me take\na look!\f")
+
+
+## .give_poke_balls — 5 POKé BALLs once (EVENT_GOT_POKEBALLS_FROM_OAK), the get-key-item
+## fanfare on the "got" line, then the catching explanation (moved verbatim from the retired
+## OaksLab adapter; the record sets the flag before invoking, matching the adapter's order).
+func oak_give_balls() -> void:
+	main.cutscene_active = true
+	await say("OAK: You can't get\ndetailed data on\nPOKéMON by just\nseeing them.\fYou must catch\nthem! Use these\nto capture wild\nPOKéMON.")
+	main.add_item("POKé BALL", 5)
+	if main.audio:
+		main.audio.play_sfx("get_key_item")
+	await say("%s got 5\nPOKé BALLs!" % main.player_name)
+	await say("When a wild\nPOKéMON appears,\nit's fair game.\fJust throw a POKé\nBALL at it and try\nto catch it!\fThis won't always\nwork, though.\fA healthy POKéMON\ncould escape. You\nhave to be lucky!")
+	main.cutscene_active = false
+
+
 # Player starter -> [rival species, "RIVAL DISPLAY", rival's ball key, OPP_RIVAL1 party number].
 # The rival always takes the type-advantage counterpart (scripts/OaksLab.asm).
 const _RIVAL_PICK := {

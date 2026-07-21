@@ -1,0 +1,10 @@
+{
+ "$comment": "scripts/OaksLab.asm — the rival stands by the table until he storms out after the first battle.",
+ "id": "event:oaks_lab_rival_shown",
+ "trigger": {
+  "kind": "visible",
+  "map": "map:OaksLab",
+  "object": "SPRITE_BLUE@4,3",
+  "visible_when": "not RIVAL_LEFT_LAB"
+ }
+}

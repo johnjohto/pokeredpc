@@ -1,0 +1,13 @@
+{
+ "$comment": "scripts/OaksLab.asm OaksLabRivalChallengesPlayerScript — heading for the exit (YCoord == 6) with a starter but before the first rival battle: the rival's challenge.",
+ "id": "event:oaks_lab_rival_challenge",
+ "trigger": {
+  "kind": "step",
+  "map": "map:OaksLab",
+  "region": [0, 6, 9, 6],
+  "when": "GOT_STARTER and not BEAT_RIVAL1"
+ },
+ "commands": [
+  {"cmd": "beat", "name": "rival_challenge"}
+ ]
+}

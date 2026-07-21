@@ -582,6 +582,11 @@ func _ident_value(ident: String, label: String):
 	if ident == "dex_owned":
 		main._sync_owned()
 		return main.pokedex_owned.size()
+	if ident.begins_with("player_starter_"):
+		# Starter identity (OaksLab's untaken-ball rule): which species the player picked.
+		return 1 if str(main.player_starter) == ident.substr(15) else 0
+	if ident.begins_with("rival_starter_"):
+		return 1 if str(main.rival_starter) == ident.substr(14) else 0
 	if ident.begins_with("defeated_"):
 		var parts := ident.substr(9).split("_")
 		if parts.size() == 2:

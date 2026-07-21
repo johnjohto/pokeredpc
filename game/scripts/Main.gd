@@ -9282,7 +9282,7 @@ func _oaktest() -> void:
 		# Lab choose-mon speech done -> snapshot the lab, then pick SQUIRTLE.
 		if not picked and has_event("OAK_ASKED_TO_CHOOSE_MON") and not cutscene_active \
 				and modal == null:
-			oak_before = map_script("OaksLab")._oak_text()
+			oak_before = _oak_line_preview()
 			await RenderingServer.frame_post_draw
 			get_viewport().get_texture().get_image().save_png("res://oak_choosemon.png")
 			inlab_shot = true
@@ -9291,7 +9291,7 @@ func _oaktest() -> void:
 		# Starter taken, control returned -> verify no immediate battle, then head to the exit (Y==6).
 		if picked and not challenged and has_event("GOT_STARTER") and not cutscene_active \
 				and modal == null:
-			oak_after_starter = map_script("OaksLab")._oak_text()
+			oak_after_starter = _oak_line_preview()
 			print("[oaktest] after pick: battle_now=%s (expect false), heading to exit..." % (modal == battle))
 			player.place(Vector2i(5, 6))
 			_on_player_moved(Vector2i(5, 6))       # crossing Y==6 triggers the rival challenge
@@ -9309,8 +9309,31 @@ func _oaktest() -> void:
 		has_event("BEAT_RIVAL1"), pmon, inlab_shot])
 	print("[oaktest] oak text: before='%s' after_starter='%s' after_rival='%s'" % [
 		oak_before.replace("\n", " "), oak_after_starter.replace("\n", " "),
-		map_script("OaksLab")._oak_text().replace("\n", " ")])
+		_oak_line_preview().replace("\n", " ")])
 	get_tree().quit()
+
+
+## The line Oak's interact record would open with — a pure preview for the test harnesses
+## (--oaktest/--parceltest log it). OaksLab is authored events now; keep this branch order in
+## sync with events/oaks_lab_oak.json (which mirrors OaksLabOak1Text).
+func _oak_line_preview() -> String:
+	_sync_owned()
+	if has_event("PALLET_AFTER_GETTING_POKEBALLS") \
+			or (pokedex_owned.size() >= 2 and has_event("GOT_POKEDEX")):
+		return "OAK: Good to see\nyou! How is your\nPOKéDEX coming?\nHere, let me take\na look!"
+	if int(player_bag.get("POKé BALL", 0)) > 0:
+		return "OAK: Come see me\nsometimes.\fI want to know how\nyour POKéDEX is\ncoming along."
+	if has_event("BEAT_ROUTE22_RIVAL_1"):
+		if has_event("GOT_POKEBALLS_FROM_OAK"):
+			return "OAK: Come see me\nsometimes.\fI want to know how\nyour POKéDEX is\ncoming along."
+		return "OAK: You can't get\ndetailed data on\nPOKéMON by just\nseeing them."
+	if has_event("GOT_POKEDEX"):
+		return "POKéMON around the\nworld wait for\nyou, %s!" % player_name
+	if has_event("BEAT_RIVAL1"):
+		return "OAK: %s,\nraise your young\nPOKéMON by making\nit fight!" % player_name
+	if has_event("GOT_STARTER"):
+		return "OAK: If a wild\nPOKéMON appears,\nyour POKéMON can\nfight against it!"
+	return "OAK: Now, %s,\nwhich POKéMON do\nyou want?" % player_name
 
 
 ## Legit-play run — Stage 1 of the 1.0 sign-off (gh #76, ADR-011). Increment 1: drive the *seeded*
@@ -14403,7 +14426,7 @@ func _parceltest() -> void:
 		has_event("OAK_GOT_PARCEL"), has_event("GOT_POKEDEX"), has_event("RIVAL_GOT_POKEDEX"),
 		not player_bag.has("OAK's PARCEL"), dex_on_shelf,
 		dex1 != null and not dex1.shown, rival != null and not rival.shown])
-	print("[parceltest] oak line now: '%s'" % map_script("OaksLab")._oak_text().replace("\n", " "))
+	print("[parceltest] oak line now: '%s'" % _oak_line_preview().replace("\n", " "))
 
 	# Phase 3: with the Pokédex, the Viridian gate lets the player through.
 	load_world("ViridianCity")

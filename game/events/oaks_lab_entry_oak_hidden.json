@@ -1,0 +1,10 @@
+{
+ "$comment": "scripts/OaksLab.asm — the entry Oak (near the door) exists only for the intercept cutscene, which shows him itself; the map never draws him.",
+ "id": "event:oaks_lab_entry_oak_hidden",
+ "trigger": {
+  "kind": "visible",
+  "map": "map:OaksLab",
+  "object": "SPRITE_OAK@5,10",
+  "visible_when": "0"
+ }
+}

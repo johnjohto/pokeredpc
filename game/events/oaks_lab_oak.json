@@ -1,0 +1,85 @@
+{
+ "$comment": "scripts/OaksLab.asm — Oak himself: parcel delivery first (-> the Pokédex beat), else OaksLabOak1Text's exact branch order — the dex rating once the collection is going (PALLET_AFTER_GETTING_POKEBALLS, or >=2 owned with the dex), then, only with NO POKé BALLs in the bag, the one-time 5-ball gift after the Route 22 rival (.give_poke_balls; the flag sets before the beat, matching the retired adapter's order), else the story-progress lines.",
+ "id": "event:oaks_lab_oak",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:OaksLab",
+  "object": "SPRITE_OAK@5,2"
+ },
+ "commands": [
+  {
+   "cmd": "if",
+   "cond": "GOT_OAKS_PARCEL and not OAK_GOT_PARCEL",
+   "then": [
+    {"cmd": "beat", "name": "deliver_parcel"}
+   ],
+   "else": [
+    {
+     "cmd": "if",
+     "cond": "PALLET_AFTER_GETTING_POKEBALLS or (dex_owned >= 2 and GOT_POKEDEX)",
+     "then": [
+      {"cmd": "beat", "name": "oak_dex_rating"}
+     ],
+     "else": [
+      {
+       "cmd": "if",
+       "cond": "item_poke_ball > 0",
+       "then": [
+        {"cmd": "notice", "text": "OAK: Come see me\nsometimes.\fI want to know how\nyour POKéDEX is\ncoming along."}
+       ],
+       "else": [
+        {
+         "cmd": "if",
+         "cond": "BEAT_ROUTE22_RIVAL_1",
+         "then": [
+          {
+           "cmd": "if",
+           "cond": "GOT_POKEBALLS_FROM_OAK",
+           "then": [
+            {"cmd": "notice", "text": "OAK: Come see me\nsometimes.\fI want to know how\nyour POKéDEX is\ncoming along."}
+           ],
+           "else": [
+            {"cmd": "set_flag", "flag": "GOT_POKEBALLS_FROM_OAK"},
+            {"cmd": "beat", "name": "oak_give_balls"}
+           ]
+          }
+         ],
+         "else": [
+          {
+           "cmd": "if",
+           "cond": "GOT_POKEDEX",
+           "then": [
+            {"cmd": "notice", "text": "POKéMON around the\nworld wait for\nyou, {player}!"}
+           ],
+           "else": [
+            {
+             "cmd": "if",
+             "cond": "BEAT_RIVAL1",
+             "then": [
+              {"cmd": "notice", "text": "OAK: {player},\nraise your young\nPOKéMON by making\nit fight!"}
+             ],
+             "else": [
+              {
+               "cmd": "if",
+               "cond": "GOT_STARTER",
+               "then": [
+                {"cmd": "notice", "text": "OAK: If a wild\nPOKéMON appears,\nyour POKéMON can\nfight against it!"}
+               ],
+               "else": [
+                {"cmd": "notice", "text": "OAK: Now, {player},\nwhich POKéMON do\nyou want?"}
+               ]
+              }
+             ]
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

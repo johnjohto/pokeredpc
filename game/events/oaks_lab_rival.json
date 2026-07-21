@@ -1,0 +1,30 @@
+{
+ "$comment": "scripts/OaksLab.asm OaksLabRivalText — the rival's line: before Oak's speech / before & after picking a starter. His battle is positional (the rival_challenge step record).",
+ "id": "event:oaks_lab_rival",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:OaksLab",
+  "object": "SPRITE_BLUE@4,3"
+ },
+ "commands": [
+  {
+   "cmd": "if",
+   "cond": "not FOLLOWED_OAK_INTO_LAB_2",
+   "then": [
+    {"cmd": "notice", "text": "{rival}: Yo\n{player}! Gramps\nisn't around!"}
+   ],
+   "else": [
+    {
+     "cmd": "if",
+     "cond": "not GOT_STARTER",
+     "then": [
+      {"cmd": "notice", "text": "{rival}: Heh, I\ndon't need to be\ngreedy like you!\fGo ahead and\nchoose, {player}!"}
+     ],
+     "else": [
+      {"cmd": "notice", "text": "{rival}: My\nPOKéMON looks a\nlot stronger."}
+     ]
+    }
+   ]
+  }
+ ]
+}

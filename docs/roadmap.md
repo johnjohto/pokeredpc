@@ -111,8 +111,21 @@ four `--battledettest` md5s **byte-identical to the Phase-2 baseline** (f426d037
 36c598d7 / 25fcd316 — but see gh #44: on the wave-B machine the same commit reproduces
 018610cf / bd9ec91d / 86180e61 / 25fcd316, stable and replay-identical; wave B gates against
 that locally reproduced baseline).
-**In progress: wave B (gh #40)** — the adapter migration, nine family waves landed 2026-07-21
-(**97 of the 98 adapter files deleted; only OaksLab.gd remains**): the trigger grammar grew `enter` / `step`
+**Wave B COMPLETE (gh #40, closed 2026-07-21)** — the adapter migration, ten family waves
+(**all 98 adapter files deleted; `scripts/maps/` is empty — the whole overworld is authored
+events**). B10 was OaksLab, the last one (same session as the gh #45 fix, which unblocked it):
+15 records — the two row-6 step regions (don't-go-away / the rival challenge), the three
+starter-ball interacts (`choose_starter` via the `@npc` beat arg), Oak's full OaksLabOak1Text
+branch tree (parcel → dex rating → the one-time 5-ball gift → the story lines), the rival's
+lines, and seven visibles incl. the untaken-ball rule via the new
+`player_starter_<id>`/`rival_starter_<id>` condition identifiers; `oak_dex_rating` +
+`oak_give_balls` moved into Cutscene (the award_diploma precedent); the harnesses' _oak_text
+dependency became Main._oak_line_preview. Gate: `--eventtest` ALL GREEN, `--validate` 0 errors
+(275 events, semantics pass), `--parceltest` green, `--oaktest` completes END TO END windowed
+(its rival-challenge hang fell to the gh #45 wipe-gap fix), the four `--battledettest` md5s
+unchanged, double extraction byte-identical (1557 files), and a fresh `--playthrough --seed 1`
+NEW GAME → HALL OF FAME **GATE GREEN** through the event-driven lab.
+The waves as landed: nine family waves first — the trigger grammar grew `enter` / `step`
 ((map, cell)-indexed, `when` gates, non-consuming pokes, regions) / `battle_end` / front-cell
 + facing interacts, and the command library grew exactly what each family demanded
 (`set_last_map`, `mount_bike`/`set_force_bike`, `beat` — the strangler-fig call into a native
@@ -161,15 +174,15 @@ native modal), `club_enter`/`club_leave` (the Cable Club room pair's doormat row
 RAM-like state, the `--surgetest` harness rewired). A real VM bug was caught by
 `--fossilguardtest`: an UNAWAITED async native inside run() (trainer_battle, fall_hole) let
 the wrapper's cutscene_active restore trample the beat's own flag on the same frame — both
-are awaited now. Remaining for wave B: **OaksLab.gd alone** (blocked on the gh #45
-`_oak_text` harness fix + starter-identity conditions; it leans on wave C's beat
-dissolution). **Wave D (gh #42) closed 2026-07-21**: `--validate` grew the event-semantics
+are awaited now. (OaksLab.gd — then the last remaining adapter — landed as wave B10 above,
+closing gh #40.) **Wave D (gh #42) closed 2026-07-21**: `--validate` grew the event-semantics
 pass (every object a trigger/command names must exist on the record's map; every
 cell/front/at/region in bounds — the real project's 260 records verify clean, an independent
 cross-check of the whole migration), `--schematest` grew two broken-event fixtures (12/12),
 and `audit_chokepoints` gates on the nine EVENT_BACKED doors (a record must name both the
-map and the object; a hidden record fails the audit loud — proven by a negative test). What
-remains before gh #40 closes: OaksLab + the wave-E (gh #43) two-seed playthrough gate.
+map and the object; a hidden record fails the audit loud — proven by a negative test). (Both
+of gh #40's then-remaining items — OaksLab and the wave-E gate — closed later the same day;
+see the wave-B10 and wave-E entries.)
 **Wave E probing (2026-07-21, same session):** four full seed-1 attempts against the fully
 event-driven build. The migration held everywhere the bot went — a checkpoint-resume chain
 ran erika → blaine → three E4 gauntlet loops (the lobby-reset/LANCE-door/Champion records
@@ -207,8 +220,12 @@ both — all 21 checkpoints in order, zero anomaly lines (no `[qrace]` drops, no
 no watchdog). Same-commit battery: the four `--battledettest` md5s byte-identical,
 `--validate=project` 0 errors (1541 files, 260 event records), `linktest` ALL GREEN /
 `linksoak` 8/8 / `linkdrop` ALL GREEN, the three audits at zero (the nine EVENT_BACKED doors
-9/9); the cross-OS `determinism` workflow dispatched on the commit. gh #40's remaining item
-is OaksLab.gd alone (leans on wave C, gh #41).
+9/9); the cross-OS `determinism` workflow ran green on the commit — Linux fully green, macOS
+reproducing all four md5s byte-for-byte with `linksoak` 8/8 (its linktest 1/0-events flake
+recurred — gh #37, environmental). gh #40 then closed with OaksLab (wave B10 above).
+**Next: wave C (gh #41)** — dissolving Cutscene's story beats into authored events by
+questline — is all that stands between here and the gh #17 Phase-3 close (gh #42 and #43 are
+done; the strangler-fig `beat` seam is exactly where wave C picks up).
 **Landed: gh #34** (2026-07-20): Catch + Progression are behind the seam and the
 **config-first knobs are real** — `Gen1Catch` (`attempt` over the byte-exact kernel + the
 safari `bait_rate`/`rock_rate` transitions, which moved out of the host's input handler),

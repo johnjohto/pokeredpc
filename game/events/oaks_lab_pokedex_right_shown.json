@@ -1,0 +1,10 @@
+{
+ "$comment": "scripts/OaksLab.asm — the right Pokédex stays on the shelf until Oak hands them out.",
+ "id": "event:oaks_lab_pokedex_right_shown",
+ "trigger": {
+  "kind": "visible",
+  "map": "map:OaksLab",
+  "object": "SPRITE_POKEDEX@3,1",
+  "visible_when": "not GOT_POKEDEX"
+ }
+}

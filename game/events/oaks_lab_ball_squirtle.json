@@ -1,0 +1,30 @@
+{
+ "$comment": "scripts/OaksLab.asm — the SQUIRTLE ball: 'those are POKé BALLs' before the choose-mon speech (OaksLabThoseArePokeBallsText), the pick menu after it (OaksLabMonChoiceMenu via the choose_starter beat), the untaken leftover once picked (OaksLabLastMonScript).",
+ "id": "event:oaks_lab_ball_squirtle",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:OaksLab",
+  "object": "SPRITE_POKE_BALL@7,3"
+ },
+ "commands": [
+  {
+   "cmd": "if",
+   "cond": "not OAK_ASKED_TO_CHOOSE_MON",
+   "then": [
+    {"cmd": "notice", "text": "Those are POKé\nBALLs. They\ncontain POKéMON!"}
+   ],
+   "else": [
+    {
+     "cmd": "if",
+     "cond": "not GOT_STARTER",
+     "then": [
+      {"cmd": "beat", "name": "choose_starter", "args": ["@npc"]}
+     ],
+     "else": [
+      {"cmd": "notice", "text": "That's PROF.OAK's\nlast POKéMON!"}
+     ]
+    }
+   ]
+  }
+ ]
+}

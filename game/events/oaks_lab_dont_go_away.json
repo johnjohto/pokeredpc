@@ -1,0 +1,13 @@
+{
+ "$comment": "scripts/OaksLab.asm OaksLabPlayerDontGoAwayScript — trying to leave (YCoord == 6) between Oak's choose-a-mon speech and taking a starter: Oak stops you and walks you back up.",
+ "id": "event:oaks_lab_dont_go_away",
+ "trigger": {
+  "kind": "step",
+  "map": "map:OaksLab",
+  "region": [0, 6, 9, 6],
+  "when": "OAK_ASKED_TO_CHOOSE_MON and not GOT_STARTER"
+ },
+ "commands": [
+  {"cmd": "beat", "name": "oak_dont_go_away"}
+ ]
+}

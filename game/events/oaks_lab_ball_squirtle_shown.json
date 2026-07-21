@@ -1,0 +1,10 @@
+{
+ "$comment": "scripts/OaksLab.asm — the SQUIRTLE ball: all three sit on the table until someone picks; afterwards only the untaken one (neither the player's nor the rival's starter) stays.",
+ "id": "event:oaks_lab_ball_squirtle_shown",
+ "trigger": {
+  "kind": "visible",
+  "map": "map:OaksLab",
+  "object": "SPRITE_POKE_BALL@7,3",
+  "visible_when": "not GOT_STARTER or (not player_starter_squirtle and not rival_starter_squirtle)"
+ }
+}
