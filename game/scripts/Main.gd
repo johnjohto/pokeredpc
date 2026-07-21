@@ -14314,6 +14314,11 @@ func _drive_until(done_check: Callable, budget := 4000) -> int:
 		await get_tree().process_frame
 		if textbox.active and textbox.visible:
 			textbox.advance()
+		elif cutscene and cutscene._in_credits and cutscene._credit_end:
+			# THE END holds for a button (WaitForTextScrollButtonPress, gh #179) — with audio
+			# on the credits run at full fidelity, and the bot must press A like a player or
+			# the Hall of Fame ceremony never returns (the seed-1 wedge at (4,2)).
+			await _press("ui_accept")
 		if done_check.call():
 			return i
 	return budget
