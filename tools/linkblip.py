@@ -21,7 +21,7 @@ import json
 import sys
 import time
 
-from linktest import launch, collect, godot_user_dir
+from linktest import launch, collect, godot_user_dir, clear_slot, leftover_journals
 
 BASE_PORT = 17801
 UDIR = godot_user_dir()
@@ -65,6 +65,8 @@ def battle_pair(port, host_extra=(), join_extra=()):
 
 
 def trade_pair(port, hslot, jslot, join_extra, host_extra=()):
+    clear_slot(hslot)                    # gh #36: start from nothing, every scenario
+    clear_slot(jslot)
     h = launch(["--clubtest", "--clubhost", "--trade", f"--port={port}",
                 f"--saveslot={hslot}", *FAST, *host_extra])
     time.sleep(6)
@@ -131,6 +133,9 @@ def main():
                 "machamp" in hp and "alakazam" in jp and "machoke" not in jp,
                 f"{hp} / {jp}")
 
+    if not ok and leftover_journals():
+        print(f"[blip] hint: leftover trade journals in the user dir (a stale one changes "
+              f"launch behavior — gh #36): {', '.join(leftover_journals())}")
     print(f"[blip] {'ALL GREEN' if ok else 'FAIL'}")
     sys.exit(0 if ok else 1)
 

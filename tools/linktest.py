@@ -47,6 +47,27 @@ def godot_user_dir():
 GODOT = godot_binary()
 
 
+def clear_slot(slot):
+    """gh #36: scenario slots must be self-isolating. A leftover save — or worse, an ACKED
+    trade journal from a raced earlier run — changes the next launch's behavior (an acked
+    journal rolls the trade FORWARD at load), so one bad run poisons every later one.
+    Delete the slot's save + journal so each scenario starts from nothing."""
+    for name in (f"pokeredpc_save_{slot}.json",
+                 f"pokeredpc_save_{slot}_trade_journal.json"):
+        try:
+            (godot_user_dir() / name).unlink()
+        except OSError:
+            pass
+
+
+def leftover_journals():
+    """Names of any trade journals left in the user dir — a FAIL diagnosis hint (gh #36)."""
+    try:
+        return sorted(p.name for p in godot_user_dir().glob("*_trade_journal.json"))
+    except OSError:
+        return []
+
+
 def launch(user_args):
     """Start a headless instance with its stdout drained by a reader thread. The drain is
     load-bearing: an unread stdout PIPE fills, the game blocks mid-print, and a blocked
@@ -163,6 +184,8 @@ def main():
     # mons trade-evolving (ALAKAZAM / MACHAMP), nickname/OT/trainer ID intact, the commit
     # two-phase, and BOTH save files holding the traded party (read directly below).
     tr_port = BASE_PORT + 6
+    clear_slot("tradehost")
+    clear_slot("tradejoin")
     h = launch(["--clubtest", "--clubhost", "--trade", f"--port={tr_port}",
                 "--saveslot=tradehost"])
     time.sleep(6)
@@ -203,6 +226,8 @@ def main():
     # faints, replacements, the win), and their [battledet] event streams must be
     # BYTE-IDENTICAL: equality of streams is ADR-014's definition of "in sync".
     col_port = BASE_PORT + 7
+    clear_slot("colhost")
+    clear_slot("coljoin")
     h = launch(["--clubtest", "--clubhost", "--battle", f"--port={col_port}",
                 "--saveslot=colhost"])
     time.sleep(6)

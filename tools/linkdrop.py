@@ -18,7 +18,7 @@ import sys
 import time
 from pathlib import Path
 
-from linktest import launch, collect, godot_user_dir
+from linktest import launch, collect, godot_user_dir, clear_slot, leftover_journals
 
 BASE_PORT = 17701
 UDIR = godot_user_dir()
@@ -43,6 +43,8 @@ def party_of(slot):
 
 
 def trade_pair(port, hslot, jslot, join_extra, host_extra=()):
+    clear_slot(hslot)                    # gh #36: start from nothing, every scenario
+    clear_slot(jslot)
     h = launch(["--clubtest", "--clubhost", "--trade", f"--port={port}",
                 f"--saveslot={hslot}", *FAST, *host_extra])
     time.sleep(6)
@@ -117,6 +119,9 @@ def main():
     ok &= check("dupe@ack: the puller KEPT the original (MACHOKE) — the classic dupe",
                 "dupe easter egg" in rec and "machoke" in jp, str(jp))
 
+    if not ok and leftover_journals():
+        print(f"[drop] hint: leftover trade journals in the user dir (a stale one changes "
+              f"launch behavior — gh #36): {', '.join(leftover_journals())}")
     print(f"[drop] {'ALL GREEN' if ok else 'FAIL'}")
     sys.exit(0 if ok else 1)
 
