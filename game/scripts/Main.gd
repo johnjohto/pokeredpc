@@ -15,10 +15,9 @@ const BORDER_MARGIN := 8            # blocks of border drawn around the world
 # connected-map rebases keep the player inside the Cycling Road corridor.
 const FORCE_BIKE_MAPS := {"Route16": true, "Route17": true, "Route18": true}
 
-# HM field moves: the item that teaches each, and the badge that lets it be used in the field.
+# HM field moves: the item that teaches each. The badge gating each field move is the
+# ruleset progression module's mapping now (gh #34: ruleset.progression.badge_for_field_move).
 const HM_MOVES := {"HM01": "CUT", "HM02": "FLY", "HM03": "SURF", "HM04": "STRENGTH", "HM05": "FLASH"}
-const FIELD_MOVE_BADGE := {"CUT": "CASCADEBADGE", "FLASH": "BOULDERBADGE", "STRENGTH": "RAINBOWBADGE",
-	"SURF": "SOULBADGE", "FLY": "THUNDERBADGE"}
 # Every move with an overworld effect, i.e. what `_open_mon_menu` offers. The five HMs need a badge
 # (FIELD_MOVE_BADGE); DIG (TM28) and TELEPORT (a level-up move) are TM/level moves that need none — so
 # the offer set must be separate from the badge table, or they never appear in the party menu (gh #102).
@@ -2157,7 +2156,7 @@ func _open_mon_menu(idx: int) -> void:
 ## Use a field move from the party menu (FLASH lights a dark cave; CUT chops the tree in front).
 func _use_field_move(move: String) -> void:
 	var mon: Dictionary = player_party[_mon_menu_idx]
-	var badge := str(FIELD_MOVE_BADGE.get(move, ""))
+	var badge := ruleset.progression.badge_for_field_move(move)   # gh #34: config-driven gate
 	if badge != "" and not badge in badges:
 		_say("You can't use\nthat yet!")
 		return
@@ -2373,7 +2372,7 @@ func _try_cut(front: Vector2i) -> bool:
 	if tile != cut_tile:                               # facing a non-tree quadrant of a tree block
 		return false
 	var cutter := _mon_with_move("CUT")
-	if cutter == "" or not "CASCADEBADGE" in badges:   # can see it's cuttable, but can't yet
+	if cutter == "" or not ruleset.progression.badge_for_field_move("CUT") in badges:   # can see it's cuttable, but can't yet (gh #34)
 		_say("This tree looks\nlike it can be\nCUT down!")
 		return true
 	_cut_tree_anim(front, bid, cutter)                 # shake + flicker, then swap the block + text
@@ -5181,6 +5180,26 @@ func _rulesettest() -> void:
 	ok = _rs_check("catch_attempt: MASTER BALL always catches",
 		bool(F.catch_attempt("MASTER BALL", "", 3, 10, 10, func(_n): return 0)["caught"]),
 		"") and ok
+	# gh #34: the Catch + Progression modules and the data/ruleset.json config record.
+	ok = _rs_check("gen1 carries Catch + Progression modules",
+		ruleset.catching != null and ruleset.progression != null, "") and ok
+	var rc := ProjectData.ruleset_config()
+	ok = _rs_check("data/ruleset.json present with base gen1",
+		str(rc.get("base", "")) == "gen1" and rc.get("config") is Dictionary,
+		str(rc)) and ok
+	ok = _rs_check("progression: BadgeStatBoosts mapping + field-move gates",
+		ruleset.progression.badge_for_stat("atk") == "BOULDERBADGE"
+		and ruleset.progression.badge_for_stat("spc") == "VOLCANOBADGE"
+		and ruleset.progression.badge_for_field_move("SURF") == "SOULBADGE"
+		and ruleset.progression.badge_for_field_move("DIG") == "", "") and ok
+	ok = _rs_check("catch module: safari bait halves / rock doubles (cap 255)",
+		ruleset.catching.bait_rate(90) == 45 and ruleset.catching.rock_rate(200) == 255,
+		"") and ok
+	# the knobs are LIVE, not decorative: an overridden stage table answers differently
+	var f2 := Gen1Formulas.new()
+	f2.apply_config({"stat_stage_multipliers": {"2": 300}})
+	ok = _rs_check("config override turns a knob (stage +2 -> 300%)",
+		f2.stage_apply(100, 2) == 300 and F.stage_apply(100, 2) == 200, "") and ok
 	print("[ruleset] %s" % ("ALL GREEN" if ok else "FAIL"))
 	get_tree().quit(0 if ok else 1)
 

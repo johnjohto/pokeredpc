@@ -1178,16 +1178,10 @@ func _choose_action() -> void:
 		"BALL":
 			_safari_ball()
 		"BAIT":
-			_det_paction = "bait"
-			safari_catch = safari_catch >> 1                 # bait halves the catch rate
-			safari_escape = 0
-			safari_bait = min(255, safari_bait + (_ri(5) + 1))
+			mech._safari_bait()                     # rate transition on the Catch module (gh #34)
 			_safari_turn(["%s threw\nsome BAIT." % main.player_name])
 		"ROCK":
-			_det_paction = "rock"
-			safari_catch = min(255, safari_catch * 2)         # a rock doubles the catch rate
-			safari_bait = 0
-			safari_escape = min(255, safari_escape + (_ri(5) + 1))
+			mech._safari_rock()
 			_safari_turn(["%s threw\na ROCK." % main.player_name])
 
 

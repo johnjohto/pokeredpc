@@ -63,6 +63,18 @@ equivalence sweep; config-first knobs are **only what is already data** (`data/r
 additive under `format: 1`); extraction is strangler-fig with `--battledettest` between every
 move. Sub-issues **gh #31–#35** (interfaces+registry → types+formulas → battle+link →
 catch/progression/config → expression evaluator, which carries the phase gate).
+**Landed: gh #34** (2026-07-20): Catch + Progression are behind the seam and the
+**config-first knobs are real** — `Gen1Catch` (`attempt` over the byte-exact kernel + the
+safari `bait_rate`/`rock_rate` transitions, which moved out of the host's input handler),
+`Gen1Progression` (`badge_for_stat` = BadgeStatBoosts' mapping, `badge_for_field_move` = the
+HM badge gates; `Main` consults it instead of its own tables), and the schema'd
+**`data/ruleset.json`** record ({base, config}; base must match the manifest's selector;
+additive under `format: 1`) carrying only what was already data — badge boosts, field-move
+gates, both stat-stage tables, the high-crit list — emitted by the extractor with the
+faithful gen1 values (project identity: **14 parts** now). Gate: `--schematest` +
+`--validate` (1281 files, 0 errors) green, **double extraction byte-identical**, all four
+`--battledettest` md5s unchanged, `--rulesettest` grew the module + config checks incl.
+"a knob actually turns", `--movefxtest`/`--selftest`/`--projparitytest` green.
 **Landed: gh #33** (2026-07-20): the battle module is behind the seam — `Gen1Battle` owns
 the battle STATE (61 vars: mons/party/stages/volatiles, stored stats, AI state, safari,
 catch/flee outcomes, the determinism RNG + stream, the lockstep link state) and the

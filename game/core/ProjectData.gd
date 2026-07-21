@@ -50,6 +50,13 @@ static func legacy(name: String):
 	return v.duplicate(true) if (v is Dictionary or v is Array) else v
 
 
+static func ruleset_config() -> Dictionary:
+	## The data/ruleset.json record (ADR-018 §4, gh #34): {base, config}. Absent file ->
+	## {} (the ruleset falls back to its built-in faithful defaults).
+	var rc = _read_json(dir.path_join("data/ruleset.json"))
+	return rc if rc is Dictionary else {}
+
+
 static func map_exists(label: String) -> bool:
 	return FileAccess.file_exists(dir.path_join("maps/%s.json" % label))
 

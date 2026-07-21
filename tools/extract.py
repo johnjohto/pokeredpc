@@ -2352,6 +2352,32 @@ def build_project():
                     "nick": t["nick"], "dialogset": t["dialogset"]}
                    for t in tr["trades"]],
         "text_trades": tr["text_trades"]})
+
+    # The ruleset config record (ADR-018 §4, gh #34): ONLY knobs that were already data,
+    # emitted with the faithful gen1 values — the badge stat-boost mapping
+    # (BadgeStatBoosts' even bit positions), the field-move badge gates, the two
+    # stat-stage tables (StatModifier n/100; MoveHitTest's accuracy/evasion scale), and
+    # the high-crit move list. Absent keys fall back to gen1's built-in defaults.
+    _pj_write("data/ruleset.json", {
+        "base": "gen1",
+        "config": {
+            "badge_stat_boosts": {"atk": "BOULDERBADGE", "def": "THUNDERBADGE",
+                                  "spd": "SOULBADGE", "spc": "VOLCANOBADGE"},
+            "field_move_badges": {"CUT": "CASCADEBADGE", "FLASH": "BOULDERBADGE",
+                                  "STRENGTH": "RAINBOWBADGE", "SURF": "SOULBADGE",
+                                  "FLY": "THUNDERBADGE"},
+            "stat_stage_multipliers": {str(k): v for k, v in
+                                       [(-6, 25), (-5, 28), (-4, 33), (-3, 40), (-2, 50),
+                                        (-1, 66), (0, 100), (1, 150), (2, 200), (3, 250),
+                                        (4, 300), (5, 350), (6, 400)]},
+            "accuracy_stage_multipliers": {str(k): v for k, v in
+                                           [(-6, 0.25), (-5, 0.28), (-4, 0.33), (-3, 0.4),
+                                            (-2, 0.5), (-1, 0.66), (0, 1.0), (1, 1.5),
+                                            (2, 2.0), (3, 2.5), (4, 3.0), (5, 3.5),
+                                            (6, 4.0)]},
+            "high_crit_moves": ["move:slash", "move:karate_chop", "move:razor_leaf",
+                                "move:crabhammer"],
+        }})
     _pj_write("data/text.json", J("text.json"))
 
     # cries not owned by a species record (missingno — the ghost's pitch source)

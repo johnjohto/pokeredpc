@@ -1,0 +1,59 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "schema:ruleset",
+ "$comment": "The ruleset config record (ADR-018 §4, gh #34): base names the built-in ruleset (must match the manifest's selector); config carries ONLY knobs that were already data — the badge stat-boost mapping, the field-move badge gates, the two stat-stage multiplier tables, and the high-crit move list. Absent keys fall back to the ruleset's built-in faithful defaults.",
+ "type": "object",
+ "required": [
+  "base"
+ ],
+ "properties": {
+  "base": {
+   "type": "string"
+  },
+  "config": {
+   "type": "object",
+   "properties": {
+    "badge_stat_boosts": {
+     "$comment": "battle stat key (atk/def/spd/spc) -> the progression flag (badge) that boosts it in battle",
+     "type": "object",
+     "additionalProperties": {
+      "type": "string"
+     }
+    },
+    "field_move_badges": {
+     "$comment": "field move -> the progression flag (badge) required to use it outside battle",
+     "type": "object",
+     "additionalProperties": {
+      "type": "string"
+     }
+    },
+    "stat_stage_multipliers": {
+     "$comment": "stage (-6..6, string keys) -> percent (StatModifier n/100)",
+     "type": "object",
+     "additionalProperties": {
+      "type": "integer"
+     }
+    },
+    "accuracy_stage_multipliers": {
+     "$comment": "stage (-6..6, string keys) -> the MoveHitTest accuracy/evasion scale factor",
+     "type": "object",
+     "additionalProperties": {
+      "type": "number"
+     }
+    },
+    "high_crit_moves": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "x-ref": "move"
+     }
+    }
+   },
+   "additionalProperties": false
+  },
+  "custom": {
+   "type": "object"
+  }
+ },
+ "additionalProperties": false
+}

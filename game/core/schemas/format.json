@@ -75,6 +75,11 @@
    "kind": "table"
   },
   {
+   "path": "data/ruleset.json",
+   "schema": "ruleset",
+   "kind": "table"
+  },
+  {
    "path": "presentation/**",
    "schema": "blob",
    "kind": "blob"

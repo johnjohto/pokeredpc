@@ -30,6 +30,12 @@ project/
     marts.json           table — map ref -> item list
     hidden_items.json    table — map ref -> placements
     trades.json          table — the in-game trades
+    ruleset.json         table — the ruleset config record (ADR-018 §4, gh #34):
+                         {base, config} — base must match the manifest's ruleset;
+                         config carries ONLY knobs that were already data (badge
+                         stat boosts, field-move badge gates, the two stat-stage
+                         tables, the high-crit move list); absent keys fall back
+                         to the ruleset's built-in faithful defaults
   maps/<Label>.json      one record per file — INTERIM: v1's extracted map JSON
                          carried as-is (name field = bare label); replaced by the
                          Tiled TMX bridge in Phase 5 (a format bump, gh #19)

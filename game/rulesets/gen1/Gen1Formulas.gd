@@ -6,14 +6,35 @@ class_name Gen1Formulas
 ## draw helpers as Callables so the draw ORDER never moves.
 
 # pokered's stat-stage ratio table for accuracy/evasion scaling (MoveHitTest).
-const STAGE_MULT := {-6: 0.25, -5: 0.28, -4: 0.33, -3: 0.4, -2: 0.5, -1: 0.66,
+# These three tables are the faithful DEFAULTS; data/ruleset.json's config can override
+# them (ADR-018 §4, gh #34) — the config-first knobs that were already data.
+var STAGE_MULT := {-6: 0.25, -5: 0.28, -4: 0.33, -3: 0.4, -2: 0.5, -1: 0.66,
 	0: 1.0, 1: 1.5, 2: 2.0, 3: 2.5, 4: 3.0, 5: 3.5, 6: 4.0}
 
 # pokered's stat-stage ratios (StatModifier n/100); the modified stat floors and lives in [1, 999].
-const STAGE_NUM := {-6: 25, -5: 28, -4: 33, -3: 40, -2: 50, -1: 66,
+var STAGE_NUM := {-6: 25, -5: 28, -4: 33, -3: 40, -2: 50, -1: 66,
 	0: 100, 1: 150, 2: 200, 3: 250, 4: 300, 5: 350, 6: 400}
 
-const HIGH_CRIT := ["SLASH", "KARATE_CHOP", "RAZOR_LEAF", "CRABHAMMER"]
+var HIGH_CRIT := ["SLASH", "KARATE_CHOP", "RAZOR_LEAF", "CRABHAMMER"]
+
+
+## Apply data/ruleset.json's config (string stage keys -> int; move ids -> v1 consts).
+func apply_config(cfg: Dictionary) -> void:
+	if cfg.get("stat_stage_multipliers") is Dictionary and not (cfg["stat_stage_multipliers"] as Dictionary).is_empty():
+		var t := {}
+		for k in cfg["stat_stage_multipliers"]:
+			t[int(str(k))] = int(cfg["stat_stage_multipliers"][k])
+		STAGE_NUM = t
+	if cfg.get("accuracy_stage_multipliers") is Dictionary and not (cfg["accuracy_stage_multipliers"] as Dictionary).is_empty():
+		var t2 := {}
+		for k in cfg["accuracy_stage_multipliers"]:
+			t2[int(str(k))] = float(cfg["accuracy_stage_multipliers"][k])
+		STAGE_MULT = t2
+	if cfg.get("high_crit_moves") is Array and not (cfg["high_crit_moves"] as Array).is_empty():
+		var hc: Array = []
+		for mid in cfg["high_crit_moves"]:
+			hc.append(str(mid).substr(str(mid).find(":") + 1).to_upper())
+		HIGH_CRIT = hc
 
 
 ## Gen-1 stat: floor((base + DV) * 2 * level / 100) + 5  (+ level + 10 for HP).

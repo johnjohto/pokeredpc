@@ -33,10 +33,8 @@ var _eff_re := RegEx.new()
 var p_mod := {"atk": 1, "def": 1, "spd": 1, "spc": 1}
 var e_mod := {"atk": 1, "def": 1, "spd": 1, "spc": 1}
 
-# Gen-1 badge stat boosts, by the EVEN BIT POSITIONS of wObtainedBadges (BadgeStatBoosts):
-# Boulder (bit 0) -> ATTACK, Thunder (bit 2) -> DEFENSE, Soul (bit 4) -> SPEED,
-# Volcano (bit 6) -> SPECIAL. (Not the intuitive gym order - Cascade boosts nothing.)
-const _BADGE_STAT := {"atk": "BOULDERBADGE", "def": "THUNDERBADGE", "spd": "SOULBADGE", "spc": "VOLCANOBADGE"}
+# (The badge->stat mapping — BadgeStatBoosts' even bit positions — is the progression
+# module's config-driven table now: rset.progression.badge_for_stat, gh #34.)
 
 const SPECIAL_TYPES := ["FIRE", "WATER", "GRASS", "ELECTRIC", "PSYCHIC_TYPE", "ICE", "DRAGON"]
 const STAT_KEY := {"ATTACK": "atk", "DEFENSE": "def", "SPECIAL": "spc",
@@ -236,7 +234,8 @@ func _new_stages() -> Dictionary:
 func _badge_boost(v: int, key: String) -> int:
 	if link_battle:
 		return v
-	if b.main and str(_BADGE_STAT.get(key, "")) in b.main.badges:
+	var badge := rset.progression.badge_for_stat(key)   # config-driven mapping (gh #34)
+	if b.main and badge != "" and badge in b.main.badges:
 		return mini(999, v + (v >> 3))
 	return v
 
@@ -1130,11 +1129,28 @@ func _revert_battle_copy(mon: Dictionary, vol: Dictionary) -> void:
 ## it at .failedToCapture whichever stage failed — a rand1-stage failure uses the same
 ## HP-derived X as a rand2-stage one, never the catch rate (gh #176).
 func _attempt_catch(ball := "POKé BALL", rate_override := -1) -> Dictionary:
-	# The byte-exact ItemUseBall algorithm is the ruleset's catch_attempt kernel (gh #32).
+	# Routed through the Catch module (gh #34); the byte-exact ItemUseBall arithmetic
+	# stays the formula layer's catch_attempt kernel (gh #32).
 	var rate := rate_override if rate_override >= 0 \
 		else int(base_stats[enemy_mon["species"]]["catch"])
-	return rset.formulas.catch_attempt(ball, str(enemy_mon["status"]), rate,
+	return rset.catching.attempt(ball, str(enemy_mon["status"]), rate,
 		int(enemy_mon["hp"]), int(enemy_mon["maxhp"]), _ri)
+
+
+## Safari BAIT/ROCK (safari_zone.asm): the rate transitions live on the Catch module;
+## the eating/angry counters gain 1-5 turns and zero each other out.
+func _safari_bait() -> void:
+	_det_paction = "bait"
+	safari_catch = rset.catching.bait_rate(safari_catch)
+	safari_escape = 0
+	safari_bait = min(255, safari_bait + (_ri(5) + 1))
+
+
+func _safari_rock() -> void:
+	_det_paction = "rock"
+	safari_catch = rset.catching.rock_rate(safari_catch)
+	safari_bait = 0
+	safari_escape = min(255, safari_escape + (_ri(5) + 1))
 
 
 func _resolve(action: Dictionary) -> void:
