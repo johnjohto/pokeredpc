@@ -163,8 +163,13 @@ RAM-like state, the `--surgetest` harness rewired). A real VM bug was caught by
 the wrapper's cutscene_active restore trample the beat's own flag on the same frame — both
 are awaited now. Remaining for wave B: **OaksLab.gd alone** (blocked on the gh #45
 `_oak_text` harness fix + starter-identity conditions; it leans on wave C's beat
-dissolution) — plus wave D's extractor lints and the wave-E full-playthrough gate before
-gh #40 closes.
+dissolution). **Wave D (gh #42) closed 2026-07-21**: `--validate` grew the event-semantics
+pass (every object a trigger/command names must exist on the record's map; every
+cell/front/at/region in bounds — the real project's 260 records verify clean, an independent
+cross-check of the whole migration), `--schematest` grew two broken-event fixtures (12/12),
+and `audit_chokepoints` gates on the nine EVENT_BACKED doors (a record must name both the
+map and the object; a hidden record fails the audit loud — proven by a negative test). What
+remains before gh #40 closes: OaksLab + the wave-E (gh #43) two-seed playthrough gate.
 **Landed: gh #34** (2026-07-20): Catch + Progression are behind the seam and the
 **config-first knobs are real** — `Gen1Catch` (`attempt` over the byte-exact kernel + the
 safari `bait_rate`/`rock_rate` transitions, which moved out of the host's input handler),

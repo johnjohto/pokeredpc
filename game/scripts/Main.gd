@@ -10797,6 +10797,14 @@ func _pt_win_battle(budget := 800) -> void:
 		elif battle.state == "party_forced":           # lead fainted: send out the best matchup
 			battle.cursor = _pt_best_actor()
 			await _press("ui_accept")
+		elif battle.state == "shift":
+			# The BATTLE STYLE SHIFT free-switch prompt ("Will <PLAYER> change POKéMON?").
+			# The old `else` pressed A on YES (cursor 0) into party_shift, then pressed A on
+			# the already-active mon forever — the mtmoontest/playthrough wedge. Decline: the
+			# bot's matchup logic acts on its own turn anyway.
+			await _press("ui_cancel")
+		elif battle.state == "party_shift":
+			await _press("ui_cancel")                  # declined after all: play on
 		elif battle.state == "learn":
 			# A level-up with four moves already known. The cursor starts on slot 0, so the old `else`
 			# below pressed A on it — which is how a L43 Blastoise traded SURF for SKULL BASH and
