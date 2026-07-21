@@ -63,6 +63,24 @@ equivalence sweep; config-first knobs are **only what is already data** (`data/r
 additive under `format: 1`); extraction is strangler-fig with `--battledettest` between every
 move. Sub-issues **gh #31–#35** (interfaces+registry → types+formulas → battle+link →
 catch/progression/config → expression evaluator, which carries the phase gate).
+**PHASE 2 COMPLETE — gh #16 closed 2026-07-20.** The last piece, **gh #35**: `FormulaExpr`
+(Core) — the integer-exact expression evaluator (named variables, operators with int/float
+promotion, comparisons + and/or, min/max/floor/ceil/sqrt/int/abs/if) — and `Gen1ExprFormulas`,
+the alternate provider authoring stat_calc / the growth curves / damage_core (its /4
+byte-overflow branch via if()) as expressions, proven by `--exprtest`'s **1,264-vector
+equivalence sweep** against the native kernels (every value equal; never on gen1's hot path).
+**The phase gate:** `--playthrough --seed 1` and `--seed 2` each ran NEW GAME → **HALL OF
+FAME** in one unbroken process — all 21 checkpoints in order, `validate_gate.py` → **GATE
+GREEN** on both (Champion at L70/L73) — *the bot beats the game through the seam*; the three
+audits report 0 findings; all four `--battledettest` md5s **byte-identical to the pre-phase
+baseline at every step and at the end**; `linktest`/`linksoak`/`linkdrop` ALL GREEN (a
+`linkdrop` red herring traced to stale test-slot journals — gh #36); and the cross-OS
+`determinism` workflow: Linux + macOS both reproduce the four md5s byte-for-byte with
+`linksoak` 8/8 in sync (one macOS-runner `linktest` colosseum failure **bisected to
+pre-Phase-2 code** — environmental, gh #37; gh #38 tracks a once-seen silent surge-stage
+wedge in the bot). Kanto's mechanics are now a plug-in: the engine core knows five
+interfaces, `gen1` implements them asm-faithfully, and the config knobs are live data.
+**Next: Phase 3 — the Event VM (gh #17).**
 **Landed: gh #34** (2026-07-20): Catch + Progression are behind the seam and the
 **config-first knobs are real** — `Gen1Catch` (`attempt` over the byte-exact kernel + the
 safari `bait_rate`/`rock_rate` transitions, which moved out of the host's input handler),
