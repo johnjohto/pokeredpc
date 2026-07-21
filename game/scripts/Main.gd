@@ -4248,6 +4248,15 @@ func shake_elevator() -> void:
 
 const TURBO_SCALE := 4.0         # hold the turbo key (Space) to fast-forward everything
 var pt_time_scale := 0.0         # > 0: a --playthrough / --<flag>test driver owns Engine.time_scale (gh #98)
+# gh #38: the playthrough watchdog. A wedged leg is invisible from outside — nested nav/battle
+# budgets multiply into hours of silent CPU (the gh #27 FLY-cursor lesson, seen again after
+# 'Surge coverage'). Once per second, sample a PROGRESS signature; if it freezes for the whole
+# window, dump the wedge state with a FAIL( the gate validator counts, and quit loudly.
+var _pt_watch_window_ms := 0     # 0 = watchdog off (only --playthrough arms it)
+var _pt_watch_sig := ""
+var _pt_watch_since_ms := 0
+var _pt_watch_check_ms := 0
+var _pt_stage := ""              # the stage being run, named in the watchdog's dump
 var _last_cam_block := Vector2i(-9999, -9999)   # the culled world redraws on block crossings
 
 
@@ -4280,6 +4289,16 @@ func _process(delta: float) -> void:
 	# modal, so that fix stays intact.
 	if pt_time_scale > 0.0:
 		Engine.time_scale = pt_time_scale
+		if _pt_watch_window_ms > 0:                   # gh #38: the playthrough watchdog
+			var wnow := Time.get_ticks_msec()
+			if wnow >= _pt_watch_check_ms:
+				_pt_watch_check_ms = wnow + 1000
+				var sig := _pt_progress_sig()
+				if sig != _pt_watch_sig:
+					_pt_watch_sig = sig
+					_pt_watch_since_ms = wnow
+				elif wnow - _pt_watch_since_ms >= _pt_watch_window_ms:
+					_pt_watchdog_bark(wnow - _pt_watch_since_ms)
 	else:
 		var can_turbo: bool = (modal == null and not cutscene_active) or modal == battle
 		var turbo: bool = Input.is_action_pressed("p_turbo") and can_turbo
@@ -9258,6 +9277,12 @@ func _playthrough() -> void:
 	Engine.max_fps = 500                        # lift the headless fps cap (battles/steps run ~8x faster)
 	Engine.time_scale = 25.0                    # accelerate the many 0.27s walk steps (headless)
 	pt_time_scale = 25.0
+	# gh #38: arm the wedge watchdog. 120 wall-clock seconds of a frozen progress signature is
+	# ~50 in-game minutes at 25x — no legit leg sits that still. --ptwatchdog=<secs> overrides
+	# (0 disables, for debugging a wedge by hand).
+	var wd := _pt_arg_value("--ptwatchdog")
+	_pt_watch_window_ms = (int(wd) if wd != "" else 120) * 1000
+	_pt_watch_since_ms = Time.get_ticks_msec()
 	print("[playthrough] start seed=%d" % _parse_seed_arg())
 	# The default run now walks the whole gate (all 21 stages are in _PT_STAGES since 0.9.37); _PT_STAGES_WIP
 	# is empty, so `--all` is a no-op kept for compatibility. `--from=<stage>` resumes from a checkpoint.
@@ -9951,7 +9976,43 @@ func _pt_party_can_cut() -> bool:
 	return false
 
 
+## gh #38: everything legitimate the bot does moves at least one of these within seconds — a
+## step (map/cell), a battle turn (det events), a story beat (events/money), damage or exp
+## (party). A signature frozen for the whole watchdog window is a wedge, not a slow leg.
+func _pt_progress_sig() -> String:
+	var party := ""
+	for m in player_party:
+		party += "%s:%d:%d:%d;" % [str(m["species"]), int(m["level"]), int(m["hp"]),
+			int(m.get("exp", 0))]
+	return "%s|%s|%d|%d|%d|%s" % [str(center_label), str(player.cell),
+		battle.det_stream.size() if modal == battle else -1,
+		story_events.size(), player_money, party]
+
+
+## gh #38: the watchdog fired — dump everything a diagnosis needs (which modal holds the
+## screen, the battle's state, the cutscene/textbox flags), fail loudly, and end the process.
+func _pt_watchdog_bark(frozen_ms: int) -> void:
+	var modal_name := "null"
+	if modal != null:
+		modal_name = "battle" if modal == battle else ("menu" if modal == menu
+			else ("textbox" if modal == textbox else modal.get_class()))
+	print("[playthrough] WATCHDOG: stage '%s' frozen for %ds — modal=%s battle_state=%s cutscene=%s textbox(active=%s,visible=%s) player(moving=%s,jumping=%s) sig=%s" % [
+		_pt_stage, frozen_ms / 1000, modal_name,
+		str(battle.state) if modal == battle else "-", cutscene_active,
+		textbox.active, textbox.visible, player.moving, player.jumping, _pt_watch_sig])
+	_pt_fail("watchdog: stage '%s' made no progress for %ds" % [_pt_stage, frozen_ms / 1000])
+	_pt_watch_window_ms = 0                           # bark once, not every second until exit
+	get_tree().quit()
+
+
 func _pt_run_stage(stage: String) -> bool:
+	_pt_stage = stage
+	if _pt_arg_value("--ptwedge") == stage:
+		# gh #38: simulate the silent-wedge shape (CPU alive, zero output, no progress) so the
+		# watchdog itself is testable: --playthrough --ptwatchdog=10 --ptwedge=opening
+		print("[playthrough] ptwedge: spinning silently in '%s' for the watchdog" % stage)
+		while true:
+			await get_tree().process_frame
 	match stage:
 		"opening": return await _pt_stage_opening()
 		"parcel": return await _pt_stage_parcel()
@@ -10675,6 +10736,12 @@ func _pt_win_battle(budget := 800) -> void:
 			await _press("ui_accept")
 		else:
 			await _press("ui_accept")                  # advance messages / level-up boxes
+	if modal == battle:
+		# gh #38: a battle the budget couldn't finish used to return SILENTLY — and every caller
+		# (e.g. _pt_walk_to's battle branch) just re-enters, multiplying budgets into hours of
+		# quiet CPU. Say so; the watchdog ends the run if the state really is frozen.
+		print("[playthrough] win_battle: budget (%d) died with the battle still up — state=%s vs %s" % [
+			budget, str(battle.state), str(battle.enemy_mon.get("species", "?"))])
 
 
 ## The best healing potion in the bag (biggest heal first), or "" if none.
