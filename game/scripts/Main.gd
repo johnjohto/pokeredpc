@@ -11230,7 +11230,17 @@ func _pt_catch_species(sp: String, budget := 50, min_level := 0) -> bool:
 				await _pt_catch()
 			else:
 				await _pt_win_battle()                       # wrong species/level — KO it and fish again
-			await _drive_until(func() -> bool: return modal == null and not cutscene_active, 500)
+			await _drive_until(func() -> bool: return modal == null and not cutscene_active, 1500)
+			if modal != null or cutscene_active:
+				# NEVER force a new encounter over an unsettled battle: battle.start() reuses
+				# the battle object, so an overlap smears the old ceremony onto the new
+				# enemy — the caught mon lands in the party as the NEXT encounter's species
+				# (the seed-1 growlithe hunt failed exactly this way, and it is the likely
+				# root of the 'species'-crash family, gh #45). Bail; the caller's leg retry
+				# is the recovery.
+				print("[playthrough] catch: the previous battle never settled (modal=%s cs=%s state=%s caught=%s qlen=%d) — abandoning the hunt" % [
+					str(modal), cutscene_active, str(battle.state), battle.caught, battle.queue.size()])
+				break
 		if str(center_label) != gmap:
 			break
 	heal_party()
@@ -11955,7 +11965,12 @@ func _pt_lavender_to_celadon(grind_to := 0, catch_fire := false, catch_fly := fa
 	var arrival: Vector2i = player.cell                    # the Underground Path exit spot (crossing-friendly)
 	if catch_fire and not _pt_has_species("growlithe"):    # Fire coverage for Erika (Route 7 Growlithe, L18-20)
 		_pt_buy("POKé BALL", 12)
-		if not await _pt_catch_species("growlithe", 80, 18):
+		for hunt in 3:                                     # the settle guard can abandon a hunt cleanly
+			if await _pt_catch_species("growlithe", 80, 18):
+				break
+			print("[playthrough] growlithe hunt %d/3 came up empty — retrying" % (hunt + 1))
+			await _drive_until(func() -> bool: return modal == null and not cutscene_active, 3000)
+		if not _pt_has_species("growlithe"):
 			return _pt_fail("catch a GROWLITHE (Erika Fire coverage) on Route 7")
 		print("[playthrough] MILESTONE caught GROWLITHE for Erika (%s)" % str(_pt_party_summary()))
 	# The party is all coverage/HM-slave mons — none of them can learn FLY, which the `blaine` stage needs
