@@ -35,7 +35,8 @@ const CMDS := ["say", "notice", "if", "give_item", "take_item", "set_flag", "cle
 	"elevator_retarget", "elevator_panel", "block_cell", "unblock_cell",
 	"trainer_battle", "reset_elite4", "boulder_fall", "walk_forward",
 	"set_var", "set_npc_text", "hide_object", "show_object", "lucky_slot", "play_slots",
-	"club_enter", "club_leave", "trash_reset", "trash_can", "face_object"]
+	"club_enter", "club_leave", "trash_reset", "trash_can", "face_object",
+	"face_player", "play_song", "wait", "walk_object_to", "class_battle", "heal_party"]
 
 ## Player facing indices (Player.facing) by direction word.
 const DIRS := {"down": 0, "up": 1, "left": 2, "right": 3}
@@ -434,6 +435,41 @@ func _run_block(cmds: Array, ctx: Dictionary) -> bool:
 				var fo = main._npc_by_key(str(c["object"]))
 				if fo != null:
 					fo.face(DIRS[str(c["dir"])])
+			"face_player":
+				main.player.facing = DIRS[str(c["dir"])]
+				main.player._update_sprite()
+			"play_song":
+				if main.audio:
+					main.audio.play_song(str(c["key"]))
+			"wait":
+				# A timed beat in frames (battle/text DelayFrames domain: 1/60 s each).
+				await main.cutscene.wait(int(c["frames"]) / 60.0)
+			"walk_object_to":
+				# Pathfound walk to a fixed cell or to the player (+ offset) — the beats'
+				# `walk(npc, find_path(...))` as a declarative command (wave C).
+				var wo = main._npc_by_key(str(c["object"]))
+				if wo != null:
+					var tgt: Vector2i
+					if str(c["to"]) == "player":
+						tgt = main.player.cell
+					else:
+						var ta: Array = c["to"]
+						tgt = Vector2i(int(ta[0]), int(ta[1]))
+					if c.has("offset"):
+						var off: Array = c["offset"]
+						tgt += Vector2i(int(off[0]), int(off[1]))
+					await main.cutscene.walk(wo, main.find_path(wo.cell, tgt))
+			"class_battle":
+				# A scripted trainer-class battle (the rival, not a map trainer): faithful
+				# to the beats' start_trainer_battle(class, party, npc_id) + await finished.
+				# Awaited so run()'s cutscene_active restore cannot trample it.
+				main.start_trainer_battle(str(c["class"]), int(c["party"]), str(c.get("npc", "")))
+				if bool(c.get("no_blackout", false)):
+					main.battle.no_blackout = true
+				await main.battle.finished
+				main.cutscene_active = true    # re-arm for the rest of the event (as beat does)
+			"heal_party":
+				main.heal_party()
 			"hide_object":
 				# pokered's HideObject predef: flip a toggleable object's visibility right now.
 				var h = main._npc_by_key(str(c["object"]))
@@ -593,6 +629,9 @@ func _ident_value(ident: String, label: String):
 		return 1 if str(main.player_starter) == ident.substr(15) else 0
 	if ident.begins_with("rival_starter_"):
 		return 1 if str(main.rival_starter) == ident.substr(14) else 0
+	if ident == "battle_won":
+		# The last battle's outcome, for post-class_battle branches (wave C).
+		return 1 if main.battle.won else 0
 	if ident.begins_with("defeated_"):
 		var parts := ident.substr(9).split("_")
 		if parts.size() == 2:

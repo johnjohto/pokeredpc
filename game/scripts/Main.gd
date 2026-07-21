@@ -14934,8 +14934,9 @@ func _rivallosstest() -> void:
 	player_party = [make_mon("charmander", 5, ["SCRATCH"])]
 	load_world("OaksLab")
 	set_event("GOT_STARTER")
+	player.place(Vector2i(5, 7))
 	player.place(Vector2i(5, 6))
-	cutscene.rival_challenge()
+	_on_player_moved(Vector2i(5, 6))                    # row 6: the authored challenge record fires (wave C)
 	await _drive_until(func() -> bool: return modal == battle, 400)
 	player_party[0]["hp"] = 0                           # faint -> would normally black out
 	battle.blacked_out = true

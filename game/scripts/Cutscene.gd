@@ -691,49 +691,6 @@ func route22_rival(which: int) -> void:
 	main.cutscene_active = false
 
 
-func rival_challenge() -> void:
-	main.cutscene_active = true
-	main.modal = null
-	var rn: String = main.rival_name
-	var pn: String = main.player_name
-	var r: Array = _RIVAL_PICK[main.player_starter]
-	var rival = main._npc_by_key("SPRITE_BLUE@4,3")
-	# OaksLabRivalChallengesPlayerScript: the rival turns south, the player turns to face him,
-	# MEET_RIVAL strikes up, he calls the challenge from where he stands — and only THEN
-	# walks over to the player for the battle.
-	if rival:
-		rival.face(DOWN)
-	main.player.face(UP)
-	if main.audio:
-		main.audio.play_song("meetrival")
-	await say("%s: Wait\n%s!\nLet's check out\nour POKéMON!\fCome on, I'll take\nyou on!" % [rn, pn])
-	if rival:
-		await walk(rival, main.find_path(rival.cell, main.player.cell + Vector2i(0, -1)))
-		rival.face_to(main.player.cell)
-	main.start_trainer_battle("OPP_RIVAL1", int(r[3]), "OaksLab:4,3")
-	main.battle.no_blackout = true                 # this battle never whites you out (OaksLabRivalEndBattle)
-	await main.battle.finished                    # _on_battle_finished clears the modal + music
-	if main.audio:
-		main.audio.play_song("oakslab")
-	main.heal_party()                              # HealParty runs win or lose, then the story continues
-	if main.battle.won:
-		await say("WHAT?\nUnbelievable!\nI picked the\nwrong POKéMON!")
-	else:
-		await say("%s: Yeah! Am\nI great or what?" % rn)
-	await wait(20.0 / 60.0)                        # OaksLabRivalStartsExitScript's 20-frame beat
-	await say("%s: Okay!\nI'll make my\nPOKéMON fight to\ntoughen it up!\f%s! Gramps!\nSmell you later!" % [rn, pn])
-	if main.audio:
-		main.audio.play_song("meetrival_alt")      # Music_RivalAlternateStart for his walk-out
-	if rival:                                      # rival walks out the lab door and leaves
-		await walk(rival, main.find_path(rival.cell, Vector2i(4, 11)))
-		rival.set_shown(false)
-	if main.audio:
-		main.audio.play_song("oakslab")
-	main.set_event("BEAT_RIVAL1")
-	main.set_event("RIVAL_LEFT_LAB")
-	main.cutscene_active = false
-
-
 # ---- Bill's house: the cell-separator event (scripts/BillsHouse.asm) --------
 
 ## Talk to Bill-as-a-POKéMON: he explains, you agree to help, and he walks into the teleporter.

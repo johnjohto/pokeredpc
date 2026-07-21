@@ -430,6 +430,129 @@
      {
       "type": "object",
       "required": [
+       "cmd",
+       "dir"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "face_player"
+       },
+       "dir": {
+        "enum": [
+         "down",
+         "up",
+         "left",
+         "right"
+        ]
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "key"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "play_song"
+       },
+       "key": {
+        "type": "string"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "frames"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "wait"
+       },
+       "frames": {
+        "type": "integer",
+        "minimum": 1
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "object",
+       "to"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "walk_object_to"
+       },
+       "object": {
+        "type": "string"
+       },
+       "to": {
+        "anyOf": [
+         {
+          "$ref": "#/$defs/cell"
+         },
+         {
+          "const": "player"
+         }
+        ]
+       },
+       "offset": {
+        "$ref": "#/$defs/cell"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "class",
+       "party"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "class_battle"
+       },
+       "class": {
+        "type": "string"
+       },
+       "party": {
+        "type": "integer",
+        "minimum": 1
+       },
+       "npc": {
+        "type": "string"
+       },
+       "no_blackout": {
+        "type": "boolean"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "heal_party"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
        "cmd"
       ],
       "properties": {

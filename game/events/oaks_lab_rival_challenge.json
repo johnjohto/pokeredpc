@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/OaksLab.asm OaksLabRivalChallengesPlayerScript — heading for the exit (YCoord == 6) with a starter but before the first rival battle: the rival's challenge.",
+ "$comment": "scripts/OaksLab.asm OaksLabRivalChallengesPlayerScript — heading for the exit (YCoord == 6) with a starter but before the first rival battle. Fully authored (wave C): the rival turns south, the player faces him, MEET_RIVAL strikes up, he calls the challenge from where he stands and only THEN walks over for the battle (OPP_RIVAL1's party by the player's starter). The battle never whites you out (OaksLabRivalEndBattle); HealParty runs win or lose; his 20-frame beat, the goodbye, Music_RivalAlternateStart for the walk-out, and he leaves the lab for good.",
  "id": "event:oaks_lab_rival_challenge",
  "trigger": {
   "kind": "step",
@@ -8,6 +8,50 @@
   "when": "GOT_STARTER and not BEAT_RIVAL1"
  },
  "commands": [
-  {"cmd": "beat", "name": "rival_challenge"}
+  {"cmd": "face_object", "object": "SPRITE_BLUE@4,3", "dir": "down"},
+  {"cmd": "face_player", "dir": "up"},
+  {"cmd": "play_song", "key": "meetrival"},
+  {"cmd": "say", "text": "{rival}: Wait\n{player}!\nLet's check out\nour POKéMON!\fCome on, I'll take\nyou on!"},
+  {"cmd": "walk_object_to", "object": "SPRITE_BLUE@4,3", "to": "player", "offset": [0, -1]},
+  {"cmd": "face_object", "object": "SPRITE_BLUE@4,3", "dir": "down"},
+  {
+   "cmd": "if",
+   "cond": "player_starter_charmander",
+   "then": [
+    {"cmd": "class_battle", "class": "OPP_RIVAL1", "party": 1, "npc": "OaksLab:4,3", "no_blackout": true}
+   ],
+   "else": [
+    {
+     "cmd": "if",
+     "cond": "player_starter_squirtle",
+     "then": [
+      {"cmd": "class_battle", "class": "OPP_RIVAL1", "party": 2, "npc": "OaksLab:4,3", "no_blackout": true}
+     ],
+     "else": [
+      {"cmd": "class_battle", "class": "OPP_RIVAL1", "party": 3, "npc": "OaksLab:4,3", "no_blackout": true}
+     ]
+    }
+   ]
+  },
+  {"cmd": "play_song", "key": "oakslab"},
+  {"cmd": "heal_party"},
+  {
+   "cmd": "if",
+   "cond": "battle_won",
+   "then": [
+    {"cmd": "say", "text": "WHAT?\nUnbelievable!\nI picked the\nwrong POKéMON!"}
+   ],
+   "else": [
+    {"cmd": "say", "text": "{rival}: Yeah! Am\nI great or what?"}
+   ]
+  },
+  {"cmd": "wait", "frames": 20},
+  {"cmd": "say", "text": "{rival}: Okay!\nI'll make my\nPOKéMON fight to\ntoughen it up!\f{player}! Gramps!\nSmell you later!"},
+  {"cmd": "play_song", "key": "meetrival_alt"},
+  {"cmd": "walk_object_to", "object": "SPRITE_BLUE@4,3", "to": [4, 11]},
+  {"cmd": "hide_object", "object": "SPRITE_BLUE@4,3"},
+  {"cmd": "play_song", "key": "oakslab"},
+  {"cmd": "set_flag", "flag": "BEAT_RIVAL1"},
+  {"cmd": "set_flag", "flag": "RIVAL_LEFT_LAB"}
  ]
 }
