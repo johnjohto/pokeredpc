@@ -1,0 +1,16 @@
+{
+ "$comment": "scripts/Route22Gate.asm — the one gate house entered from two different maps: all four doors are LAST_MAP warps, so pokered re-picks wLastMap from the half of the building the player stands in (wYCoord < 4 -> ROUTE_23). Without it Route 23 — and the League — is unreachable on foot (gh #87). Non-consuming poke; the id's 'a_' keeps it sorted before the badge check so it runs on shared cells.",
+ "id": "event:route22_gate_a_north_half",
+ "trigger": {
+  "kind": "step",
+  "map": "map:Route22Gate",
+  "region": [0, 0, 9, 3],
+  "consume": false
+ },
+ "commands": [
+  {
+   "cmd": "set_last_map",
+   "map": "map:Route23"
+  }
+ ]
+}

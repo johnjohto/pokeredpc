@@ -1,0 +1,24 @@
+{
+ "$comment": "scripts/Route23.asm Route23DefaultScript — the badge checkpoint at cell row 96 needs the SOULBADGE to pass north. Each guard checks its badge once (EVENT_PASSED_<badge>_CHECK, gh #178); refused, a MovePlayerDownScript push-back after the text.",
+ "id": "event:route23_gate_soulbadge",
+ "trigger": {
+  "kind": "step",
+  "map": "map:Route23",
+  "region": [0, 96, 19, 96],
+  "when": "not PASSED_SOULBADGE_CHECK"
+ },
+ "commands": [
+  {
+   "cmd": "if",
+   "cond": "badge_soulbadge",
+   "then": [
+    {"cmd": "set_flag", "flag": "PASSED_SOULBADGE_CHECK"},
+    {"cmd": "notice", "text": "You can pass here\nonly if you have\nthe SOULBADGE!\fOh! That is the\nSOULBADGE!\fOK then! Please,\ngo right ahead!"}
+   ],
+   "else": [
+    {"cmd": "step_back_down"},
+    {"cmd": "notice", "text": "You can pass here\nonly if you have\nthe SOULBADGE!\fYou don't have\nthe SOULBADGE yet!\fYou have to have\nit to get to\nPOKéMON LEAGUE!"}
+   ]
+  }
+ ]
+}

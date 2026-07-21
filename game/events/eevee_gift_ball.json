@@ -1,0 +1,16 @@
+{
+ "$comment": "scripts/CeladonMansionRoofHouse.asm — the Eevee gift ball.",
+ "id": "event:eevee_gift_ball",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:CeladonMansionRoofHouse",
+  "object": "SPRITE_POKE_BALL@4,3"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "gift_mon_ball",
+   "args": ["eevee", 25, "GOT_EEVEE", "@npc"]
+  }
+ ]
+}

@@ -1,0 +1,15 @@
+{
+ "$comment": "scripts/Route2Gate.asm — Oak's aide: HM05 (FLASH) at 10 owned species (the beat carries the count gate).",
+ "id": "event:route2_gate_aide",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:Route2Gate",
+  "object": "SPRITE_SCIENTIST@1,4"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "oaks_aide_flash"
+  }
+ ]
+}

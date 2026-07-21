@@ -14943,6 +14943,41 @@ func _eventtest() -> void:
 	ok = _ev_check("visible_when: walking Daisy shown once GOT_TOWN_MAP",
 		not _npc_by_key("SPRITE_DAISY@2,3").shown and _npc_by_key("SPRITE_DAISY@6,4").shown) and ok
 
+	# 7 — wave-B refusals (gh #40): a beat that is not a Cutscene method, a step trigger
+	# with no cells — each refuses at boot naming the record.
+	e = vm.load_all({"badbeat": {"trigger": {"kind": "interact", "map": "map:X", "object": "o"},
+		"commands": [{"cmd": "beat", "name": "no_such_beat"}]}})
+	ok = _ev_check("loader refuses an unknown beat", e.contains("unknown beat 'no_such_beat'"), e) and ok
+	e = vm.load_all({"badstep": {"trigger": {"kind": "step", "map": "map:X"}, "commands": []}})
+	ok = _ev_check("loader refuses a step trigger without cells", e.contains("needs cells"), e) and ok
+
+	# 8 — step dispatch: the non-consuming record runs first (id order), its flag is
+	# visible to the consuming record's `when` in the SAME step, and the step consumes.
+	var vm2 := EventVM.new()
+	vm2.main = self
+	e = vm2.load_all({
+		"a_poke": {"trigger": {"kind": "step", "map": "map:X", "cells": [[1, 1]], "consume": false},
+			"commands": [{"cmd": "set_flag", "flag": "EVT_POKE"}]},
+		"b_gate": {"trigger": {"kind": "step", "map": "map:X", "cells": [[1, 1]], "when": "EVT_POKE"},
+			"commands": [{"cmd": "set_flag", "flag": "EVT_GATE"}]}})
+	ok = _ev_check("wave-B synthetic records load clean", e == "", e) and ok
+	story_events = {}
+	var consumed: bool = vm2.step_fire("X", Vector2i(1, 1))
+	ok = _ev_check("step: poke ran, gated record consumed the step",
+		consumed and has_event("EVT_POKE") and has_event("EVT_GATE")) and ok
+	ok = _ev_check("step: run() restored cutscene_active", not cutscene_active) and ok
+
+	# 9 — battle_end records run inside the trainer-battle beat, which still owns the
+	# cutscene flag: run() must save/restore it, never clear it.
+	e = vm2.load_all({"c_be": {"trigger": {"kind": "battle_end", "map": "map:Y"},
+		"commands": [{"cmd": "set_flag", "flag": "EVT_BE"}]}})
+	ok = _ev_check("battle_end record loads clean", e == "", e) and ok
+	cutscene_active = true
+	vm2.run_battle_end("Y")
+	ok = _ev_check("battle_end: ran with cutscene_active preserved",
+		has_event("EVT_BE") and cutscene_active) and ok
+	cutscene_active = false
+
 	print("[eventtest] %s" % ("ALL GREEN" if ok else "FAIL"))
 	get_tree().quit(0 if ok else 1)
 

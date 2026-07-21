@@ -31,10 +31,14 @@ project/
     hidden_items.json    table — map ref -> placements
     trades.json          table — the in-game trades
     events/<key>.json    one record per file  (id: "event:<key>") — an AUTHORED
-                         event (ADR-019, gh #39): a declarative trigger {kind, map,
-                         object|cell, …} + a nested-block command list; `visible`
-                         triggers carry `visible_when` (a FormulaExpr over story
-                         flags/vars) and are load-time queries, never command runs.
+                         event (ADR-019, gh #39/#40): a declarative trigger {kind:
+                         interact|visible|enter|step|battle_end, map, object|front|
+                         cells|region, facing, when, consume} + a nested-block
+                         command list; `visible` triggers carry `visible_when` and
+                         are load-time queries, never command runs; `step` dispatch
+                         is (map, cell)-indexed at load. Conditions are FormulaExpr
+                         over story flags/vars plus item_<id>/badge_<name>/
+                         badge_count/force_bike.
                          Authored in-repo (game/events/), byte-copied in by the
                          extractor — events cannot be extracted from the asm. The
                          trigger-kind and command enums grow wave by wave with the

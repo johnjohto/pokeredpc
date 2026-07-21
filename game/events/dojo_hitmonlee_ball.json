@@ -1,0 +1,16 @@
+{
+ "$comment": "scripts/FightingDojo.asm — the Hitmonlee prize ball: pick one, the other vanishes.",
+ "id": "event:dojo_hitmonlee_ball",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:FightingDojo",
+  "object": "SPRITE_POKE_BALL@4,1"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "hitmon_gift",
+   "args": ["hitmonlee", "@npc"]
+  }
+ ]
+}

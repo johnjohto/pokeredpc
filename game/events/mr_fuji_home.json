@@ -1,0 +1,10 @@
+{
+ "$comment": "scripts/MrFujisHouse.asm — he's only home after the Pokémon Tower rescue.",
+ "id": "event:mr_fuji_home",
+ "trigger": {
+  "kind": "visible",
+  "map": "map:MrFujisHouse",
+  "object": "SPRITE_MR_FUJI@3,1",
+  "visible_when": "RESCUED_MR_FUJI"
+ }
+}

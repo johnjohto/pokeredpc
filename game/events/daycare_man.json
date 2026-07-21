@@ -1,0 +1,15 @@
+{
+ "$comment": "scripts/Daycare.asm — the Day-Care man boards one party mon.",
+ "id": "event:daycare_man",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:Daycare",
+  "object": "SPRITE_GENTLEMAN@2,3"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "daycare_man"
+  }
+ ]
+}

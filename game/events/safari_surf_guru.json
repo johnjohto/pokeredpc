@@ -1,0 +1,15 @@
+{
+ "$comment": "scripts/SafariZoneSecretHouse.asm — the secret-house guru gives HM03 (SURF).",
+ "id": "event:safari_surf_guru",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:SafariZoneSecretHouse",
+  "object": "SPRITE_FISHING_GURU@3,3"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "safari_surf_guru"
+  }
+ ]
+}

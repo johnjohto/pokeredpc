@@ -1,0 +1,15 @@
+{
+ "$comment": "scripts/BikeShop.asm — the clerk trades the BIKE VOUCHER for the BICYCLE.",
+ "id": "event:bike_shop_clerk",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:BikeShop",
+  "object": "SPRITE_BIKE_SHOP_CLERK@6,2"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "bike_shop_clerk"
+  }
+ ]
+}

@@ -85,25 +85,6 @@ func sfx(key: String) -> void:
 		main.audio.play_sfx(key)
 
 
-## Turn the player back the way they came (a guard pushing you off a gate cell).
-func bounce_back(cell: Vector2i) -> void:
-	var fd: Vector2i = [Vector2i(0, 1), Vector2i(0, -1), Vector2i(-1, 0), Vector2i(1, 0)][main.player.facing]
-	main.player.place(cell - fd)
-
-
-## pokered's `*MovePlayerDownScript` idiom (Viridian City's gym door, Route 23's badge checkpoints):
-## face DOWN, then simulate one PAD_DOWN. It is a **step**, not a teleport — collision still applies, so
-## the press hops a down-ledge two cells, walks onto open ground, or bumps a wall and leaves the player
-## exactly where they stood. Turning it into a `place()` is how you end up inside scenery (gh #86).
-func step_back_down(cell: Vector2i) -> void:
-	main.player.facing = 0                       # ld [wSpritePlayerStateData1FacingDirection], 0
-	var d := Vector2i(0, 1)
-	if main.ledge_match(cell, "down", d):
-		main.player.place(cell + d * 2)
-	elif main.player_can_enter(cell + d):
-		main.player.place(cell + d)
-
-
 func face_player(npc) -> void:
 	npc.face_to(main.player.cell)
 
@@ -249,35 +230,6 @@ func elevator_panel(floors: Array) -> void:
 		w["dest_map"] = str(floors[idx][1])
 		w["dest_warp"] = int(floors[idx][2])
 	await main.shake_elevator()
-
-
-# Saffron gate guards (scripts/Route5Gate.asm): thirsty, they block the way until handed a drink.
-const SAFFRON_DRINKS := ["FRESH WATER", "SODA POP", "LEMONADE"]
-const _PUSH_DIR := {Vector2i(0, 1): 0, Vector2i(0, -1): 1, Vector2i(-1, 0): 2, Vector2i(1, 0): 3}
-
-
-## One drink opens all four gates (GAVE_SAFFRON_GUARDS_DRINK); otherwise pushed back off the
-## checkpoint cell, away from Saffron.
-func thirsty_guard(cell: Vector2i, push: Vector2i) -> void:
-	var drink := ""
-	for d in SAFFRON_DRINKS:
-		if main.player_bag.has(d):
-			drink = d
-			break
-	if drink != "":
-		main.player_bag[drink] = int(main.player_bag[drink]) - 1
-		if int(main.player_bag[drink]) <= 0:
-			main.player_bag.erase(drink)
-		set_event("GAVE_SAFFRON_GUARDS_DRINK")
-		say("Yech! That hit\nthe spot!\fThanks! Now I feel\nrefreshed.\fGo right ahead!")
-	else:
-		# pokered Route5GateDefaultScript: show the thirsty line, THEN a simulated PAD walks the player
-		# back one tile — a real walk step, not a teleport, and text-first (gh #113).
-		main.cutscene_active = true
-		main.modal = null
-		await main.cutscene.say("I'm on guard duty.\fGee, I'm thirsty,\nthough!\fSorry, the road's\nclosed.")
-		await main.player.step(_PUSH_DIR[push])
-		main.cutscene_active = false
 
 
 ## Gen-1 **dungeon warp**: stepping on a hole drops you to the floor below. The holes are *not* tiles —

@@ -1,0 +1,14 @@
+{
+ "$comment": "scripts/CinnabarIsland.asm — leaving the lab finishes the fossil revival.",
+ "id": "event:cinnabar_island_lab_done",
+ "trigger": {
+  "kind": "enter",
+  "map": "map:CinnabarIsland"
+ },
+ "commands": [
+  {
+   "cmd": "clear_flag",
+   "flag": "LAB_STILL_REVIVING_FOSSIL"
+  }
+ ]
+}

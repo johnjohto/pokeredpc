@@ -1,0 +1,24 @@
+{
+ "$comment": "scripts/Route23.asm Route23DefaultScript — the badge checkpoint at cell row 56 needs the VOLCANOBADGE to pass north. Each guard checks its badge once (EVENT_PASSED_<badge>_CHECK, gh #178); refused, a MovePlayerDownScript push-back after the text.",
+ "id": "event:route23_gate_volcanobadge",
+ "trigger": {
+  "kind": "step",
+  "map": "map:Route23",
+  "region": [0, 56, 19, 56],
+  "when": "not PASSED_VOLCANOBADGE_CHECK"
+ },
+ "commands": [
+  {
+   "cmd": "if",
+   "cond": "badge_volcanobadge",
+   "then": [
+    {"cmd": "set_flag", "flag": "PASSED_VOLCANOBADGE_CHECK"},
+    {"cmd": "notice", "text": "You can pass here\nonly if you have\nthe VOLCANOBADGE!\fOh! That is the\nVOLCANOBADGE!\fOK then! Please,\ngo right ahead!"}
+   ],
+   "else": [
+    {"cmd": "step_back_down"},
+    {"cmd": "notice", "text": "You can pass here\nonly if you have\nthe VOLCANOBADGE!\fYou don't have\nthe VOLCANOBADGE yet!\fYou have to have\nit to get to\nPOKéMON LEAGUE!"}
+   ]
+  }
+ ]
+}

@@ -1,0 +1,14 @@
+{
+ "$comment": "scripts/Route16Gate1F.asm — no pedestrians on CYCLING ROAD without the BICYCLE: turned back the way you came.",
+ "id": "event:route16_gate_pedestrians",
+ "trigger": {
+  "kind": "step",
+  "map": "map:Route16Gate1F",
+  "cells": [[4, 7], [4, 8], [4, 9], [4, 10]],
+  "when": "item_bicycle == 0"
+ },
+ "commands": [
+  {"cmd": "bounce_back"},
+  {"cmd": "notice", "text": "No pedestrians\nare allowed on\nCYCLING ROAD!"}
+ ]
+}

@@ -1,0 +1,37 @@
+{
+ "$comment": "scripts/Route5Gate.asm — the thirsty guard blocks the way into Saffron until handed a drink (FRESH WATER > SODA POP > LEMONADE, one bottle taken). One drink opens all four gates (GAVE_SAFFRON_GUARDS_DRINK). Refused: the thirsty line, THEN a simulated PAD walks the player back one tile — a real step, not a teleport, and text-first (gh #113).",
+ "id": "event:route5_gate_thirsty_guard",
+ "trigger": {
+  "kind": "step",
+  "map": "map:Route5Gate",
+  "cells": [[3, 3], [4, 3]],
+  "when": "not GAVE_SAFFRON_GUARDS_DRINK"
+ },
+ "commands": [
+  {
+   "cmd": "if",
+   "cond": "item_fresh_water > 0 or item_soda_pop > 0 or item_lemonade > 0",
+   "then": [
+    {
+     "cmd": "if",
+     "cond": "item_fresh_water > 0",
+     "then": [{"cmd": "take_item", "item": "item:fresh_water"}],
+     "else": [
+      {
+       "cmd": "if",
+       "cond": "item_soda_pop > 0",
+       "then": [{"cmd": "take_item", "item": "item:soda_pop"}],
+       "else": [{"cmd": "take_item", "item": "item:lemonade"}]
+      }
+     ]
+    },
+    {"cmd": "set_flag", "flag": "GAVE_SAFFRON_GUARDS_DRINK"},
+    {"cmd": "notice", "text": "Yech! That hit\nthe spot!\fThanks! Now I feel\nrefreshed.\fGo right ahead!"}
+   ],
+   "else": [
+    {"cmd": "say", "text": "I'm on guard duty.\fGee, I'm thirsty,\nthough!\fSorry, the road's\nclosed."},
+    {"cmd": "walk_player", "dir": "up"}
+   ]
+  }
+ ]
+}

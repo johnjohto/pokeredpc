@@ -1,0 +1,14 @@
+{
+ "$comment": "scripts/ViridianCity.asm ViridianCityMovePlayerDownScript — the cell below the gym door at (32,7): one simulated PAD_DOWN, and (32,9) is a down-ledge, so the press hops the player clean over it back onto the street (gh #86). The badge terms cover the just-earned-seventh-badge walk-up before the latch record has run on a reload.",
+ "id": "event:viridian_gym_locked",
+ "trigger": {
+  "kind": "step",
+  "map": "map:ViridianCity",
+  "cells": [[32, 8]],
+  "when": "not VIRIDIAN_GYM_OPEN and not (badge_boulderbadge and badge_cascadebadge and badge_thunderbadge and badge_rainbowbadge and badge_soulbadge and badge_marshbadge and badge_volcanobadge)"
+ },
+ "commands": [
+  {"cmd": "step_back_down"},
+  {"cmd": "notice", "text": "The GYM's doors are\nlocked..."}
+ ]
+}

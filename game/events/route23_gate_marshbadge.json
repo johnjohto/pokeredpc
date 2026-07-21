@@ -1,0 +1,24 @@
+{
+ "$comment": "scripts/Route23.asm Route23DefaultScript — the badge checkpoint at cell row 85 needs the MARSHBADGE to pass north. Each guard checks its badge once (EVENT_PASSED_<badge>_CHECK, gh #178); refused, a MovePlayerDownScript push-back after the text.",
+ "id": "event:route23_gate_marshbadge",
+ "trigger": {
+  "kind": "step",
+  "map": "map:Route23",
+  "region": [0, 85, 19, 85],
+  "when": "not PASSED_MARSHBADGE_CHECK"
+ },
+ "commands": [
+  {
+   "cmd": "if",
+   "cond": "badge_marshbadge",
+   "then": [
+    {"cmd": "set_flag", "flag": "PASSED_MARSHBADGE_CHECK"},
+    {"cmd": "notice", "text": "You can pass here\nonly if you have\nthe MARSHBADGE!\fOh! That is the\nMARSHBADGE!\fOK then! Please,\ngo right ahead!"}
+   ],
+   "else": [
+    {"cmd": "step_back_down"},
+    {"cmd": "notice", "text": "You can pass here\nonly if you have\nthe MARSHBADGE!\fYou don't have\nthe MARSHBADGE yet!\fYou have to have\nit to get to\nPOKéMON LEAGUE!"}
+   ]
+  }
+ ]
+}

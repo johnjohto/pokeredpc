@@ -1,0 +1,37 @@
+{
+ "$comment": "scripts/Route6Gate.asm — the thirsty guard blocks the way into Saffron until handed a drink; pushed back down toward Route 6 when refused (gh #113: text first, then a real step).",
+ "id": "event:route6_gate_thirsty_guard",
+ "trigger": {
+  "kind": "step",
+  "map": "map:Route6Gate",
+  "cells": [[3, 2], [4, 2]],
+  "when": "not GAVE_SAFFRON_GUARDS_DRINK"
+ },
+ "commands": [
+  {
+   "cmd": "if",
+   "cond": "item_fresh_water > 0 or item_soda_pop > 0 or item_lemonade > 0",
+   "then": [
+    {
+     "cmd": "if",
+     "cond": "item_fresh_water > 0",
+     "then": [{"cmd": "take_item", "item": "item:fresh_water"}],
+     "else": [
+      {
+       "cmd": "if",
+       "cond": "item_soda_pop > 0",
+       "then": [{"cmd": "take_item", "item": "item:soda_pop"}],
+       "else": [{"cmd": "take_item", "item": "item:lemonade"}]
+      }
+     ]
+    },
+    {"cmd": "set_flag", "flag": "GAVE_SAFFRON_GUARDS_DRINK"},
+    {"cmd": "notice", "text": "Yech! That hit\nthe spot!\fThanks! Now I feel\nrefreshed.\fGo right ahead!"}
+   ],
+   "else": [
+    {"cmd": "say", "text": "I'm on guard duty.\fGee, I'm thirsty,\nthough!\fSorry, the road's\nclosed."},
+    {"cmd": "walk_player", "dir": "down"}
+   ]
+  }
+ ]
+}

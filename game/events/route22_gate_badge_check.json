@@ -1,0 +1,15 @@
+{
+ "$comment": "scripts/Route22Gate.asm — the way north to Route 23 / the League needs the BOULDERBADGE.",
+ "id": "event:route22_gate_badge_check",
+ "trigger": {
+  "kind": "step",
+  "map": "map:Route22Gate",
+  "cells": [[4, 2], [5, 2]],
+  "when": "not badge_boulderbadge"
+ },
+ "commands": [
+  {"cmd": "bounce_back"},
+  {"cmd": "sfx", "key": "denied"},
+  {"cmd": "notice", "text": "Only truly skilled\ntrainers are\nallowed through.\fThe rules are the\nrules. I can't\nlet you pass!"}
+ ]
+}

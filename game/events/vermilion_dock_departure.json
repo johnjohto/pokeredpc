@@ -1,0 +1,16 @@
+{
+ "$comment": "scripts/VermilionDock.asm — stepping off the ship onto the dock with HM01, the S.S. Anne sets sail (wDestinationWarpID == 1: the record's cell (14,2) is the gangway-warp arrival tile).",
+ "id": "event:vermilion_dock_departure",
+ "trigger": {
+  "kind": "enter",
+  "map": "map:VermilionDock",
+  "cells": [[14, 2]],
+  "when": "GOT_HM01 and not SS_ANNE_LEFT"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "ss_anne_departs"
+  }
+ ]
+}

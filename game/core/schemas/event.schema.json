@@ -1,7 +1,7 @@
 {
  "$schema": "https://json-schema.org/draft/2020-12/schema",
  "$id": "schema:event",
- "$comment": "An authored event record (ADR-019, gh #39/#40): a declarative trigger + a nested-block command list. The trigger-kind and command enums are extended wave by wave — each kind/command lands with the Kanto beat that demands it (ADR-019 §6), and the runtime VM refuses at boot any kind, command, or condition it cannot execute, so this schema and the interpreter move together. `visible` triggers are load-time QUERIES (visible_when decides a map object's visibility), never command runs; `step` dispatch is (map, cell)-indexed at load. Conditions (`visible_when`, `when`, `if.cond`) are FormulaExpr strings whose bare identifiers read story flags (1/0) and event vars, plus the engine-state vocabulary `item_<id>` (bag count), `badge_<name>`, `badge_count`, and `force_bike`. `say` text may hold {player}/{rival} placeholders; \\n is a line break, \\f a page break, as v1's text engine reads them. `beat` invokes a native Cutscene beat by name (the strangler-fig seam while wave C dissolves story beats; ceremonies stay native forever); the arg \"@npc\" resolves to the triggering NPC.",
+ "$comment": "An authored event record (ADR-019, gh #39/#40): a declarative trigger + a nested-block command list. The trigger-kind and command enums are extended wave by wave — each kind/command lands with the Kanto beat that demands it (ADR-019 §6), and the runtime VM refuses at boot any kind, command, or condition it cannot execute, so this schema and the interpreter move together. `visible` triggers are load-time QUERIES (visible_when decides a map object's visibility), never command runs; `step` dispatch is (map, cell)-indexed at load. Conditions (`visible_when`, `when`, `if.cond`) are FormulaExpr strings whose bare identifiers read story flags (1/0) and event vars, plus the engine-state vocabulary `item_<id>` (bag count), `badge_<name>`, `badge_count`, and `force_bike`. `say` is a blocking dialogue page; `notice` is the one-shot non-blocking textbox (a guard's line after a push-back — the event ends without waiting for the dismissal). Text may hold {player}/{rival} placeholders; \\n is a line break, \\f a page break, as v1's text engine reads them. `beat` invokes a native Cutscene beat by name (the strangler-fig seam while wave C dissolves story beats; ceremonies stay native forever); the arg \"@npc\" resolves to the triggering NPC.",
  "type": "object",
  "required": [
   "id",
@@ -108,6 +108,22 @@
       "properties": {
        "cmd": {
         "const": "say"
+       },
+       "text": {
+        "type": "string"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "text"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "notice"
        },
        "text": {
         "type": "string"

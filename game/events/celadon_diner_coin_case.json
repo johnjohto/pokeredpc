@@ -1,0 +1,15 @@
+{
+ "$comment": "scripts/CeladonDiner.asm — the gambler hands over the COIN CASE (he lost it at the slots).",
+ "id": "event:celadon_diner_coin_case",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:CeladonDiner",
+  "object": "SPRITE_GYM_GUIDE@0,1"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "coin_case_giver"
+  }
+ ]
+}

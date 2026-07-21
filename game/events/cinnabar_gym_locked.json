@@ -1,0 +1,14 @@
+{
+ "$comment": "scripts/CinnabarIsland.asm CinnabarIslandDefaultScript — without the SECRET KEY, standing on the tile below the Gym door bounces you straight back: a MovePlayerDownScript (face up, 'The door is locked...', one simulated PAD_DOWN), so you never step onto the door warp itself (gh #172). With the key this record's gate fails and the door warp works normally.",
+ "id": "event:cinnabar_gym_locked",
+ "trigger": {
+  "kind": "step",
+  "map": "map:CinnabarIsland",
+  "cells": [[18, 4]],
+  "when": "item_secret_key == 0"
+ },
+ "commands": [
+  {"cmd": "step_back_down"},
+  {"cmd": "notice", "text": "The door is\nlocked..."}
+ ]
+}

@@ -1,0 +1,16 @@
+{
+ "$comment": "scripts/ViridianCity.asm — the awake old man runs the catching demo (BATTLE_TYPE_OLD_MAN).",
+ "id": "event:viridian_oldman_demo",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:ViridianCity",
+  "object": "SPRITE_GAMBLER@17,5"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "oldman_demo",
+   "args": ["@npc"]
+  }
+ ]
+}

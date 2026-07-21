@@ -1,0 +1,24 @@
+{
+ "$comment": "scripts/Route23.asm Route23DefaultScript — the badge checkpoint at cell row 119 needs the THUNDERBADGE to pass north. Each guard checks its badge once (EVENT_PASSED_<badge>_CHECK, gh #178); refused, a MovePlayerDownScript push-back after the text.",
+ "id": "event:route23_gate_thunderbadge",
+ "trigger": {
+  "kind": "step",
+  "map": "map:Route23",
+  "region": [0, 119, 19, 119],
+  "when": "not PASSED_THUNDERBADGE_CHECK"
+ },
+ "commands": [
+  {
+   "cmd": "if",
+   "cond": "badge_thunderbadge",
+   "then": [
+    {"cmd": "set_flag", "flag": "PASSED_THUNDERBADGE_CHECK"},
+    {"cmd": "notice", "text": "You can pass here\nonly if you have\nthe THUNDERBADGE!\fOh! That is the\nTHUNDERBADGE!\fOK then! Please,\ngo right ahead!"}
+   ],
+   "else": [
+    {"cmd": "step_back_down"},
+    {"cmd": "notice", "text": "You can pass here\nonly if you have\nthe THUNDERBADGE!\fYou don't have\nthe THUNDERBADGE yet!\fYou have to have\nit to get to\nPOKéMON LEAGUE!"}
+   ]
+  }
+ ]
+}

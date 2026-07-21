@@ -1,0 +1,14 @@
+{
+ "$comment": "scripts/CeladonMartRoof.asm — the rooftop vending machines (bg_events) sell the drinks the Saffron guards want. (The roof girl's drink-for-TM trade is a text-id branch in Main.)",
+ "id": "event:celadon_roof_vending",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:CeladonMartRoof",
+  "front": [[10, 1], [11, 1], [12, 2]]
+ },
+ "commands": [
+  {
+   "cmd": "vending"
+  }
+ ]
+}

@@ -1,0 +1,15 @@
+{
+ "$comment": "scripts/SSAnneCaptainsRoom.asm — rub the seasick captain's back -> HM01 (CUT).",
+ "id": "event:ss_anne_captain",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:SSAnneCaptainsRoom",
+  "object": "SPRITE_CAPTAIN@4,2"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "ss_anne_captain"
+  }
+ ]
+}

@@ -1,0 +1,16 @@
+{
+ "$comment": "scripts/ViridianCity.asm ViridianCityCheckGotPokedexScript — the sleepy old man blocks the road north (X==19, Y==9) until the player has the POKéDEX.",
+ "id": "event:viridian_oldman_block",
+ "trigger": {
+  "kind": "step",
+  "map": "map:ViridianCity",
+  "cells": [[19, 9]],
+  "when": "not GOT_POKEDEX"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "viridian_oldman_block"
+  }
+ ]
+}

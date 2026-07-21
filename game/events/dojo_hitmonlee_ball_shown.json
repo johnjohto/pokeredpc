@@ -1,0 +1,10 @@
+{
+ "$comment": "scripts/FightingDojo.asm — both prize balls stand until either Hitmon is taken.",
+ "id": "event:dojo_hitmonlee_ball_shown",
+ "trigger": {
+  "kind": "visible",
+  "map": "map:FightingDojo",
+  "object": "SPRITE_POKE_BALL@4,1",
+  "visible_when": "not (GOT_HITMONLEE or GOT_HITMONCHAN)"
+ }
+}

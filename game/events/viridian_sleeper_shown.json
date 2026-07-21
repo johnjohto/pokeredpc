@@ -1,0 +1,10 @@
+{
+ "$comment": "toggleable_objects.asm — the sleepy road-blocker ships ON and wakes (vanishes) after his coffee, i.e. once the player holds the POKéDEX.",
+ "id": "event:viridian_sleeper_shown",
+ "trigger": {
+  "kind": "visible",
+  "map": "map:ViridianCity",
+  "object": "SPRITE_GAMBLER_ASLEEP@18,9",
+  "visible_when": "not GOT_POKEDEX"
+ }
+}

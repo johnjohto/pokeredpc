@@ -1,0 +1,16 @@
+{
+ "$comment": "scripts/GameCornerPrizeRoom.asm — the left prize counter (bg_event at (2,2)): the first Pokémon counter.",
+ "id": "event:prize_counter_left",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:GameCornerPrizeRoom",
+  "front": [[2, 2]]
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "prize_vendor",
+   "args": [0]
+  }
+ ]
+}

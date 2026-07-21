@@ -1,0 +1,15 @@
+{
+ "$comment": "scripts/Route12SuperRodHouse.asm — the Route 12 brother gives the SUPER ROD.",
+ "id": "event:route12_super_rod_guru",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:Route12SuperRodHouse",
+  "object": "SPRITE_FISHING_GURU@2,4"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "super_rod_guru"
+  }
+ ]
+}

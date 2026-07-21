@@ -1,0 +1,15 @@
+{
+ "$comment": "scripts/Route23.asm Route23SetVictoryRoadBoulders — stepping back onto the road re-arms Victory Road's boulder puzzle: both of 2F's switches and both of 3F's reset, 3F's boulder goes back to (22,15) (ShowObject TOGGLE_VICTORY_ROAD_3F_BOULDER) and 2F's is hidden again, so a second trip through Victory Road is a second solve.",
+ "id": "event:route23_boulder_reset",
+ "trigger": {
+  "kind": "enter",
+  "map": "map:Route23"
+ },
+ "commands": [
+  {"cmd": "clear_flag", "flag": "VR2_SWITCH1"},
+  {"cmd": "clear_flag", "flag": "VR2_SWITCH2"},
+  {"cmd": "clear_flag", "flag": "VR3_SWITCH1"},
+  {"cmd": "clear_flag", "flag": "VR3_SWITCH2"},
+  {"cmd": "clear_flag", "flag": "FELL_SPRITE_BOULDER@22,15"}
+ ]
+}

@@ -1,0 +1,15 @@
+{
+ "$comment": "scripts/FuchsiaGoodRodHouse.asm — the Fishing Guru's older brother gives the GOOD ROD.",
+ "id": "event:fuchsia_good_rod_guru",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:FuchsiaGoodRodHouse",
+  "object": "SPRITE_FISHING_GURU@5,3"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "good_rod_guru"
+  }
+ ]
+}

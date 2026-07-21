@@ -1,0 +1,15 @@
+{
+ "$comment": "scripts/WardensHouse.asm — the Warden trades the GOLD TEETH for HM04 (STRENGTH).",
+ "id": "event:warden_strength",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:WardensHouse",
+  "object": "SPRITE_WARDEN@2,3"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "warden_strength"
+  }
+ ]
+}

@@ -1,0 +1,17 @@
+{
+ "$comment": "scripts/ViridianCity.asm ViridianCityCheckGymOpenScript — the gym stays shut until you hold every OTHER badge (cp ~(1 << BIT_EARTHBADGE)), then EVENT_VIRIDIAN_GYM_OPEN latches on for good. The asm latches on any step; the record latches on the door step itself — the only cell that consults the flag — as a non-consuming poke sorted (by id) before the gym_locked gate, so the seventh badge opens the door on the very step.",
+ "id": "event:viridian_gym_latch",
+ "trigger": {
+  "kind": "step",
+  "map": "map:ViridianCity",
+  "cells": [[32, 8]],
+  "when": "not VIRIDIAN_GYM_OPEN and badge_boulderbadge and badge_cascadebadge and badge_thunderbadge and badge_rainbowbadge and badge_soulbadge and badge_marshbadge and badge_volcanobadge",
+  "consume": false
+ },
+ "commands": [
+  {
+   "cmd": "set_flag",
+   "flag": "VIRIDIAN_GYM_OPEN"
+  }
+ ]
+}

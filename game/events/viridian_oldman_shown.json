@@ -1,0 +1,10 @@
+{
+ "$comment": "toggleable_objects.asm — the awake old man ships OFF and appears once the player holds the POKéDEX.",
+ "id": "event:viridian_oldman_shown",
+ "trigger": {
+  "kind": "visible",
+  "map": "map:ViridianCity",
+  "object": "SPRITE_GAMBLER@17,5",
+  "visible_when": "GOT_POKEDEX"
+ }
+}

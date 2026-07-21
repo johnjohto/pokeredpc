@@ -1,0 +1,16 @@
+{
+ "$comment": "scripts/Route11Gate2F.asm — Oak's aide: the ITEMFINDER at 30 owned species. (The retired adapter's info text carried doubled apostrophes — a generation artifact; the record is the faithful text.)",
+ "id": "event:route11_gate_aide",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:Route11Gate2F",
+  "object": "SPRITE_SCIENTIST@2,6"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "oaks_aide",
+   "args": ["ITEMFINDER", 30, "GOT_ITEMFINDER", "There are items on\nthe ground that\ncan't be seen.\fITEMFINDER will\ndetect an item\nclose to you.\fIt can't pinpoint\nit, so you have\nto look yourself!"]
+  }
+ ]
+}

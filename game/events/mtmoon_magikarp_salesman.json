@@ -1,0 +1,15 @@
+{
+ "$comment": "scripts/MtMoonPokecenter.asm — the MAGIKARP salesman (L5 for 500).",
+ "id": "event:mtmoon_magikarp_salesman",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:MtMoonPokecenter",
+  "object": "SPRITE_MIDDLE_AGED_MAN@10,6"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "magikarp_salesman"
+  }
+ ]
+}

@@ -1,0 +1,14 @@
+{
+ "$comment": "scripts/Route16Gate1F.asm — res BIT_ALWAYS_ON_BIKE, [wStatusFlags6]: the gate house ends Cycling Road's forced ride.",
+ "id": "event:route16_gate_bike_reset",
+ "trigger": {
+  "kind": "enter",
+  "map": "map:Route16Gate1F"
+ },
+ "commands": [
+  {
+   "cmd": "set_force_bike",
+   "value": false
+  }
+ ]
+}

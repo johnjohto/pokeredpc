@@ -25,7 +25,7 @@ var _by_enter := {}      # "<label>"              -> [records]
 var _by_battle_end := {} # "<label>"              -> [records]
 
 const KINDS := ["interact", "visible", "enter", "step", "battle_end"]
-const CMDS := ["say", "if", "give_item", "take_item", "set_flag", "clear_flag", "sfx",
+const CMDS := ["say", "notice", "if", "give_item", "take_item", "set_flag", "clear_flag", "sfx",
 	"beat", "set_last_map", "set_block", "set_force_bike", "mount_bike",
 	"bounce_back", "step_back_down", "walk_player", "vending"]
 
@@ -230,6 +230,11 @@ func _run_block(cmds: Array, ctx: Dictionary) -> bool:
 		match str(c["cmd"]):
 			"say":
 				await main.cutscene.say(_interp(str(c["text"])))
+			"notice":
+				# The one-shot, non-blocking textbox (Main._say) — a guard's one-liner after a
+				# push-back. The event does not wait for the dismissal, exactly as the retired
+				# adapters' say() helper behaved; `say` is the blocking dialogue page.
+				main._say(_interp(str(c["text"])))
 			"if":
 				var branch: Array = c.get("then", []) if _truthy(c["_cond"]) else c.get("else", [])
 				if not await _run_block(branch, ctx):

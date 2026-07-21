@@ -1,0 +1,15 @@
+{
+ "$comment": "scripts/CinnabarLabFossilRoom.asm — the fossil scientist revives DOME/HELIX/AMBER.",
+ "id": "event:cinnabar_fossil_scientist",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:CinnabarLabFossilRoom",
+  "object": "SPRITE_SCIENTIST@5,2"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "revive_fossil"
+  }
+ ]
+}

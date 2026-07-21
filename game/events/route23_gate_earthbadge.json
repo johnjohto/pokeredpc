@@ -1,0 +1,24 @@
+{
+ "$comment": "scripts/Route23.asm Route23DefaultScript — the badge checkpoint at cell row 35 needs the EARTHBADGE to pass north. Each guard checks its badge once (EVENT_PASSED_<badge>_CHECK, gh #178); refused, a MovePlayerDownScript push-back after the text.",
+ "id": "event:route23_gate_earthbadge",
+ "trigger": {
+  "kind": "step",
+  "map": "map:Route23",
+  "region": [0, 35, 13, 35],
+  "when": "not PASSED_EARTHBADGE_CHECK"
+ },
+ "commands": [
+  {
+   "cmd": "if",
+   "cond": "badge_earthbadge",
+   "then": [
+    {"cmd": "set_flag", "flag": "PASSED_EARTHBADGE_CHECK"},
+    {"cmd": "notice", "text": "You can pass here\nonly if you have\nthe EARTHBADGE!\fOh! That is the\nEARTHBADGE!\fOK then! Please,\ngo right ahead!"}
+   ],
+   "else": [
+    {"cmd": "step_back_down"},
+    {"cmd": "notice", "text": "You can pass here\nonly if you have\nthe EARTHBADGE!\fYou don't have\nthe EARTHBADGE yet!\fYou have to have\nit to get to\nPOKéMON LEAGUE!"}
+   ]
+  }
+ ]
+}

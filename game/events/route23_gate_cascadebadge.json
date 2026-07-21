@@ -1,0 +1,24 @@
+{
+ "$comment": "scripts/Route23.asm Route23DefaultScript — the badge checkpoint at cell row 136 needs the CASCADEBADGE to pass north. Each guard checks its badge once (EVENT_PASSED_<badge>_CHECK, gh #178); refused, a MovePlayerDownScript push-back after the text.",
+ "id": "event:route23_gate_cascadebadge",
+ "trigger": {
+  "kind": "step",
+  "map": "map:Route23",
+  "region": [0, 136, 19, 136],
+  "when": "not PASSED_CASCADEBADGE_CHECK"
+ },
+ "commands": [
+  {
+   "cmd": "if",
+   "cond": "badge_cascadebadge",
+   "then": [
+    {"cmd": "set_flag", "flag": "PASSED_CASCADEBADGE_CHECK"},
+    {"cmd": "notice", "text": "You can pass here\nonly if you have\nthe CASCADEBADGE!\fOh! That is the\nCASCADEBADGE!\fOK then! Please,\ngo right ahead!"}
+   ],
+   "else": [
+    {"cmd": "step_back_down"},
+    {"cmd": "notice", "text": "You can pass here\nonly if you have\nthe CASCADEBADGE!\fYou don't have\nthe CASCADEBADGE yet!\fYou have to have\nit to get to\nPOKéMON LEAGUE!"}
+   ]
+  }
+ ]
+}

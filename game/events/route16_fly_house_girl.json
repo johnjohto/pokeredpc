@@ -1,0 +1,15 @@
+{
+ "$comment": "scripts/Route16FlyHouse.asm — the girl gives HM02 (FLY).",
+ "id": "event:route16_fly_house_girl",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:Route16FlyHouse",
+  "object": "SPRITE_BRUNETTE_GIRL@2,3"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "fly_house_girl"
+  }
+ ]
+}

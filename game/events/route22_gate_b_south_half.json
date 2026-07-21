@@ -1,0 +1,16 @@
+{
+ "$comment": "scripts/Route22Gate.asm — the southern half of the gate re-picks wLastMap = ROUTE_22 (gh #87).",
+ "id": "event:route22_gate_b_south_half",
+ "trigger": {
+  "kind": "step",
+  "map": "map:Route22Gate",
+  "region": [0, 4, 9, 7],
+  "consume": false
+ },
+ "commands": [
+  {
+   "cmd": "set_last_map",
+   "map": "map:Route22"
+  }
+ ]
+}

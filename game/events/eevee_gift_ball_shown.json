@@ -1,0 +1,10 @@
+{
+ "$comment": "scripts/CeladonMansionRoofHouse.asm — the Eevee ball stays on the table until taken.",
+ "id": "event:eevee_gift_ball_shown",
+ "trigger": {
+  "kind": "visible",
+  "map": "map:CeladonMansionRoofHouse",
+  "object": "SPRITE_POKE_BALL@4,3",
+  "visible_when": "not GOT_EEVEE"
+ }
+}

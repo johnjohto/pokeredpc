@@ -1,0 +1,24 @@
+{
+ "$comment": "scripts/Route23.asm Route23DefaultScript — the badge checkpoint at cell row 105 needs the RAINBOWBADGE to pass north. Each guard checks its badge once (EVENT_PASSED_<badge>_CHECK, gh #178); refused, a MovePlayerDownScript push-back after the text.",
+ "id": "event:route23_gate_rainbowbadge",
+ "trigger": {
+  "kind": "step",
+  "map": "map:Route23",
+  "region": [0, 105, 19, 105],
+  "when": "not PASSED_RAINBOWBADGE_CHECK"
+ },
+ "commands": [
+  {
+   "cmd": "if",
+   "cond": "badge_rainbowbadge",
+   "then": [
+    {"cmd": "set_flag", "flag": "PASSED_RAINBOWBADGE_CHECK"},
+    {"cmd": "notice", "text": "You can pass here\nonly if you have\nthe RAINBOWBADGE!\fOh! That is the\nRAINBOWBADGE!\fOK then! Please,\ngo right ahead!"}
+   ],
+   "else": [
+    {"cmd": "step_back_down"},
+    {"cmd": "notice", "text": "You can pass here\nonly if you have\nthe RAINBOWBADGE!\fYou don't have\nthe RAINBOWBADGE yet!\fYou have to have\nit to get to\nPOKéMON LEAGUE!"}
+   ]
+  }
+ ]
+}

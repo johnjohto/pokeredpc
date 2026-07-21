@@ -1,0 +1,15 @@
+{
+ "$comment": "scripts/VermilionOldRodHouse.asm — the Fishing Guru gives the OLD ROD.",
+ "id": "event:vermilion_old_rod_guru",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:VermilionOldRodHouse",
+  "object": "SPRITE_FISHING_GURU@2,4"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "old_rod_guru"
+  }
+ ]
+}
