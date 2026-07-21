@@ -181,10 +181,25 @@ party_shift forever — the mtmoontest wedge), THE END's held credits screen was
 encounter over an unsettled battle — `battle.start()` reuses the battle object, so the
 half-done ceremony smeared onto the new enemy and caught mons landed in the party as the NEXT
 encounter's species (very likely the root of gh #45's 'species'-crash family; the bot now
-guards + retries instead of corrupting). The single-process gate stays blocked on the
-remaining root cause: an intermittent battle-ceremony race under the 25× clock (a completed
-catch leaves the battle at its action menu with caught=true; same seed, different leg each
-run) — the gh #43/#45 trail has the full diagnosis.
+guards + retries instead of corrupting). **The "ceremony race" is root-caused and fixed
+(2026-07-21, gh #45):** it was never a queue race — `Main.start_battle` (and the
+trainer/safari variants) set `modal = battle` but ran `battle.start()` only after the awaited
+battle wipe, so through that multi-frame gap every reader of `battle.*` saw the PREVIOUS
+battle's terminal state. The hunt evaluated the enemy one battle behind (catching random mons,
+KO'ing real growlithes — the tell: a try that read "clefairy" on Route 7), stale `caught=true`
+broke `_pt_catch` instantly on the next encounter and left it undriven at its menu (the
+"never settled" wedge verbatim), and harnesses reading `enemy_mon` right after starting an
+encounter crashed on an empty dict's 'species'. The fix splits the starters into a synchronous
+`prime*()` (full state install, atomic with `modal = battle`, BEFORE the wipe) + a
+`begin_*intro()` after it; the battle's message pump is also generation-checked now (a stale
+tween/coroutine continuation drops loudly — `[qrace]` — instead of pumping a queue it never
+belonged to; optiontest caught a real one). The whole gh #45 red family went green on the fix:
+fishtest/towertest/snorlaxtest/crivaltest (the 'species' crashes), mtmoontest, gymtest's
+gh #109 leg, surgetest's post-puzzle section — with all four `--battledettest` md5s
+byte-identical and `--erikastage` catching the FIRST growlithe in 3/3 runs. (oaktest /
+diplomatest / flytest headless hangs are the separate frame_post_draw screenshot class —
+wipetest/moveanimtest hang headless the same way on HEAD and pass windowed — and
+route22test's budget stays marginal; those legs remain open on gh #45.)
 **Landed: gh #34** (2026-07-20): Catch + Progression are behind the seam and the
 **config-first knobs are real** — `Gen1Catch` (`attempt` over the byte-exact kernel + the
 safari `bait_rate`/`rock_rate` transitions, which moved out of the host's input handler),

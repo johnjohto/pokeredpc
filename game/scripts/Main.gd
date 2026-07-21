@@ -3928,9 +3928,14 @@ func start_battle(species: String, level: int) -> void:
 		and not player_bag.has("SILPH SCOPE") and not battle.unveil
 	if audio:
 		audio.play_song("wildbattle")
+	# The new battle's STATE installs atomically with `modal = battle` — the wipe's await
+	# opens a multi-frame gap, and anything that read battle.* through it (the bot's hunt,
+	# the test harnesses) got the PREVIOUS battle's terminal state: stale enemy_mon (the
+	# 'species' crash family), stale caught=true (the "never settled" wedges) — gh #45.
 	modal = battle
+	battle.prime(player_party, species, level)
 	await _battle_wipe(level, false)
-	battle.start(player_party, species, level)
+	battle.begin_intro()
 	transition.clear()
 
 
@@ -3939,8 +3944,9 @@ func start_safari_battle(species: String, level: int) -> void:
 	if audio:
 		audio.play_song("wildbattle")
 	modal = battle
+	battle.prime_safari(player_party, species, level)   # atomic with modal — gh #45
 	await _battle_wipe(level, false)
-	battle.start_safari(player_party, species, level)
+	battle.begin_safari_intro()
 	transition.clear()
 
 
@@ -3963,17 +3969,19 @@ func start_trainer_battle(opp_class: String, num: int, npc_id := "") -> void:
 		audio.play_song(song)
 	modal = battle
 	var party_data: Array = t["parties"][num - 1]
-	await _battle_wipe(int(party_data[0]["level"]), true)
 	# The rival battles (OPP_RIVAL1/2/3, incl. the Champion) use the name you gave him, not "RIVAL1".
 	var tname: String = rival_name if opp_class in ["OPP_RIVAL1", "OPP_RIVAL2", "OPP_RIVAL3"] else str(t["name"])
 	var pic_slug: String = str(trainer_pics.get(opp_class, ""))
 	var pic_tex: Texture2D = load("res://assets/trainers/pics/%s.png" % pic_slug) if pic_slug != "" else null
-	battle.start_trainer(player_party, party_data, tname, int(t["money"]), pic_tex)
+	# State atomic with modal (gh #45): prime + the AI config BEFORE the wipe's await gap.
+	battle.prime_trainer(player_party, party_data, tname, int(t["money"]), pic_tex)
 	# Gen-1 trainer AI config for the class (trainer_ai.asm / move_choices.asm).
 	battle.ai_mods = t.get("ai_mods", [])
 	battle.ai_kind = str(t.get("ai", "Generic"))
 	battle.ai_count_max = int(t.get("ai_count", 3))
 	battle._ai_uses = battle.ai_count_max
+	await _battle_wipe(int(party_data[0]["level"]), true)
+	battle.begin_trainer_intro()
 	transition.clear()
 
 
@@ -11129,6 +11137,15 @@ func _pt_catch(budget := 600) -> bool:
 				await _press("ui_accept")
 			_:
 				await _press("ui_accept")                # advance "Gotcha!" / broke-free messages
+	if modal == battle and not battle.caught:
+		# The budget died with the battle still up — say WHY the presses went nowhere
+		# (a stuck-held accept starves is_action_just_pressed; a stuck player.moving
+		# starves the Player._process modal dispatch), so a future wedge diagnoses
+		# itself instead of failing silently (gh #45's lesson).
+		print("[hunt] catch budget died: battle_state=%s qlen=%d accept_held=%s player_moving=%s placed=%s cs=%s modal_is_battle=%s modal_script=%s" % [
+			str(battle.state), battle.queue.size(), Input.is_action_pressed("ui_accept"),
+			player.moving, player.placed, cutscene_active, modal == battle,
+			str(modal.get_script().resource_path) if (modal != null and modal.get_script() != null) else "-"])
 	await _pt_drive_catch_ceremony()
 	return player_party.size() > party0 or pc_box.size() > box0
 
@@ -11225,21 +11242,29 @@ func _pt_catch_species(sp: String, budget := 50, min_level := 0) -> bool:
 		repel_steps = 0
 		_try_wild_encounter("grass", true)
 		if modal == battle:
+			# battle.* is trustworthy here: prime() installs the new battle's state
+			# synchronously inside start_battle, before the wipe's await gap (gh #45).
 			var e: Dictionary = battle.enemy_mon
 			if not battle.is_trainer and str(e["species"]) == sp and int(e["level"]) >= min_level:
-				await _pt_catch()
+				var got := await _pt_catch()
+				print("[hunt] %s L%d catch attempt -> got=%s (party=%d box=%d balls=%d)" % [
+					str(e["species"]), int(e["level"]), got, player_party.size(), pc_box.size(),
+					int(player_bag.get(_pt_ball_key(), 0))])
 			else:
 				await _pt_win_battle()                       # wrong species/level — KO it and fish again
 			await _drive_until(func() -> bool: return modal == null and not cutscene_active, 1500)
 			if modal != null or cutscene_active:
-				# NEVER force a new encounter over an unsettled battle: battle.start() reuses
-				# the battle object, so an overlap smears the old ceremony onto the new
-				# enemy — the caught mon lands in the party as the NEXT encounter's species
-				# (the seed-1 growlithe hunt failed exactly this way, and it is the likely
-				# root of the 'species'-crash family, gh #45). Bail; the caller's leg retry
-				# is the recovery.
-				print("[playthrough] catch: the previous battle never settled (modal=%s cs=%s state=%s caught=%s qlen=%d) — abandoning the hunt" % [
-					str(modal), cutscene_active, str(battle.state), battle.caught, battle.queue.size()])
+				# NEVER force a new encounter over an unsettled battle — battle.start()
+				# reuses the battle object. (The gh #45 hunts wedged here through the
+				# start_battle wipe gap — stale caught=true broke _pt_catch instantly and
+				# nobody drove the new battle; prime() closed that gap. The guard stays:
+				# any future unsettled state should still fail loud, not corrupt.)
+				print("[playthrough] catch: the previous battle never settled (modal=%s script=%s is_battle=%s cs=%s state=%s caught=%s qlen=%d accept_held=%s player_moving=%s) — abandoning the hunt" % [
+					str(modal), str(modal.get_script().resource_path) if (modal != null and modal.get_script() != null) else "-",
+					modal == battle, cutscene_active, str(battle.state), battle.caught, battle.queue.size(),
+					Input.is_action_pressed("ui_accept"), player.moving])
+				# The det stream is the forensic record of what the battle actually did.
+				print("[playthrough] catch: det tail: %s" % str(battle.det_stream.slice(maxi(0, battle.det_stream.size() - 8))))
 				break
 		if str(center_label) != gmap:
 			break

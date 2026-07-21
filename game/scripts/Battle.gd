@@ -235,6 +235,12 @@ var _pic_gone := {"player": false, "enemy": false}
 var _level_stats := {}         # new stats shown in the level-up box (PrintStatsBox)
 var queue: Array = []
 var after := ""
+# gh #45: every async continuation that resumes the pump (tween callbacks, the move-anim
+# coroutine) belongs to the queue that spawned it. _say/_begin bump the generation; a
+# continuation firing under an older generation is stale — a second pump draining a queue
+# it never belonged to (the intermittent catch-ceremony race: a completed catch back at
+# its action menu with caught=true). _cont() drops it, loudly.
+var _gen := 0
 
 # ---- determinism oracle (gh #2, ADR-014) -----------------------------------
 # The battle-local RNG + canonical event stream live on the module (gh #33); the full
@@ -410,13 +416,21 @@ func _new_vol() -> Dictionary:
 
 
 func start(p_party: Array, e_species: String, e_level: int) -> void:
+	prime(p_party, e_species, e_level)
+	begin_intro()
+
+
+## Install the whole battle STATE synchronously — reset, enemy, seed, the det S event.
+## Main's wrapped starters call this BEFORE the awaited battle wipe, atomically with
+## `modal = battle`, so nothing can ever read the PREVIOUS battle's terminal state
+## through the wipe's await gap (gh #45: the bot's hunt evaluated the enemy one battle
+## behind, stale `caught` wedged whole runs, and harnesses crashed on an empty
+## enemy_mon's 'species' — one gap, the whole family).
+func prime(p_party: Array, e_species: String, e_level: int) -> void:
 	_begin(p_party)
 	is_trainer = false
 	enemy_party = [main.make_mon(e_species, e_level, [])]
 	_set_enemy(0)
-	# Faithful to _InitBattleCommon/StartBattle/SendOutMon: silhouettes slide in, palettes reveal,
-	# the wild mon cries as the party pokeballs appear, "Wild X appeared!" types (no A press), the
-	# enemy HUD joins it, a 40-frame beat, the player pic slides off, then "Go!" + poof + pop-out.
 	if ghost or unveil:
 		# Pokémon Tower: the enemy presents as the unidentified GHOST (common_text.asm
 		# .pokemonTower — the GhostPic and the name "GHOST" over the real mon data).
@@ -424,6 +438,15 @@ func start(p_party: Array, e_species: String, e_level: int) -> void:
 		enemy_mon["real_name"] = enemy_mon["name"]
 		enemy_mon["name"] = "GHOST"
 		enemy_mon["label"] = "GHOST"
+	_det_event("S", "wild seed=%d" % battle_seed)
+
+
+## The presentation half: runs after the wipe (or immediately for direct start() callers).
+## Faithful to _InitBattleCommon/StartBattle/SendOutMon: silhouettes slide in, palettes reveal,
+## the wild mon cries as the party pokeballs appear, "Wild X appeared!" types (no A press), the
+## enemy HUD joins it, a 40-frame beat, the player pic slides off, then "Go!" + poof + pop-out.
+func begin_intro() -> void:
+	visible = true              # the wipe hid the scene; the intro brings it back
 	var q: Array = [{"intro": "silhouette"}, {"intro": "reveal"}, {"intro": "pokeballs"},
 		{"auto": "Wild %s\nappeared!" % enemy_mon["name"]}]
 	if ghost:
@@ -435,12 +458,17 @@ func start(p_party: Array, e_species: String, e_level: int) -> void:
 	if not demo:                # BATTLE_TYPE_OLD_MAN sends no mon out: the back pic stays put
 		q.append_array([{"intro": "slide_off"},
 			{"auto": "Go! %s!" % player_mon["name"]}, {"intro": "throw"}])
-	_det_event("S", "wild seed=%d" % battle_seed)
 	_say(q, "menu")
 
 
 ## Trainer battle: enemy_data is a list of {species, level}; fight the whole team.
 func start_trainer(p_party: Array, enemy_data: Array, tname: String, money_base: int, pic_tex: Texture2D = null) -> void:
+	prime_trainer(p_party, enemy_data, tname, money_base, pic_tex)
+	begin_trainer_intro()
+
+
+## The synchronous state half of a trainer battle (see prime() for why it exists — gh #45).
+func prime_trainer(p_party: Array, enemy_data: Array, tname: String, money_base: int, pic_tex: Texture2D = null) -> void:
 	_begin(p_party)
 	is_trainer = true
 	trainer_name = tname
@@ -451,18 +479,22 @@ func start_trainer(p_party: Array, enemy_data: Array, tname: String, money_base:
 	_set_enemy(0)
 	trainer_pic_tex = pic_tex
 	_trainer_intro = trainer_pic_tex != null
-	# Faithful to _InitBattleCommon/EnemySendOutFirstMon: the trainer's pic slides in as the
-	# silhouette, the encounter sting + a beat, both parties' pokeball brackets, "wants to
-	# fight!" (no A press), the trainer slides off right, "sent out X!", the mon grows in and
-	# cries, its HUD appears, a 40-frame beat, then the player's own send-out.
+	_det_event("S", "trainer seed=%d" % battle_seed)
+
+
+## Faithful to _InitBattleCommon/EnemySendOutFirstMon: the trainer's pic slides in as the
+## silhouette, the encounter sting + a beat, both parties' pokeball brackets, "wants to
+## fight!" (no A press), the trainer slides off right, "sent out X!", the mon grows in and
+## cries, its HUD appears, a 40-frame beat, then the player's own send-out.
+func begin_trainer_intro() -> void:
+	visible = true
 	var q: Array = [{"intro": "silhouette"}, {"intro": "reveal"}, {"intro": "t_appeared"},
-		{"intro": "pokeballs"}, {"auto": "%s\nwants to fight!" % tname}]
+		{"intro": "pokeballs"}, {"auto": "%s\nwants to fight!" % trainer_name}]
 	if trainer_pic_tex:
 		q.append({"intro": "t_slide_off"})
-	q.append_array([{"auto": "%s sent\nout %s!" % [tname, enemy_mon["name"]]},
+	q.append_array([{"auto": "%s sent\nout %s!" % [trainer_name, enemy_mon["name"]]},
 		{"intro": "enemy_grow"}, {"intro": "enemy_hud"}, {"intro": "pause"},
 		{"intro": "slide_off"}, {"auto": "Go! %s!" % player_mon["name"]}, {"intro": "throw"}])
-	_det_event("S", "trainer seed=%d" % battle_seed)
 	_say(q, "menu")
 
 
@@ -509,6 +541,12 @@ func start_link(p_party: Array, e_party: Array, host: bool, seed_v: int, pname: 
 
 ## Safari Zone encounter: throw BALL/BAIT/ROCK or RUN; the mon can flee, you can't fight.
 func start_safari(p_party: Array, e_species: String, e_level: int) -> void:
+	prime_safari(p_party, e_species, e_level)
+	begin_safari_intro()
+
+
+## The synchronous state half of a safari encounter (see prime() — gh #45).
+func prime_safari(p_party: Array, e_species: String, e_level: int) -> void:
 	_begin(p_party)
 	is_safari = true
 	menu_items = SAFARI_MENU
@@ -516,15 +554,24 @@ func start_safari(p_party: Array, e_species: String, e_level: int) -> void:
 	enemy_party = [main.make_mon(e_species, e_level, [])]
 	_set_enemy(0)
 	safari_catch = int(base_stats[enemy_mon["species"]]["catch"])
-	# The same wild intro, but no send-out — the player's own pic stays on screen (StartBattle
-	# jumps straight to the safari menu).
 	_det_event("S", "safari seed=%d" % battle_seed)
+
+
+## The same wild intro, but no send-out — the player's own pic stays on screen (StartBattle
+## jumps straight to the safari menu).
+func begin_safari_intro() -> void:
+	visible = true
 	_say([{"intro": "silhouette"}, {"intro": "reveal"}, {"intro": "pokeballs"},
 		{"auto": "Wild %s\nappeared!" % enemy_mon["name"]}, {"intro": "enemy_hud"},
 		{"intro": "pause"}, {"intro": "end"}], "menu")
 
 
 func _begin(p_party: Array) -> void:
+	_gen += 1                          # the previous battle's pending continuations are dead (gh #45)
+	queue = []                         # nothing of the previous battle's presentation survives
+	after = ""
+	state = "anim"                     # input-dead until the intro's first item takes over
+	_anim_sprites = []
 	link_battle = false
 	link_host = false
 	peer_name = ""
@@ -644,6 +691,10 @@ func _move_anim_marker(move: String, att_is_player: bool) -> Dictionary:
 func _say(msgs: Array, next: String) -> void:
 	# Word-wrap each message to the box width and paginate to <=2 lines, so text
 	# never runs off the right edge.
+	_gen += 1                     # continuations of the old queue are stale from here (gh #45)
+	if not _anim_sprites.is_empty():
+		_anim_sprites = []        # a superseded animation's OAM must not linger (its coroutine
+		queue_redraw()            # bails at its next step without cleaning up)
 	queue = []
 	for m in msgs:
 		if m is String:
@@ -673,6 +724,18 @@ func _wrap(text: String) -> Array:
 		pages.append("\n".join(lines.slice(i, i + 2)))
 		i += 2
 	return pages
+
+
+## The generation-checked pump resume for async continuations (gh #45). Synchronous handlers
+## inside _next_msg keep calling _next_msg() directly; anything that fires LATER (a tween
+## callback, the move-anim coroutine's tail) must come through here with the generation it
+## was created under, so a continuation that outlived its queue can never pump the new one.
+func _cont(gen: int, tag: String) -> void:
+	if gen != _gen:
+		print("[qrace] stale pump continuation dropped: site=%s gen=%d now=%d state=%s after=%s qlen=%d caught=%s frame=%d" % [
+			tag, gen, _gen, state, after, queue.size(), caught, Engine.get_process_frames()])
+		return
+	_next_msg()
 
 
 func _next_msg() -> void:
@@ -716,9 +779,10 @@ func _next_msg() -> void:
 		var to_x := 168.0 if str(item["trainer_slide"]) == "out" else 112.0
 		if str(item["trainer_slide"]) == "in":
 			trainer_pic_x = 168.0
+		var tsg := _gen
 		var tw := create_tween()
 		tw.tween_method(func(x: float) -> void: trainer_pic_x = x; queue_redraw(), trainer_pic_x, to_x, 0.35)
-		tw.tween_callback(func() -> void: _trainer_intro = false; _next_msg())  # mons appear after slide-out
+		tw.tween_callback(func() -> void: _trainer_intro = false; _cont(tsg, "trainer_slide"))  # mons appear after slide-out
 		return
 	if item is Dictionary and item.has("hp"):    # drain the HP bar toward a new value (UpdateHPBar2)
 		var who := str(item["hp"])
@@ -735,9 +799,10 @@ func _next_msg() -> void:
 			_next_msg()
 			return
 		state = "anim"                            # 2 frames per pixel, like AnimateHPBar
+		var hpg := _gen
 		var tw := create_tween()
 		tw.tween_method(func(v: float) -> void: _shown_hp[who] = v; queue_redraw(), float(_shown_hp[who]), to, px * 2.0 / 60.0)
-		tw.tween_callback(_next_msg)
+		tw.tween_callback(func() -> void: _cont(hpg, "hp"))
 		return
 	if item is Dictionary and item.has("status"):   # the status badge flips now, with its message
 		_shown_status[str(item["status"])] = str(item["to"])
@@ -758,13 +823,14 @@ func _next_msg() -> void:
 				main.audio.play_cry(str(player_mon["species"]))   # the player's mon cries as it faints
 			else:
 				main.audio.play_sfx("faint_fall")
+		var fg := _gen
 		var ftw := create_tween()
 		ftw.tween_method(func(v: float) -> void: _faint_t = v; queue_redraw(), 0.0, 1.0, 0.25)
 		ftw.tween_callback(func() -> void:
 			_faint_who = ""
 			_pic_gone[fwho] = true                # gone until the next send-out
 			queue_redraw()
-			_next_msg())
+			_cont(fg, "faint"))
 		return
 	if item is Dictionary and item.has("next_enemy"):  # the trainer's next mon steps in only now —
 		_set_enemy(int(item["next_enemy"]))       # deferred from _end_of_turn so its pic/HUD/cry
@@ -787,9 +853,10 @@ func _next_msg() -> void:
 		# (animations.asm), so the throw/poof/wobbles show even with move animations off (gh #119).
 		if main and not main.options["battle_anim"] and not item.get("always", false):
 			state = "anim"
+			var og := _gen
 			var otw := create_tween()
 			otw.tween_interval(30.0 / 60.0)
-			otw.tween_callback(_next_msg)
+			otw.tween_callback(func() -> void: _cont(og, "animoff_beat"))
 			return
 		state = "anim"                            # no input while the animation plays
 		_play_move_anim(str(item["moveanim"]), str(item.get("attacker", "player")) == "player")
@@ -822,9 +889,10 @@ func _next_msg() -> void:
 			main.audio.play_cry(str(enemy_mon["species"]))
 		queue_redraw()
 		state = "anim"                               # a beat while the reveal lands
+		var ug := _gen
 		var utw := create_tween()
 		utw.tween_interval(0.8)
-		utw.tween_callback(_next_msg)
+		utw.tween_callback(func() -> void: _cont(ug, "unveil"))
 		return
 	if item is Dictionary and item.has("shift"):  # SHIFT style: offer a free switch before the
 		msg = "Will %s change\nPOKéMON?" % main.player_name   # trainer's next mon
@@ -838,6 +906,7 @@ func _next_msg() -> void:
 			_next_msg()
 			return
 		state = "anim"                            # ignore input while the hit animation plays
+		var ag := _gen
 		var tw := create_tween()
 		match str(item["anim"]):
 			"shake":                              # PredefShakeScreenHorizontally/Vertically: the
@@ -852,7 +921,7 @@ func _next_msg() -> void:
 					tw.tween_interval(out_t)
 					tw.tween_callback(func() -> void: _anim_shake = Vector2.ZERO; queue_redraw())
 					tw.tween_interval(back_t)
-				tw.tween_callback(func() -> void: _next_msg())
+				tw.tween_callback(func() -> void: _cont(ag, "hit_shake"))
 			"sway":                               # ShakeScreenHorizontallySlow: glide px right at
 				var px := float(item.get("px", 6))   # 1 px per 2 frames and back, twice; silent
 				for r in 2:
@@ -860,7 +929,7 @@ func _next_msg() -> void:
 						0.0, px, px * 2.0 / 60.0)
 					tw.tween_method(func(v: float) -> void: _anim_shake = Vector2(v, 0); queue_redraw(),
 						px, 0.0, px * 2.0 / 60.0)
-				tw.tween_callback(func() -> void: _anim_shake = Vector2.ZERO; queue_redraw(); _next_msg())
+				tw.tween_callback(func() -> void: _anim_shake = Vector2.ZERO; queue_redraw(); _cont(ag, "hit_sway"))
 			_:                                    # blink the hit mon: 6 cycles of 5+5 frames
 				_flash_who = str(item["who"])     # (BlinkEnemyMonSprite -> AnimationBlinkMon)
 				for i in 6:
@@ -868,7 +937,7 @@ func _next_msg() -> void:
 					tw.tween_interval(5.0 / 60.0)
 					tw.tween_callback(func() -> void: _flash_on = true; queue_redraw())
 					tw.tween_interval(5.0 / 60.0)
-				tw.tween_callback(func() -> void: _flash_who = ""; _next_msg())
+				tw.tween_callback(func() -> void: _flash_who = ""; _cont(ag, "hit_blink"))
 		return
 	if item is Dictionary and item.has("auto"):  # intro text that flows on without an A press
 		msg = str(item["auto"])
@@ -1289,6 +1358,12 @@ func _consume(item: String) -> void:
 
 
 func _use_item(item: String) -> void:
+	if caught or not queue.is_empty():
+		# gh #45 tripwire: a legit item use comes off the menu with the queue drained and no
+		# catch pending. An activation in this state is the "phantom second throw" the wedged
+		# runs implied — name it so the ceremony-race diagnosis can tell the two theories apart.
+		print("[qrace] _use_item('%s') in anomalous state: state=%s caught=%s qlen=%d after=%s frame=%d" % [
+			item, state, caught, queue.size(), after, Engine.get_process_frames()])
 	if link_battle:
 		# Unreachable via the UI (the ITEM menu entry refuses first, as the asm does);
 		# kept so a scripted driver calling _use_item directly can't open a desync surface.
@@ -2041,6 +2116,7 @@ func _draw_party() -> void:
 func _do_intro_stage(stage: String) -> void:
 	_intro_stage = stage
 	state = "anim"                                       # no input while the sequence plays
+	var ig := _gen
 	var tw := create_tween()
 	match stage:
 		"silhouette":                                    # dark pics slide in: 144 px at 2 px/frame
@@ -2107,7 +2183,7 @@ func _do_intro_stage(stage: String) -> void:
 			_intro_stage = ""
 			_intro_pokeballs = false
 			queue_redraw()
-	tw.tween_callback(_next_msg)
+	tw.tween_callback(func() -> void: _cont(ig, "intro:" + stage))
 
 
 func _draw_intro() -> void:
@@ -2318,7 +2394,12 @@ func _play_move_anim(move: String, att_is_player: bool) -> void:
 	# The per-anim frame-block hook (AnimationIdSpecialEffects): runs after every frame block,
 	# keyed on the counting-down block counter (flash cadences, Explosion's vanish, ...).
 	var hook: String = str(_manim.get("anim_special_effects", {}).get(move, ""))
+	var mg := _gen
 	for st in _build_move_anim(move, att_is_player):
+		if mg != _gen:
+			# The queue this animation belonged to is gone (gh #45) — stop before trampling
+			# the new generation's render state; _cont below reports the drop.
+			break
 		if str(st.get("sfx", "")) != "":
 			var cue := _move_sfx_cue(str(st["sfx"]))
 			if not cue.is_empty():
@@ -2331,6 +2412,9 @@ func _play_move_anim(move: String, att_is_player: bool) -> void:
 			await _anim_wait(float(st["wait"]))
 			if hook != "" and st.has("counter"):
 				await _anim_hook(hook, int(st["counter"]), att_is_player)
+	if mg != _gen:
+		_cont(mg, "moveanim:" + move)                 # stale: logs + drops, touches nothing
+		return
 	_anim_sprites = []                                # callers clean OAM after PlayAnimation
 	_anim_pal = ""                                    # safety: no SE state may leak into the turn
 	_anim_flash = false
@@ -2344,7 +2428,7 @@ func _play_move_anim(move: String, att_is_player: bool) -> void:
 	_fx = []
 	_wavy_tex = null                                  # never leave the frozen wavy frame up
 	queue_redraw()
-	_next_msg()
+	_cont(mg, "moveanim:" + move)
 
 
 func _anim_wait(s: float) -> void:
