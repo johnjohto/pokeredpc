@@ -1,0 +1,15 @@
+{
+ "$comment": "scripts/PalletTown.asm PalletTown_Script's header — entering town after Oak's ball gift arms his dex-rating dialog (SetEvent EVENT_PALLET_AFTER_GETTING_POKEBALLS).",
+ "id": "event:pallet_town_oak_arms",
+ "trigger": {
+  "kind": "enter",
+  "map": "map:PalletTown",
+  "when": "GOT_POKEBALLS_FROM_OAK"
+ },
+ "commands": [
+  {
+   "cmd": "set_flag",
+   "flag": "PALLET_AFTER_GETTING_POKEBALLS"
+  }
+ ]
+}

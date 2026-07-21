@@ -1,0 +1,20 @@
+{
+ "$comment": "scripts/SeafoamIslandsB3F.asm — the boulder shoved onto (6,16) falls through for good (SEAFOAM4_BOULDER2_DOWN_HOLE + the generic FELL_<object> visibility rule).",
+ "id": "event:seafoam_b3f_fall_2",
+ "trigger": {
+  "kind": "boulder",
+  "map": "map:SeafoamIslandsB3F",
+  "cells": [
+   [
+    6,
+    16
+   ]
+  ]
+ },
+ "commands": [
+  {
+   "cmd": "boulder_fall",
+   "flag": "SEAFOAM4_BOULDER2_DOWN_HOLE"
+  }
+ ]
+}

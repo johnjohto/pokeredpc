@@ -1,0 +1,32 @@
+{
+ "$comment": "scripts/SeafoamIslandsB4F.asm — the crossing current's eastern lane (needs both SEAFOAM4 boulders down; forced runs stop at walls).",
+ "id": "event:seafoam_b4f_current_crossing_b",
+ "trigger": {
+  "kind": "step",
+  "map": "map:SeafoamIslandsB4F",
+  "cells": [
+   [
+    5,
+    14
+   ]
+  ],
+  "when": "surfing and SEAFOAM4_BOULDER1_DOWN_HOLE and SEAFOAM4_BOULDER2_DOWN_HOLE"
+ },
+ "commands": [
+  {
+   "cmd": "walk_forward",
+   "dir": "up",
+   "count": 3
+  },
+  {
+   "cmd": "walk_forward",
+   "dir": "right",
+   "count": 3
+  },
+  {
+   "cmd": "walk_forward",
+   "dir": "up",
+   "count": 1
+  }
+ ]
+}

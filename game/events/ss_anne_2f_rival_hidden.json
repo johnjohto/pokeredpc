@@ -1,0 +1,10 @@
+{
+ "$comment": "scripts/SSAnne2F.asm — the rival appears only for the deck battle cutscene.",
+ "id": "event:ss_anne_2f_rival_hidden",
+ "trigger": {
+  "kind": "visible",
+  "map": "map:SSAnne2F",
+  "object": "SPRITE_BLUE@36,4",
+  "visible_when": "0"
+ }
+}

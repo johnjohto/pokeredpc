@@ -1,0 +1,10 @@
+{
+ "$comment": "scripts/BillsHouse.asm — the real Bill steps out of the teleporter.",
+ "id": "event:bills_house_bill_shown",
+ "trigger": {
+  "kind": "visible",
+  "map": "map:BillsHouse",
+  "object": "SPRITE_SUPER_NERD@4,4",
+  "visible_when": "USED_CELL_SEPARATOR_ON_BILL"
+ }
+}

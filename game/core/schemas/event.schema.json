@@ -1,7 +1,7 @@
 {
  "$schema": "https://json-schema.org/draft/2020-12/schema",
  "$id": "schema:event",
- "$comment": "An authored event record (ADR-019, gh #39/#40): a declarative trigger + a nested-block command list. The trigger-kind and command enums are extended wave by wave — each kind/command lands with the Kanto beat that demands it (ADR-019 §6), and the runtime VM refuses at boot any kind, command, or condition it cannot execute, so this schema and the interpreter move together. `visible` triggers are load-time QUERIES (visible_when decides a map object's visibility), never command runs; `step` dispatch is (map, cell)-indexed at load. Conditions (`visible_when`, `when`, `if.cond`) are FormulaExpr strings whose bare identifiers read story flags (1/0) and event vars, plus the engine-state vocabulary `item_<id>` (bag count), `badge_<name>`, `badge_count`, and `force_bike`. `say` is a blocking dialogue page; `notice` is the one-shot non-blocking textbox (a guard's line after a push-back — the event ends without waiting for the dismissal). Text may hold {player}/{rival} placeholders; \\n is a line break, \\f a page break, as v1's text engine reads them. `beat` invokes a native Cutscene beat by name (the strangler-fig seam while wave C dissolves story beats; ceremonies stay native forever); the arg \"@npc\" resolves to the triggering NPC.",
+ "$comment": "An authored event record (ADR-019, gh #39/#40): a declarative trigger + a nested-block command list. The trigger-kind and command enums are extended wave by wave — each kind/command lands with the Kanto beat that demands it (ADR-019 §6), and the runtime VM refuses at boot any kind, command, or condition it cannot execute, so this schema and the interpreter move together. `visible` triggers are load-time QUERIES (visible_when decides a map object's visibility), never command runs; `step` dispatch is (map, cell)-indexed at load. Conditions (`visible_when`, `when`, `if.cond`) are FormulaExpr strings whose bare identifiers read story flags (1/0) and event vars, plus the engine-state vocabulary `item_<id>` (bag count), `badge_<name>`, `badge_count`, `force_bike`, `surfing`, `player_x`/`player_y` (the player's cell), `dex_owned`, and `defeated_<x>_<y>` (the trainer at home cell (x, y) on the RECORD'S map). Beat args also accept `@object:<key>` for a named map object. A `battle_end` trigger with `rerun_enter: true` re-runs the map's enter records first — pokered's EndTrainerBattle re-running the load callback, so a door opens the moment its last guard falls. `say` is a blocking dialogue page; `notice` is the one-shot non-blocking textbox (a guard's line after a push-back — the event ends without waiting for the dismissal). Text may hold {player}/{rival} placeholders; \\n is a line break, \\f a page break, as v1's text engine reads them. `beat` invokes a native Cutscene beat by name (the strangler-fig seam while wave C dissolves story beats; ceremonies stay native forever); the arg \"@npc\" resolves to the triggering NPC.",
  "type": "object",
  "required": [
   "id",
@@ -28,7 +28,9 @@
       "visible",
       "enter",
       "step",
-      "battle_end"
+      "battle_end",
+      "boulder_hole",
+      "boulder"
      ]
     },
     "map": {
@@ -73,6 +75,9 @@
      ]
     },
     "consume": {
+     "type": "boolean"
+    },
+    "rerun_enter": {
      "type": "boolean"
     }
    },
@@ -411,6 +416,115 @@
        },
        "to": {
         "$ref": "#/$defs/cell"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "x",
+       "y"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "block_cell"
+       },
+       "x": {
+        "type": "integer"
+       },
+       "y": {
+        "type": "integer"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "x",
+       "y"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "unblock_cell"
+       },
+       "x": {
+        "type": "integer"
+       },
+       "y": {
+        "type": "integer"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "object"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "trainer_battle"
+       },
+       "object": {
+        "type": "string"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "reset_elite4"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "flag"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "boulder_fall"
+       },
+       "flag": {
+        "type": "string"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "dir",
+       "count"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "walk_forward"
+       },
+       "dir": {
+        "enum": [
+         "down",
+         "up",
+         "left",
+         "right"
+        ]
+       },
+       "count": {
+        "type": "integer"
        }
       },
       "additionalProperties": false

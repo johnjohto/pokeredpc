@@ -1,0 +1,10 @@
+{
+ "$comment": "scripts/BillsHouse.asm — Bill-as-mon until he asks for the separator.",
+ "id": "event:bills_house_bill_mon_shown",
+ "trigger": {
+  "kind": "visible",
+  "map": "map:BillsHouse",
+  "object": "SPRITE_MONSTER@6,5",
+  "visible_when": "not BILL_SAID_USE_CELL_SEPARATOR"
+ }
+}

@@ -1,0 +1,10 @@
+{
+ "$comment": "BillsHouse.asm toggles the trashed-house guards on GOT_SS_TICKET: GUARD2 blocks the door until the ticket.",
+ "id": "event:cerulean_guard2_shown",
+ "trigger": {
+  "kind": "visible",
+  "map": "map:CeruleanCity",
+  "object": "SPRITE_GUARD@27,12",
+  "visible_when": "not GOT_SS_TICKET"
+ }
+}

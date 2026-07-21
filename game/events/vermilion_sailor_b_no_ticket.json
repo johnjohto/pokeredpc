@@ -1,0 +1,26 @@
+{
+ "$comment": "scripts/VermilionCity.asm — without the S.S.TICKET the sailor turns you back the same way.",
+ "id": "event:vermilion_sailor_b_no_ticket",
+ "trigger": {
+  "kind": "step",
+  "map": "map:VermilionCity",
+  "cells": [
+   [
+    18,
+    30
+   ]
+  ],
+  "facing": "down",
+  "when": "not SS_ANNE_LEFT and not GOT_SS_TICKET"
+ },
+ "commands": [
+  {
+   "cmd": "say",
+   "text": "I'm sorry. You\nneed a TICKET to\nboard the ship."
+  },
+  {
+   "cmd": "walk_player",
+   "dir": "up"
+  }
+ ]
+}

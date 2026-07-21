@@ -1,0 +1,28 @@
+{
+ "$comment": "scripts/Route22.asm — the rival walks in for battle 1 at the gate approach: after the Pokédex, until Brock is beaten.",
+ "id": "event:route22_rival_1",
+ "trigger": {
+  "kind": "step",
+  "map": "map:Route22",
+  "cells": [
+   [
+    29,
+    4
+   ],
+   [
+    29,
+    5
+   ]
+  ],
+  "when": "GOT_POKEDEX and not BEAT_BROCK and not BEAT_ROUTE22_RIVAL_1"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "route22_rival",
+   "args": [
+    1
+   ]
+  }
+ ]
+}

@@ -1,0 +1,31 @@
+{
+ "$comment": "scripts/VictoryRoad2F.asm — a boulder on the (9,16) floor switch opens its door for good.",
+ "id": "event:victory_road_2f_switch2",
+ "trigger": {
+  "kind": "boulder",
+  "map": "map:VictoryRoad2F",
+  "cells": [
+   [
+    9,
+    16
+   ]
+  ],
+  "when": "not VR2_SWITCH2"
+ },
+ "commands": [
+  {
+   "cmd": "set_flag",
+   "flag": "VR2_SWITCH2"
+  },
+  {
+   "cmd": "set_block",
+   "x": 11,
+   "y": 7,
+   "block": 29
+  },
+  {
+   "cmd": "sfx",
+   "key": "go_inside"
+  }
+ ]
+}

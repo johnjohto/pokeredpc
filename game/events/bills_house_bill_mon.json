@@ -1,0 +1,15 @@
+{
+ "$comment": "scripts/BillsHouse.asm — Bill-as-a-POKéMON starts the cell-separator event.",
+ "id": "event:bills_house_bill_mon",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:BillsHouse",
+  "object": "SPRITE_MONSTER@6,5"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "bill_intro"
+  }
+ ]
+}

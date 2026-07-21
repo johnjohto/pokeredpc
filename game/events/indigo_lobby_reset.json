@@ -1,0 +1,18 @@
+{
+ "$comment": "scripts/IndigoPlateauLobby.asm — the reset that makes the Elite Four a GAUNTLET: coming back down wipes the Indigo Plateau event range (ResetEventRange) whenever the challenge was under way (BIT_STARTED_ELITE_4, set when LORELEI's room loads), so the four must be beaten in one run; LANCE's door also unlocks, which makes a whiteout recoverable. The lobby also clears Victory Road 1F's boulder switch on the way through.",
+ "id": "event:indigo_lobby_reset",
+ "trigger": {
+  "kind": "enter",
+  "map": "map:IndigoPlateauLobby"
+ },
+ "commands": [
+  {"cmd": "clear_flag", "flag": "VR1_SWITCH"},
+  {
+   "cmd": "if",
+   "cond": "STARTED_ELITE_4",
+   "then": [
+    {"cmd": "reset_elite4"}
+   ]
+  }
+ ]
+}

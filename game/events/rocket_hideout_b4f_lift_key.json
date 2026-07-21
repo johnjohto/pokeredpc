@@ -1,0 +1,19 @@
+{
+ "$comment": "scripts/RocketHideoutB4F.asm RocketHideoutB4FRocket3AfterBattleText — beaten, Rocket 3 lets slip that he dropped the LIFT KEY, which is what puts the ball on the floor beside him (CheckAndSetEvent EVENT_ROCKET_DROPPED_LIFT_KEY -> ShowObject ITEM_5). The reveal waits on the text, so it's a beat.",
+ "id": "event:rocket_hideout_b4f_lift_key",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:RocketHideoutB4F",
+  "object": "SPRITE_ROCKET@11,2",
+  "when": "defeated_11_2 and not ROCKET_DROPPED_LIFT_KEY"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "rocket_drops_lift_key",
+   "args": [
+    "@npc"
+   ]
+  }
+ ]
+}

@@ -1,0 +1,24 @@
+{
+ "$comment": "scripts/Museum1F.asm Museum1FDefaultScript — walking up the entrance aisle to the counter (Y==4, X==9/10) fires the receptionist: the ¥50 gate, or her wave-through once the ticket is bought.",
+ "id": "event:museum_aisle",
+ "trigger": {
+  "kind": "step",
+  "map": "map:Museum1F",
+  "cells": [
+   [
+    9,
+    4
+   ],
+   [
+    10,
+    4
+   ]
+  ]
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "museum_ticket"
+  }
+ ]
+}

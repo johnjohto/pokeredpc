@@ -1,0 +1,22 @@
+{
+ "$comment": "scripts/VictoryRoad1F.asm — re-open the already-switched door on load.",
+ "id": "event:victory_road_1f_doors",
+ "trigger": {
+  "kind": "enter",
+  "map": "map:VictoryRoad1F"
+ },
+ "commands": [
+  {
+   "cmd": "if",
+   "cond": "VR1_SWITCH",
+   "then": [
+    {
+     "cmd": "set_block",
+     "x": 4,
+     "y": 6,
+     "block": 29
+    }
+   ]
+  }
+ ]
+}

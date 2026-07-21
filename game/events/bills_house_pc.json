@@ -1,0 +1,33 @@
+{
+ "$comment": "scripts/BillsHouse.asm — the cell-separator PC (hidden_event at (1,4) facing UP).",
+ "id": "event:bills_house_pc",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:BillsHouse",
+  "front": [
+   [
+    1,
+    4
+   ]
+  ],
+  "facing": "up"
+ },
+ "commands": [
+  {
+   "cmd": "if",
+   "cond": "BILL_SAID_USE_CELL_SEPARATOR and not USED_CELL_SEPARATOR_ON_BILL",
+   "then": [
+    {
+     "cmd": "beat",
+     "name": "bill_separator"
+    }
+   ],
+   "else": [
+    {
+     "cmd": "notice",
+     "text": "TELEPORTER is\ndisplayed on the\nPC monitor."
+    }
+   ]
+  }
+ ]
+}

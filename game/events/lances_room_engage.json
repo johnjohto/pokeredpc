@@ -1,0 +1,16 @@
+{
+ "$comment": "scripts/LancesRoom.asm LancesRoomDefaultScript coords 1 and 2 — standing beside LANCE starts the fight. He has view range 0 and the hall runs straight past him to the Champion's stairs, so without this he is simply skippable. The script rets early once LANCE is beaten.",
+ "id": "event:lances_room_engage",
+ "trigger": {
+  "kind": "step",
+  "map": "map:LancesRoom",
+  "cells": [[5, 1], [6, 2]],
+  "when": "not defeated_6_1"
+ },
+ "commands": [
+  {
+   "cmd": "trainer_battle",
+   "object": "SPRITE_LANCE@6,1"
+  }
+ ]
+}

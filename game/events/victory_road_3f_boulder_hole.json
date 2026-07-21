@@ -1,0 +1,14 @@
+{
+ "$comment": "scripts/VictoryRoad3F.asm — (23,15) is a hole (cavern tile 0x22): a boulder shoved in vanishes and reappears on 2F at (23,16) via the two toggleable boulders.",
+ "id": "event:victory_road_3f_boulder_hole",
+ "trigger": {
+  "kind": "boulder_hole",
+  "map": "map:VictoryRoad3F",
+  "cells": [
+   [
+    23,
+    15
+   ]
+  ]
+ }
+}

@@ -1,0 +1,10 @@
+{
+ "$comment": "scripts/Museum1F.asm — the OLD AMBER display until taken.",
+ "id": "event:museum_amber_shown",
+ "trigger": {
+  "kind": "visible",
+  "map": "map:Museum1F",
+  "object": "SPRITE_OLD_AMBER@16,2",
+  "visible_when": "not GOT_OLD_AMBER"
+ }
+}

@@ -1,0 +1,10 @@
+{
+ "$comment": "scripts/RocketHideoutB4F.asm — Giovanni steps aside once beaten.",
+ "id": "event:rocket_hideout_b4f_giovanni_shown",
+ "trigger": {
+  "kind": "visible",
+  "map": "map:RocketHideoutB4F",
+  "object": "SPRITE_GIOVANNI@25,3",
+  "visible_when": "not BEAT_ROCKET_HIDEOUT_GIOVANNI"
+ }
+}

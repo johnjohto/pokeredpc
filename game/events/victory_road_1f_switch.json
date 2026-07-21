@@ -1,0 +1,31 @@
+{
+ "$comment": "scripts/VictoryRoad1F.asm — a boulder landing on the (17,13) floor switch sets its event + opens its door for good.",
+ "id": "event:victory_road_1f_switch",
+ "trigger": {
+  "kind": "boulder",
+  "map": "map:VictoryRoad1F",
+  "cells": [
+   [
+    17,
+    13
+   ]
+  ],
+  "when": "not VR1_SWITCH"
+ },
+ "commands": [
+  {
+   "cmd": "set_flag",
+   "flag": "VR1_SWITCH"
+  },
+  {
+   "cmd": "set_block",
+   "x": 4,
+   "y": 6,
+   "block": 29
+  },
+  {
+   "cmd": "sfx",
+   "key": "go_inside"
+  }
+ ]
+}

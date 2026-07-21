@@ -1,0 +1,10 @@
+{
+ "$comment": "scripts/SaffronCity.asm — the residents come back out once Silph is freed.",
+ "id": "event:saffron_resident_bird_31_12_shown",
+ "trigger": {
+  "kind": "visible",
+  "map": "map:SaffronCity",
+  "object": "SPRITE_BIRD@31,12",
+  "visible_when": "BEAT_SILPH_CO_GIOVANNI"
+ }
+}

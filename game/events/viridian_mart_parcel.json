@@ -1,0 +1,15 @@
+{
+ "$comment": "scripts/ViridianMart.asm — the parcel errand: the clerk calls you over on the first visit after getting a starter.",
+ "id": "event:viridian_mart_parcel",
+ "trigger": {
+  "kind": "enter",
+  "map": "map:ViridianMart",
+  "when": "GOT_STARTER and not GOT_OAKS_PARCEL and not OAK_GOT_PARCEL"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "viridian_mart_parcel"
+  }
+ ]
+}

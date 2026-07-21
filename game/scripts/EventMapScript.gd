@@ -25,5 +25,13 @@ func on_battle_end() -> void:
 	main.event_vm.run_battle_end(label)
 
 
+func boulder_hole(cell: Vector2i) -> bool:
+	return main.event_vm.boulder_hole_at(label, cell)
+
+
+func on_boulder(cell: Vector2i, npc) -> void:
+	main.event_vm.run_boulder(label, cell, npc)
+
+
 func object_shown(k: String) -> Variant:
 	return main.event_vm.visible_for(label, k)

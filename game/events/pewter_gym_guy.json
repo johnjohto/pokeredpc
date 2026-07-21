@@ -1,0 +1,18 @@
+{
+ "$comment": "scripts/PewterCity.asm — talking to the gym guide kid marches you to the gym.",
+ "id": "event:pewter_gym_guy",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:PewterCity",
+  "object": "SPRITE_YOUNGSTER@35,16"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "pewter_gym_guy",
+   "args": [
+    "@npc"
+   ]
+  }
+ ]
+}

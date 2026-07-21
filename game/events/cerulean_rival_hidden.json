@@ -1,0 +1,10 @@
+{
+ "$comment": "scripts/CeruleanCity.asm — the rival appears only for the bridge battle cutscene.",
+ "id": "event:cerulean_rival_hidden",
+ "trigger": {
+  "kind": "visible",
+  "map": "map:CeruleanCity",
+  "object": "SPRITE_BLUE@20,2",
+  "visible_when": "0"
+ }
+}

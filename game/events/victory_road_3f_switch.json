@@ -1,0 +1,31 @@
+{
+ "$comment": "scripts/VictoryRoad3F.asm .SwitchOrHoleCoords — (3,5) is a floor switch: a boulder on it opens a door.",
+ "id": "event:victory_road_3f_switch",
+ "trigger": {
+  "kind": "boulder",
+  "map": "map:VictoryRoad3F",
+  "cells": [
+   [
+    3,
+    5
+   ]
+  ],
+  "when": "not VR3_SWITCH1"
+ },
+ "commands": [
+  {
+   "cmd": "set_flag",
+   "flag": "VR3_SWITCH1"
+  },
+  {
+   "cmd": "set_block",
+   "x": 3,
+   "y": 5,
+   "block": 29
+  },
+  {
+   "cmd": "sfx",
+   "key": "go_inside"
+  }
+ ]
+}

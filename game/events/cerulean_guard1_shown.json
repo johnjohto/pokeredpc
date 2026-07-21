@@ -1,0 +1,10 @@
+{
+ "$comment": "BillsHouse.asm — GUARD1 takes GUARD2's place once the ticket is in hand (the pokered toggle swap).",
+ "id": "event:cerulean_guard1_shown",
+ "trigger": {
+  "kind": "visible",
+  "map": "map:CeruleanCity",
+  "object": "SPRITE_GUARD@28,12",
+  "visible_when": "GOT_SS_TICKET"
+ }
+}

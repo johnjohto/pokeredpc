@@ -1,0 +1,16 @@
+{
+ "$comment": "scripts/ChampionsRoom.asm — talking still starts the final battle, for a save resumed inside the room.",
+ "id": "event:champions_room_battle",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:ChampionsRoom",
+  "object": "SPRITE_BLUE@4,2",
+  "when": "not BEAT_CHAMPION"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "champion_battle"
+  }
+ ]
+}

@@ -1,0 +1,10 @@
+{
+ "$comment": "gh #79 — ROCKET9 ships OFF and appears asleep one cell east once Fuji is safe, blocking nothing.",
+ "id": "event:saffron_silph_sleeper_shown",
+ "trigger": {
+  "kind": "visible",
+  "map": "map:SaffronCity",
+  "object": "SPRITE_ROCKET@19,22",
+  "visible_when": "not BEAT_SILPH_CO_GIOVANNI and RESCUED_MR_FUJI"
+ }
+}

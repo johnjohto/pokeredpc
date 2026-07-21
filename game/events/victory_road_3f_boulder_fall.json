@@ -1,0 +1,20 @@
+{
+ "$comment": "scripts/VictoryRoad3F.asm — the boulder falling through (23,15) hides this floor's BOULDER4 and (via VR3_SWITCH2) shows 2F's BOULDER3 one row below the hole.",
+ "id": "event:victory_road_3f_boulder_fall",
+ "trigger": {
+  "kind": "boulder",
+  "map": "map:VictoryRoad3F",
+  "cells": [
+   [
+    23,
+    15
+   ]
+  ]
+ },
+ "commands": [
+  {
+   "cmd": "boulder_fall",
+   "flag": "VR3_SWITCH2"
+  }
+ ]
+}

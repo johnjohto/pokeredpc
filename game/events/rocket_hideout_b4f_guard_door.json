@@ -1,0 +1,44 @@
+{
+ "$comment": "scripts/RocketHideoutB4F.asm — the two-grunt door guarding Giovanni: both grunts (23,12) and (26,12) must fall; the open clunk plays once (EVENT_ROCKET_HIDEOUT_4_DOOR_UNLOCKED).",
+ "id": "event:rocket_hideout_b4f_guard_door",
+ "trigger": {
+  "kind": "enter",
+  "map": "map:RocketHideoutB4F"
+ },
+ "commands": [
+  {
+   "cmd": "if",
+   "cond": "defeated_23_12 and defeated_26_12",
+   "then": [
+    {
+     "cmd": "if",
+     "cond": "not ROCKET_HIDEOUT_B4F_DOOR_UNLOCKED",
+     "then": [
+      {
+       "cmd": "set_flag",
+       "flag": "ROCKET_HIDEOUT_B4F_DOOR_UNLOCKED"
+      },
+      {
+       "cmd": "sfx",
+       "key": "go_inside"
+      }
+     ]
+    },
+    {
+     "cmd": "set_block",
+     "x": 12,
+     "y": 5,
+     "block": 14
+    }
+   ],
+   "else": [
+    {
+     "cmd": "set_block",
+     "x": 12,
+     "y": 5,
+     "block": 45
+    }
+   ]
+  }
+ ]
+}

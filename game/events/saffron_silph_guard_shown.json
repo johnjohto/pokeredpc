@@ -1,0 +1,10 @@
+{
+ "$comment": "gh #79 — ROCKET8, awake in Silph Co's doorway (18,22): rescuing MR.FUJI on Pokémon Tower 7F hides him (PokemonTower7FMrFujiText), which is what opens the building; Giovanni's defeat clears him too.",
+ "id": "event:saffron_silph_guard_shown",
+ "trigger": {
+  "kind": "visible",
+  "map": "map:SaffronCity",
+  "object": "SPRITE_ROCKET@18,22",
+  "visible_when": "not BEAT_SILPH_CO_GIOVANNI and not RESCUED_MR_FUJI"
+ }
+}

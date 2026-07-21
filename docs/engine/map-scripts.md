@@ -89,10 +89,17 @@ prize/vending counters, VermilionDock's departure, …), the Saffron thirsty gua
 (Route5–8 gates, fully authored — no native mechanism left), the badge/bag bounce-backs
 (Route22Gate, Route23's seven checkpoints, ViridianCity, CinnabarIsland), the Silph Co
 card-key doors + story floors (SilphCo1F–11F), the Pokémon Mansion switch doors + 3F's
-balcony holes, Cinnabar Gym's quiz gates, and all three elevators (`elevator_retarget`/
-`elevator_panel` are VM commands now). The sections below describe the adapters that remain;
-the retired base helpers (`thirsty_guard`, `bounce_back`, `step_back_down`, `mansion_*`,
-`elevator_*`, the Silph door pair) are gone with their last users.
+balcony holes, Cinnabar Gym's quiz gates, all three elevators (`elevator_retarget`/
+`elevator_panel` are VM commands), the Elite Four rooms + Indigo lobby (`defeated_<x>_<y>`
+conditions, `block_cell`, the `rerun_enter` battle_end field carrying the post-battle rule
+declaratively, `trainer_battle` for LANCE's coordinate trigger, `reset_elite4`), the
+boulder/hole family (Seafoam B1–B4F incl. the currents as `walk_forward` runs, Victory Road
+1F–3F — the `boulder_hole`/`boulder` trigger kinds + `boulder_fall`), the Rocket Hideout
+guard doors, and the story/city maps (PalletTown, Pewter, Cerulean, Vermilion's sailor,
+Saffron's occupation visibles, Route22, the Tower 2F/6F beats, S.S. Anne's deck, Bill's
+house, Museum 1F, Celadon Mansion 3F's diploma, Viridian Mart). Every retired base helper
+went with its last user — the base keeps only the hook contract and the thin say/set_block/
+face_player vocabulary the last nine adapters still use.
 
 **Complete** (gh #53): all ~80 scripted maps live behind the seam; Main's dispatchers are one
 adapter call each, and every remaining `center_label ==` in Main.gd is a test-harness assertion.

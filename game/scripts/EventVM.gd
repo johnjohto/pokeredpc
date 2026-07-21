@@ -23,12 +23,15 @@ var _by_visible := {}    # "<label>|<object key>" -> event record
 var _by_step := {}       # "<label>|<x>,<y>"      -> [records]
 var _by_enter := {}      # "<label>"              -> [records]
 var _by_battle_end := {} # "<label>"              -> [records]
+var _by_bhole := {}      # "<label>|<x>,<y>"      -> true (a boulder may be shoved in)
+var _by_boulder := {}    # "<label>|<x>,<y>"      -> [records] (a boulder landed here)
 
-const KINDS := ["interact", "visible", "enter", "step", "battle_end"]
+const KINDS := ["interact", "visible", "enter", "step", "battle_end", "boulder_hole", "boulder"]
 const CMDS := ["say", "notice", "if", "give_item", "take_item", "set_flag", "clear_flag", "sfx",
 	"beat", "set_last_map", "set_block", "set_force_bike", "mount_bike",
 	"bounce_back", "step_back_down", "walk_player", "vending", "fall_hole",
-	"elevator_retarget", "elevator_panel"]
+	"elevator_retarget", "elevator_panel", "block_cell", "unblock_cell",
+	"trainer_battle", "reset_elite4", "boulder_fall", "walk_forward"]
 
 ## Player facing indices (Player.facing) by direction word.
 const DIRS := {"down": 0, "up": 1, "left": 2, "right": 3}
@@ -112,6 +115,25 @@ func load_all(records: Dictionary) -> String:
 				if err != "":
 					return err
 				_push(_by_battle_end, label, r)
+			"boulder_hole":
+				var hc = _trigger_cells(t, key)
+				if hc is String:
+					return hc
+				if (hc as Array).is_empty():
+					return "event '%s': boulder_hole trigger needs cells" % key
+				for c in hc:
+					_by_bhole["%s|%d,%d" % [label, c.x, c.y]] = true
+			"boulder":
+				err = _compile_block(r.get("commands", []), key)
+				if err != "":
+					return err
+				var bc = _trigger_cells(t, key)
+				if bc is String:
+					return bc
+				if (bc as Array).is_empty():
+					return "event '%s': boulder trigger needs cells" % key
+				for c in bc:
+					_push(_by_boulder, "%s|%d,%d" % [label, c.x, c.y], r)
 		maps[label] = true
 	return ""
 
@@ -148,7 +170,7 @@ func visible_for(label: String, object_key: String):
 	var r = _by_visible.get("%s|%s" % [label, object_key])
 	if r == null:
 		return null
-	return _truthy(r["_vis"])
+	return _truthy(r["_vis"], label)
 
 
 ## A pressed on this map: object-keyed records for the faced NPC first, then faced-cell
@@ -194,18 +216,37 @@ func run_enter(label: String) -> void:
 			await run(r, {"cell": main.player.cell})
 
 
-## A won trainer battle on the map (pokered's EndTrainerBattle re-runs the load callback).
+## A won trainer battle on the map. `rerun_enter: true` re-runs the map's `enter` records
+## first — pokered's EndTrainerBattle sets BIT_CUR_MAP_LOADED_1, so the load callback runs
+## again the moment a trainer battle ends and a door it lays opens ON THE SPOT (the
+## map-scripts.md post-battle rule as a declarative trigger field).
 func run_battle_end(label: String) -> void:
 	for r in _by_battle_end.get(label, []):
+		if bool(r["trigger"].get("rerun_enter", false)):
+			await run_enter(label)
 		if _gate(r):
 			await run(r, {})
+
+
+## May a STRENGTH boulder be shoved into this (unwalkable) cell — a Seafoam/Victory Road
+## hole? Queried by try_push_boulder before the shove (a load-time index, no VM run).
+func boulder_hole_at(label: String, cell: Vector2i) -> bool:
+	return _by_bhole.has("%s|%d,%d" % [label, cell.x, cell.y])
+
+
+## A STRENGTH boulder just slid onto this cell: floor switches, hole falls. The landing
+## boulder NPC rides the ctx (the `boulder_fall` command hides it and marks FELL_<key>).
+func run_boulder(label: String, cell: Vector2i, npc) -> void:
+	for r in _by_boulder.get("%s|%d,%d" % [label, cell.x, cell.y], []):
+		if _gate(r):
+			await run(r, {"cell": cell, "npc": npc})
 
 
 func _gate(r: Dictionary) -> bool:
 	var t: Dictionary = r["trigger"]
 	if t.has("facing") and main.player.facing != DIRS[str(t["facing"])]:
 		return false
-	if r.has("_when") and not _truthy(r["_when"]):
+	if r.has("_when") and not _truthy(r["_when"], _bare(str(t.get("map", "")))):
 		return false
 	return true
 
@@ -219,6 +260,7 @@ func run(rec: Dictionary, ctx: Dictionary = {}) -> void:
 	main.cutscene_active = true
 	if not prev:
 		main.modal = null
+	ctx["_map"] = _bare(str(rec.get("trigger", {}).get("map", "")))
 	await _run_block(rec.get("commands", []), ctx)
 	main.cutscene_active = prev
 
@@ -237,7 +279,8 @@ func _run_block(cmds: Array, ctx: Dictionary) -> bool:
 				# adapters' say() helper behaved; `say` is the blocking dialogue page.
 				main._say(_interp(str(c["text"])))
 			"if":
-				var branch: Array = c.get("then", []) if _truthy(c["_cond"]) else c.get("else", [])
+				var branch: Array = c.get("then", []) if _truthy(c["_cond"], str(ctx.get("_map", ""))) \
+					else c.get("else", [])
 				if not await _run_block(branch, ctx):
 					return false
 			"give_item":
@@ -261,7 +304,12 @@ func _run_block(cmds: Array, ctx: Dictionary) -> bool:
 			"beat":
 				var argv: Array = []
 				for a in c.get("args", []):
-					argv.append(ctx.get("npc") if str(a) == "@npc" else a)
+					if str(a) == "@npc":
+						argv.append(ctx.get("npc"))       # the triggering NPC
+					elif str(a).begins_with("@object:"):
+						argv.append(main._npc_by_key(str(a).substr(8)))   # a named map object
+					else:
+						argv.append(a)
 				await main.cutscene.callv(str(c["name"]), argv)
 				main.cutscene_active = true    # a beat drops the flag at its end; re-arm for the rest
 			"set_last_map":
@@ -295,6 +343,38 @@ func _run_block(cmds: Array, ctx: Dictionary) -> bool:
 				# landing on the DungeonWarpData cell. The fall ceremony stays native.
 				var to: Array = c["to"]
 				main.cutscene.fall_down_hole(_bare(str(c["map"])), Vector2i(int(to[0]), int(to[1])))
+			"block_cell":
+				# Make a walkable cell impassable outside the block grid (an E4 exit seal's
+				# warp squares) — cleared per load; the enter record re-lays it.
+				main._blocked_cells[Vector2i(int(c["x"]), int(c["y"]))] = true
+			"unblock_cell":
+				main._blocked_cells.erase(Vector2i(int(c["x"]), int(c["y"])))
+			"trainer_battle":
+				# Engage a map trainer outside the sight system (a coordinate trigger:
+				# LANCE, the Mt. Moon fossil nerd). Fire-and-forget, exactly as the retired
+				# adapters called it; no-op if the object is absent or hidden.
+				var tnpc = main._npc_by_key(str(c["object"]))
+				if tnpc != null and tnpc.shown:
+					tnpc.face_to(main.player.cell)
+					main.cutscene.trainer_battle(tnpc, false)
+			"boulder_fall":
+				# The shoved boulder drops through the hole for good: the floor event + the
+				# generic FELL_<object> visibility rule (base boulder_falls, verbatim).
+				var bnpc = ctx.get("npc")
+				if bnpc != null:
+					main.set_event(str(c["flag"]))
+					main.set_event("FELL_" + str(bnpc.key))
+					bnpc.set_shown(false)
+					if main.audio:
+						main.audio.play_sfx("collision")
+			"walk_forward":
+				# A forced run of steps (Seafoam B4F's strong currents): stops at walls,
+				# exactly as Cutscene.walk_forward does.
+				await main.cutscene.walk_forward(main.player, DIRS[str(c["dir"])], int(c["count"]))
+			"reset_elite4":
+				# IndigoPlateauLobby's gauntlet reset (ResetEventRange INDIGO_PLATEAU_EVENTS);
+				# the ceremony stays native.
+				main.reset_elite4_gauntlet()
 			"elevator_retarget":
 				# engine/events/elevator.asm StoreWarpEntries: on entry the door warps lead
 				# back to the boarding floor. Call from an `enter` record.
@@ -375,17 +455,20 @@ func _compile_cond(src: String):
 	return {"expr": e, "idents": idents.keys()}
 
 
-func _truthy(cond: Dictionary) -> bool:
+func _truthy(cond: Dictionary, label := "") -> bool:
 	var vars := {}
 	for ident in cond["idents"]:
-		vars[ident] = _ident_value(str(ident))
+		vars[ident] = _ident_value(str(ident), label)
 	return bool(cond["expr"].eval(vars))
 
 
 ## Condition vocabulary: event vars win, then the engine-state prefixes, else a story
 ## flag (1/0). `item_<id>` is the bag count, `badge_<name>`/`badge_count` the badge
-## case, `force_bike` Cycling Road's BIT_ALWAYS_ON_BIKE.
-func _ident_value(ident: String):
+## case, `force_bike` Cycling Road's BIT_ALWAYS_ON_BIKE, `surfing` the surf state, and
+## `defeated_<x>_<y>` whether the trainer whose home cell is (x, y) ON THE RECORD'S MAP
+## has been beaten (the trigger's map, not the center map — visible queries can run for
+## a neighbor's objects).
+func _ident_value(ident: String, label: String):
 	if main.event_vars.has(ident):
 		return main.event_vars[ident]
 	if ident.begins_with("item_"):
@@ -396,6 +479,19 @@ func _ident_value(ident: String):
 		return 1 if main.badges.has(ident.substr(6).to_upper()) else 0
 	if ident == "force_bike":
 		return 1 if main.force_bike else 0
+	if ident == "surfing":
+		return 1 if main.surfing else 0
+	if ident == "player_x":
+		return main.player.cell.x
+	if ident == "player_y":
+		return main.player.cell.y
+	if ident == "dex_owned":
+		main._sync_owned()
+		return main.pokedex_owned.size()
+	if ident.begins_with("defeated_"):
+		var parts := ident.substr(9).split("_")
+		if parts.size() == 2:
+			return 1 if main.defeated_trainers.has("%s:%d,%d" % [label, int(parts[0]), int(parts[1])]) else 0
 	return 1 if main.has_event(ident) else 0
 
 

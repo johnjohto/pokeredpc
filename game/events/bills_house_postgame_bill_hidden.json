@@ -1,0 +1,10 @@
+{
+ "$comment": "scripts/BillsHouse.asm — post-game Bill never appears in this port's timeline.",
+ "id": "event:bills_house_postgame_bill_hidden",
+ "trigger": {
+  "kind": "visible",
+  "map": "map:BillsHouse",
+  "object": "SPRITE_SUPER_NERD@6,5",
+  "visible_when": "0"
+ }
+}

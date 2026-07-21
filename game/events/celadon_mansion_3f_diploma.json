@@ -1,0 +1,16 @@
+{
+ "$comment": "scripts/CeladonMansion3F.asm — the game designer checks the POKéDEX: at NUM_POKEMON - 1 owned (150 — Mew doesn't count) his CompletedDexText leads into the DIPLOMA screen; below that the gate fails and his regular map text shows.",
+ "id": "event:celadon_mansion_3f_diploma",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:CeladonMansion3F",
+  "object": "SPRITE_SILPH_WORKER_M@2,3",
+  "when": "dex_owned >= 150"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "award_diploma"
+  }
+ ]
+}

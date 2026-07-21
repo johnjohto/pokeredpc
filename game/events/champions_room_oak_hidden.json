@@ -1,0 +1,10 @@
+{
+ "$comment": "scripts/ChampionsRoom.asm TOGGLE_CHAMPIONS_ROOM_OAK — Oak ships hidden; the ceremony ShowObjects him mid-scene and HideObjects him on his exit (gh #179). At load he is never standing at the door.",
+ "id": "event:champions_room_oak_hidden",
+ "trigger": {
+  "kind": "visible",
+  "map": "map:ChampionsRoom",
+  "object": "SPRITE_OAK@3,7",
+  "visible_when": "0"
+ }
+}

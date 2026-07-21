@@ -1,0 +1,34 @@
+{
+ "$comment": "scripts/RocketHideoutB1F.asm — the guard door: shut until the grunt at (28,18) falls. The clunk replays on EVERY entry once he has: the asm meant to SetEvent EVENT_ENTERED_ROCKET_HIDEOUT but only CheckEventHLs it, so the gate never closes (the documented cartridge bug, kept faithfully).",
+ "id": "event:rocket_hideout_b1f_guard_door",
+ "trigger": {
+  "kind": "enter",
+  "map": "map:RocketHideoutB1F"
+ },
+ "commands": [
+  {
+   "cmd": "if",
+   "cond": "defeated_28_18",
+   "then": [
+    {
+     "cmd": "set_block",
+     "x": 12,
+     "y": 8,
+     "block": 14
+    },
+    {
+     "cmd": "sfx",
+     "key": "go_inside"
+    }
+   ],
+   "else": [
+    {
+     "cmd": "set_block",
+     "x": 12,
+     "y": 8,
+     "block": 84
+    }
+   ]
+  }
+ ]
+}

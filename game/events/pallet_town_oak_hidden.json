@@ -1,0 +1,10 @@
+{
+ "$comment": "scripts/PalletTown.asm — Oak only appears during the intercept cutscene.",
+ "id": "event:pallet_town_oak_hidden",
+ "trigger": {
+  "kind": "visible",
+  "map": "map:PalletTown",
+  "object": "SPRITE_OAK@8,5",
+  "visible_when": "0"
+ }
+}

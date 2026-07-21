@@ -1,0 +1,10 @@
+{
+ "$comment": "scripts/VictoryRoad3F.asm TOGGLE_VICTORY_ROAD_3F_BOULDER — BOULDER4 at (22,15) stands until it falls through the hole (Route23SetVictoryRoadBoulders puts it back).",
+ "id": "event:victory_road_3f_boulder_shown",
+ "trigger": {
+  "kind": "visible",
+  "map": "map:VictoryRoad3F",
+  "object": "SPRITE_BOULDER@22,15",
+  "visible_when": "not VR3_SWITCH2"
+ }
+}

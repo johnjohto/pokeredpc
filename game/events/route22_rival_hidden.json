@@ -1,0 +1,10 @@
+{
+ "$comment": "scripts/Route22.asm — the rival walks in only for his battle.",
+ "id": "event:route22_rival_hidden",
+ "trigger": {
+  "kind": "visible",
+  "map": "map:Route22",
+  "object": "SPRITE_BLUE@25,5",
+  "visible_when": "0"
+ }
+}

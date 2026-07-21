@@ -1,0 +1,22 @@
+{
+ "$comment": "scripts/SeafoamIslandsB4F.asm — the landing current's inner tile (needs both SEAFOAM3 boulders down; forced runs stop at walls).",
+ "id": "event:seafoam_b4f_current_landing_b",
+ "trigger": {
+  "kind": "step",
+  "map": "map:SeafoamIslandsB4F",
+  "cells": [
+   [
+    21,
+    16
+   ]
+  ],
+  "when": "surfing and SEAFOAM3_BOULDER1_DOWN_HOLE and SEAFOAM3_BOULDER2_DOWN_HOLE"
+ },
+ "commands": [
+  {
+   "cmd": "walk_forward",
+   "dir": "up",
+   "count": 1
+  }
+ ]
+}

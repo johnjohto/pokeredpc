@@ -1,0 +1,18 @@
+{
+ "$comment": "scripts/PewterCity.asm — the museum guy marches the player across town to the museum.",
+ "id": "event:pewter_museum_guy",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:PewterCity",
+  "object": "SPRITE_SUPER_NERD@27,17"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "pewter_museum_guy",
+   "args": [
+    "@npc"
+   ]
+  }
+ ]
+}

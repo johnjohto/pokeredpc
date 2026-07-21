@@ -1,0 +1,10 @@
+{
+ "$comment": "gh #90 — CERULEANCITY_SUPER_NERD3 stands on (4,12), the one land cell at Cerulean Cave's door; HallOfFame.asm hides him (TOGGLE_CERULEAN_CAVE_GUY) the moment you are CHAMPION.",
+ "id": "event:cerulean_cave_guy_shown",
+ "trigger": {
+  "kind": "visible",
+  "map": "map:CeruleanCity",
+  "object": "SPRITE_SUPER_NERD@4,12",
+  "visible_when": "not HALL_OF_FAME"
+ }
+}

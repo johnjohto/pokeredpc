@@ -1,0 +1,15 @@
+{
+ "$comment": "scripts/BillsHouse.asm — the real Bill gives the S.S.TICKET.",
+ "id": "event:bills_house_bill",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:BillsHouse",
+  "object": "SPRITE_SUPER_NERD@4,4"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "bill_ticket"
+  }
+ ]
+}

@@ -1,0 +1,10 @@
+{
+ "$comment": "scripts/PokemonTower2F.asm — the rival leaves after the fight.",
+ "id": "event:tower_2f_rival_shown",
+ "trigger": {
+  "kind": "visible",
+  "map": "map:PokemonTower2F",
+  "object": "SPRITE_BLUE@14,5",
+  "visible_when": "not BEAT_POKEMON_TOWER_RIVAL"
+ }
+}

@@ -1,0 +1,13 @@
+{
+ "$comment": "scripts/ChampionsRoom.asm — walking in is the trigger, not talking: beating AGATHA arms SCRIPT_CHAMPIONSROOM_PLAYER_ENTERS, and the next load marches the player up to the rival. Without it he can be walked around — the Hall of Fame stairs at (3,0)/(4,0) are reachable from the door. The armed script pointer is consumed by the walk-in.",
+ "id": "event:champions_room_entrance",
+ "trigger": {
+  "kind": "enter",
+  "map": "map:ChampionsRoom",
+  "when": "CHAMPION_ROOM_ENTRY and not BEAT_CHAMPION"
+ },
+ "commands": [
+  {"cmd": "clear_flag", "flag": "CHAMPION_ROOM_ENTRY"},
+  {"cmd": "beat", "name": "champion_entrance"}
+ ]
+}

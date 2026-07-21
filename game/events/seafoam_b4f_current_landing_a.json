@@ -1,0 +1,30 @@
+{
+ "$comment": "scripts/SeafoamIslandsB4F.asm — the landing current pushes you up out of the fall spot (needs both SEAFOAM3 boulders down; forced runs stop at walls).",
+ "id": "event:seafoam_b4f_current_landing_a",
+ "trigger": {
+  "kind": "step",
+  "map": "map:SeafoamIslandsB4F",
+  "cells": [
+   [
+    20,
+    17
+   ],
+   [
+    21,
+    17
+   ],
+   [
+    20,
+    16
+   ]
+  ],
+  "when": "surfing and SEAFOAM3_BOULDER1_DOWN_HOLE and SEAFOAM3_BOULDER2_DOWN_HOLE"
+ },
+ "commands": [
+  {
+   "cmd": "walk_forward",
+   "dir": "up",
+   "count": 2
+  }
+ ]
+}

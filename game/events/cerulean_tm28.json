@@ -1,0 +1,28 @@
+{
+ "$comment": "scripts/CeruleanCity.asm — the beaten Rocket returns the stolen TM28 (DIG) once. Undefeated, the gate fails and he battles through the generic trainer path.",
+ "id": "event:cerulean_tm28",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:CeruleanCity",
+  "object": "SPRITE_ROCKET@30,8",
+  "when": "defeated_30_8 and not GOT_TM28"
+ },
+ "commands": [
+  {
+   "cmd": "give_item",
+   "item": "item:tm_dig"
+  },
+  {
+   "cmd": "set_flag",
+   "flag": "GOT_TM28"
+  },
+  {
+   "cmd": "sfx",
+   "key": "get_item1"
+  },
+  {
+   "cmd": "notice",
+   "text": "I'll return the\nTM I stole!\f{player} received\nTM28!"
+  }
+ ]
+}

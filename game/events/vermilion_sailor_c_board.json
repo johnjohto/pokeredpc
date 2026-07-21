@@ -1,0 +1,26 @@
+{
+ "$comment": "scripts/VermilionCity.asm — the ticket checks out: the sailor waves you onto the dock (board_ss_anne says its own line and sets last_outside_map for the exit warp; VERMILION_DOCK warp 1 = 0-based 0, the dock top).",
+ "id": "event:vermilion_sailor_c_board",
+ "trigger": {
+  "kind": "step",
+  "map": "map:VermilionCity",
+  "cells": [
+   [
+    18,
+    30
+   ]
+  ],
+  "facing": "down",
+  "when": "not SS_ANNE_LEFT and GOT_SS_TICKET"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "board_ss_anne",
+   "args": [
+    "VermilionDock",
+    0
+   ]
+  }
+ ]
+}

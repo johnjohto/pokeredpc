@@ -1,0 +1,26 @@
+{
+ "$comment": "scripts/VermilionCity.asm VermilionCityDefaultScript — once the ship has sailed, the sailor turns you back with a simulated PAD_UP (gh #115: the check is (18,30) facing DOWN, a tile north of the dock warp).",
+ "id": "event:vermilion_sailor_a_departed",
+ "trigger": {
+  "kind": "step",
+  "map": "map:VermilionCity",
+  "cells": [
+   [
+    18,
+    30
+   ]
+  ],
+  "facing": "down",
+  "when": "SS_ANNE_LEFT"
+ },
+ "commands": [
+  {
+   "cmd": "say",
+   "text": "The S.S.ANNE has\nalready departed."
+  },
+  {
+   "cmd": "walk_player",
+   "dir": "up"
+  }
+ ]
+}

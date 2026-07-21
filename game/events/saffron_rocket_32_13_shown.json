@@ -1,0 +1,10 @@
+{
+ "$comment": "scripts/SaffronCity.asm — a takeover ROCKET; beating Silph Co's Giovanni clears every grunt out of the city (SilphCo11F.asm .HideToggleableObjectIDs).",
+ "id": "event:saffron_rocket_32_13_shown",
+ "trigger": {
+  "kind": "visible",
+  "map": "map:SaffronCity",
+  "object": "SPRITE_ROCKET@32,13",
+  "visible_when": "not BEAT_SILPH_CO_GIOVANNI"
+ }
+}

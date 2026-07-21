@@ -1,0 +1,21 @@
+{
+ "$comment": "scripts/AgathasRoom.asm — beating the member unseals the exit ON THE SPOT: EndTrainerBattle re-runs the load callback (rerun_enter).",
+ "id": "event:agathas_room_unseal",
+ "trigger": {
+  "kind": "battle_end",
+  "map": "map:AgathasRoom",
+  "rerun_enter": true
+ },
+ "commands": [
+  {
+   "cmd": "if",
+   "cond": "defeated_5_2",
+   "then": [
+    {
+     "cmd": "set_flag",
+     "flag": "CHAMPION_ROOM_ENTRY"
+    }
+   ]
+  }
+ ]
+}

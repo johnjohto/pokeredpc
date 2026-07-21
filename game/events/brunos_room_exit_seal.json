@@ -1,0 +1,50 @@
+{
+ "$comment": "scripts/BrunosRoom.asm ShowOrHideExitBlock — the forward exit stays a wall (and its warp cells impassable) until the room's member at home cell (5,2) is beaten.",
+ "id": "event:brunos_room_exit_seal",
+ "trigger": {
+  "kind": "enter",
+  "map": "map:BrunosRoom"
+ },
+ "commands": [
+  {
+   "cmd": "if",
+   "cond": "defeated_5_2",
+   "then": [
+    {
+     "cmd": "set_block",
+     "x": 2,
+     "y": 0,
+     "block": 5
+    },
+    {
+     "cmd": "unblock_cell",
+     "x": 4,
+     "y": 0
+    },
+    {
+     "cmd": "unblock_cell",
+     "x": 5,
+     "y": 0
+    }
+   ],
+   "else": [
+    {
+     "cmd": "set_block",
+     "x": 2,
+     "y": 0,
+     "block": 36
+    },
+    {
+     "cmd": "block_cell",
+     "x": 4,
+     "y": 0
+    },
+    {
+     "cmd": "block_cell",
+     "x": 5,
+     "y": 0
+    }
+   ]
+  }
+ ]
+}

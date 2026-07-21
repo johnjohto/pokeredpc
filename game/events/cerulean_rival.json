@@ -1,0 +1,25 @@
+{
+ "$comment": "scripts/CeruleanCity.asm CeruleanCityCoords2 — the rival ambushes the player by the north bridge ((20,6)/(21,6)).",
+ "id": "event:cerulean_rival",
+ "trigger": {
+  "kind": "step",
+  "map": "map:CeruleanCity",
+  "cells": [
+   [
+    20,
+    6
+   ],
+   [
+    21,
+    6
+   ]
+  ],
+  "when": "not BEAT_CERULEAN_RIVAL"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "cerulean_rival"
+  }
+ ]
+}

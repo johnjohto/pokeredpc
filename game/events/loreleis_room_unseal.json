@@ -1,0 +1,9 @@
+{
+ "$comment": "scripts/LoreleisRoom.asm — beating the member unseals the exit ON THE SPOT: EndTrainerBattle re-runs the load callback (rerun_enter).",
+ "id": "event:loreleis_room_unseal",
+ "trigger": {
+  "kind": "battle_end",
+  "map": "map:LoreleisRoom",
+  "rerun_enter": true
+ }
+}

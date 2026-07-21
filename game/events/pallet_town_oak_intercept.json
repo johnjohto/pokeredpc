@@ -1,0 +1,21 @@
+{
+ "$comment": "scripts/PalletTown.asm — leaving Pallet to the north without a POKéMON triggers Oak's intercept (checks YCoord == 1; fires before the player crosses into Route 1).",
+ "id": "event:pallet_town_oak_intercept",
+ "trigger": {
+  "kind": "step",
+  "map": "map:PalletTown",
+  "region": [
+   0,
+   0,
+   19,
+   1
+  ],
+  "when": "not GOT_STARTER"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "oak_intercept"
+  }
+ ]
+}

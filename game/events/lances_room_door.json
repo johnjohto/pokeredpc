@@ -1,0 +1,22 @@
+{
+ "$comment": "scripts/LancesRoom.asm LanceShowOrHideEntranceBlocks — the static .blk ships the doorway into LANCE's hall CLOSED (0x72/0x73 at blocks (2,6)/(3,6)); every load opens it (0x31/0x32) until EVENT_LANCES_ROOM_LOCK_DOOR is set. Without this load hook the whole hall — LANCE, the CHAMPION and the HALL OF FAME — is walled off (gh #88).",
+ "id": "event:lances_room_door",
+ "trigger": {
+  "kind": "enter",
+  "map": "map:LancesRoom"
+ },
+ "commands": [
+  {
+   "cmd": "if",
+   "cond": "LANCES_ROOM_LOCK_DOOR",
+   "then": [
+    {"cmd": "set_block", "x": 2, "y": 6, "block": 114},
+    {"cmd": "set_block", "x": 3, "y": 6, "block": 115}
+   ],
+   "else": [
+    {"cmd": "set_block", "x": 2, "y": 6, "block": 49},
+    {"cmd": "set_block", "x": 3, "y": 6, "block": 50}
+   ]
+  }
+ ]
+}

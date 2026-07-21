@@ -1,0 +1,10 @@
+{
+ "$comment": "toggleable_objects.asm ROCKETHIDEOUTB4F_LIFT_KEY — the ball ships hidden; Rocket 3's reveal puts it on the floor.",
+ "id": "event:rocket_hideout_b4f_lift_ball_shown",
+ "trigger": {
+  "kind": "visible",
+  "map": "map:RocketHideoutB4F",
+  "object": "SPRITE_POKE_BALL@10,2",
+  "visible_when": "ROCKET_DROPPED_LIFT_KEY"
+ }
+}

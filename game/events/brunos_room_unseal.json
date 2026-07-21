@@ -1,0 +1,9 @@
+{
+ "$comment": "scripts/BrunosRoom.asm — beating the member unseals the exit ON THE SPOT: EndTrainerBattle re-runs the load callback (rerun_enter).",
+ "id": "event:brunos_room_unseal",
+ "trigger": {
+  "kind": "battle_end",
+  "map": "map:BrunosRoom",
+  "rerun_enter": true
+ }
+}

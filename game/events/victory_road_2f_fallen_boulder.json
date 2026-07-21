@@ -1,0 +1,10 @@
+{
+ "$comment": "scripts/VictoryRoad2F.asm TOGGLE_VICTORY_ROAD_2F_BOULDER — BOULDER3 at (23,16) ships hidden and only appears once it has fallen through 3F's hole (Route23SetVictoryRoadBoulders re-hides it).",
+ "id": "event:victory_road_2f_fallen_boulder",
+ "trigger": {
+  "kind": "visible",
+  "map": "map:VictoryRoad2F",
+  "object": "SPRITE_BOULDER@23,16",
+  "visible_when": "VR3_SWITCH2"
+ }
+}

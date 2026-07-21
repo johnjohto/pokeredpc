@@ -1,0 +1,15 @@
+{
+ "$comment": "scripts/Museum1F.asm — the side-room scientist hands over the OLD AMBER.",
+ "id": "event:museum_old_amber",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:Museum1F",
+  "object": "SPRITE_SCIENTIST@15,2"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "give_old_amber"
+  }
+ ]
+}

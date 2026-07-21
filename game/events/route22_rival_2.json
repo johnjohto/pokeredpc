@@ -1,0 +1,28 @@
+{
+ "$comment": "scripts/Route22.asm — battle 2 after the 8th badge. Sorted after route22_rival_1, matching the adapter's elif order.",
+ "id": "event:route22_rival_2",
+ "trigger": {
+  "kind": "step",
+  "map": "map:Route22",
+  "cells": [
+   [
+    29,
+    4
+   ],
+   [
+    29,
+    5
+   ]
+  ],
+  "when": "badge_count >= 8 and not BEAT_ROUTE22_RIVAL_2"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "route22_rival",
+   "args": [
+    2
+   ]
+  }
+ ]
+}

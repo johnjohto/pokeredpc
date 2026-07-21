@@ -1,0 +1,24 @@
+{
+ "$comment": "scripts/VictoryRoad3F.asm DungeonWarpList — the PLAYER stepping on (23,15) takes the dungeon warp down to 2F (22,16) (DungeonWarpData).",
+ "id": "event:victory_road_3f_player_hole",
+ "trigger": {
+  "kind": "step",
+  "map": "map:VictoryRoad3F",
+  "cells": [
+   [
+    23,
+    15
+   ]
+  ]
+ },
+ "commands": [
+  {
+   "cmd": "fall_hole",
+   "map": "map:VictoryRoad2F",
+   "to": [
+    22,
+    16
+   ]
+  }
+ ]
+}

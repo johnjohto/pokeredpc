@@ -1,0 +1,16 @@
+{
+ "$comment": "scripts/ViridianMart.asm — holding the parcel, the clerk reminds you instead of opening the shop (the asm gates the shop on EVENT_OAK_GOT_PARCEL via a second text table); otherwise the gate fails and the generic mart flow opens.",
+ "id": "event:viridian_mart_clerk_reminder",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:ViridianMart",
+  "object": "SPRITE_CLERK@0,5",
+  "when": "GOT_OAKS_PARCEL and not OAK_GOT_PARCEL"
+ },
+ "commands": [
+  {
+   "cmd": "notice",
+   "text": "Okay! Say hi to\nPROF.OAK for me!"
+  }
+ ]
+}

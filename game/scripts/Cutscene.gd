@@ -2715,8 +2715,8 @@ func rocket_drops_lift_key(npc) -> void:
 	main.cutscene_active = true
 	await say(npc.after_text)
 	main.set_event("ROCKET_DROPPED_LIFT_KEY")
-	var b4f = main.map_script("RocketHideoutB4F")
-	b4f.show_object(b4f.LIFT_KEY_BALL)
+	# ITEM_5 — the ball dropped at (10,2) beside him (the floor's records key the same id).
+	main.map_script("RocketHideoutB4F").show_object("SPRITE_POKE_BALL@10,2")
 	main.cutscene_active = false
 
 
@@ -2724,9 +2724,10 @@ func rocket_drops_lift_key(npc) -> void:
 func giovanni_hideout() -> void:
 	main.cutscene_active = true
 	main.modal = null
-	# The floor's toggleable objects are the map's, so name and flip them through its adapter.
+	# The floor's toggleable objects, by their object ids (the adapter that used to name
+	# them is an authored-event map now, gh #40).
 	var b4f = main.map_script("RocketHideoutB4F")
-	var giovanni = main._npc_by_key(b4f.GIOVANNI)
+	var giovanni = main._npc_by_key("SPRITE_GIOVANNI@25,3")
 	if giovanni:
 		giovanni.face_to(main.player.cell)
 	await say("So! I must say, I\nam impressed you\ngot here!")
@@ -2738,8 +2739,8 @@ func giovanni_hideout() -> void:
 	await say("WHAT!\nThis cannot be!")
 	main.set_event("BEAT_ROCKET_HIDEOUT_GIOVANNI")
 	await say("I see that you\nraise POKéMON\nwith utmost care.\fA child like you\nwould never\nunderstand what I\nhope to achieve.\fI shall step\naside this time!\fI hope we meet\nagain...")
-	b4f.hide_object(b4f.GIOVANNI)                    # RocketHideoutB4FBeatGiovanniScript: HideObject
-	b4f.show_object(b4f.SILPH_SCOPE_BALL)            # ...then ShowObject ITEM_4, the SILPH SCOPE
+	b4f.hide_object("SPRITE_GIOVANNI@25,3")          # RocketHideoutB4FBeatGiovanniScript: HideObject
+	b4f.show_object("SPRITE_POKE_BALL@25,2")         # ...then ShowObject ITEM_4, the SILPH SCOPE
 	main.cutscene_active = false
 
 
@@ -3409,6 +3410,18 @@ const _QUIZ_Q := [
 const _QUIZ_TRAINER := ["SPRITE_SUPER_NERD@17,8", "SPRITE_SUPER_NERD@11,4",
 	"SPRITE_SUPER_NERD@11,8", "SPRITE_SUPER_NERD@11,14", "SPRITE_SUPER_NERD@3,14",
 	"SPRITE_SUPER_NERD@3,8"]
+
+
+## The GAME FREAK game designer's DIPLOMA (scripts/CeladonMansion3F.asm CompletedDexText ->
+## callfar DisplayDiploma): at NUM_POKEMON - 1 owned (150 — Mew doesn't count) his line leads
+## into the diploma card. (Moved verbatim from the retired CeladonMansion3F adapter, gh #40.)
+func award_diploma() -> void:
+	main.cutscene_active = true
+	await say("Wow! Excellent!\nYou completed\nyour POKéDEX!\nCongratulations!\n...")
+	main.modal = main.diploma
+	main.diploma.open_card()
+	await main.diploma.closed
+	main.cutscene_active = false
 
 
 ## A Cinnabar Gym quiz machine (engine/events/hidden_events/cinnabar_gym_quiz.asm): a right

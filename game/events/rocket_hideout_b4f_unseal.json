@@ -1,0 +1,9 @@
+{
+ "$comment": "scripts/RocketHideoutB4F.asm — the second guard falls -> the door swings open on the spot.",
+ "id": "event:rocket_hideout_b4f_unseal",
+ "trigger": {
+  "kind": "battle_end",
+  "map": "map:RocketHideoutB4F",
+  "rerun_enter": true
+ }
+}

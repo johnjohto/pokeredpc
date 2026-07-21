@@ -1,0 +1,18 @@
+{
+ "$comment": "scripts/SeafoamIslandsB2F.asm — the two boulder holes down to the next floor: a STRENGTH boulder may be shoved into these (unwalkable) cells.",
+ "id": "event:seafoam_b2f_holes",
+ "trigger": {
+  "kind": "boulder_hole",
+  "map": "map:SeafoamIslandsB2F",
+  "cells": [
+   [
+    19,
+    6
+   ],
+   [
+    22,
+    6
+   ]
+  ]
+ }
+}

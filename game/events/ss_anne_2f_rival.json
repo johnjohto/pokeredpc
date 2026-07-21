@@ -1,0 +1,25 @@
+{
+ "$comment": "scripts/SSAnne2F.asm — the rival intercepts the player on deck (coords (36,8)/(37,8)).",
+ "id": "event:ss_anne_2f_rival",
+ "trigger": {
+  "kind": "step",
+  "map": "map:SSAnne2F",
+  "cells": [
+   [
+    36,
+    8
+   ],
+   [
+    37,
+    8
+   ]
+  ],
+  "when": "not BEAT_SS_ANNE_RIVAL"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "ss_anne_rival"
+  }
+ ]
+}

@@ -1,0 +1,36 @@
+{
+ "$comment": "scripts/PewterCity.asm PewterCityCheckPlayerLeavingEastScript — leaving east before beating BROCK, the gym guide kid intercepts and marches you to the gym.",
+ "id": "event:pewter_east_gate",
+ "trigger": {
+  "kind": "step",
+  "map": "map:PewterCity",
+  "cells": [
+   [
+    35,
+    17
+   ],
+   [
+    36,
+    17
+   ],
+   [
+    37,
+    18
+   ],
+   [
+    37,
+    19
+   ]
+  ],
+  "when": "not BEAT_BROCK"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "pewter_gym_guy",
+   "args": [
+    "@object:SPRITE_YOUNGSTER@35,16"
+   ]
+  }
+ ]
+}

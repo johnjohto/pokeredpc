@@ -111,8 +111,8 @@ four `--battledettest` md5s **byte-identical to the Phase-2 baseline** (f426d037
 36c598d7 / 25fcd316 — but see gh #44: on the wave-B machine the same commit reproduces
 018610cf / bd9ec91d / 86180e61 / 25fcd316, stable and replay-identical; wave B gates against
 that locally reproduced baseline).
-**In progress: wave B (gh #40)** — the adapter migration, five family waves landed 2026-07-21
-(**62 of the 98 adapter files deleted; 36 remain**): the trigger grammar grew `enter` / `step`
+**In progress: wave B (gh #40)** — the adapter migration, eight family waves landed 2026-07-21
+(**90 of the 98 adapter files deleted; 8 remain**): the trigger grammar grew `enter` / `step`
 ((map, cell)-indexed, `when` gates, non-consuming pokes, regions) / `battle_end` / front-cell
 + facing interacts, and the command library grew exactly what each family demanded
 (`set_last_map`, `mount_bike`/`set_force_bike`, `beat` — the strangler-fig call into a native
@@ -127,18 +127,32 @@ departure, Tower 7F + Fuji's house…); **B3** the guards (the four Saffron thir
 authored — the native mechanism is deleted — both Cycling gate houses, Route22Gate's gh #87
 re-pick, Route23's seven badge checkpoints, ViridianCity, CinnabarIsland); **B4** Silph Co
 (all 11 floors: per-door card-key records + the story beats); **B5** the Mansion switch doors
-+ 3F holes, Cinnabar Gym's quiz gates, and the three elevators (as VM ceremony commands). The
++ 3F holes, Cinnabar Gym's quiz gates, and the three elevators (as VM ceremony commands). Waves B6–B8 (2026-07-21, same session): the E4 rooms + Indigo lobby (`defeated_<x>_<y>`
+conditions resolved against the record's map, `block_cell`/`unblock_cell`, `trainer_battle`
+for LANCE's coordinate trigger, `reset_elite4`, and the **`rerun_enter` battle_end field** —
+pokered's EndTrainerBattle re-running the load callback as a declarative trigger, which also
+carries the Rocket Hideout guard doors); the boulder/hole family (the `boulder_hole`/`boulder`
+trigger kinds + `boulder_fall`, Seafoam B1–B4F with the currents as `walk_forward` runs,
+Victory Road 1F–3F); and the story/city wave (PalletTown, Pewter's drags, Cerulean incl. the
+TM28 rocket, Vermilion's sailor, Saffron's occupation visibles enumerated per object, Route22's
+two rival battles, Tower 2F/6F, S.S. Anne's deck, Bill's house incl. the separator PC,
+Museum 1F via the new `player_x`/`player_y` conditions, Celadon Mansion 3F's diploma —
+`award_diploma` moved into Cutscene — Viridian Mart, Rocket Hideout B1F/B4F; beats that read
+deleted adapters' consts now carry their own data). The
 per-wave gate held throughout: family `--flag` suites green, `--eventtest` grown per wave
 (16 checks), audits at zero, `--validate` 0 errors, double extraction byte-identical, the four
 `--battledettest` md5s never moved. Fallout tracked honestly: gh #44 (the md5 baseline
 discrepancy above) and gh #45 (pre-existing test drift found by baselining every failure
-against HEAD: fishtest/towertest/snorlaxtest crash on a 'species' key, flytest hangs headless,
-exitwarptest + hideouttest never awaited `_do_warp` — the latter two now fixed with the
-documented `battle.fast_hp` idiom, which also revived the only elevator gate). Remaining for
-wave B: the E4 rooms + Indigo lobby, the boulder/hole family (Seafoam, Victory Road), trainers-
-as-doors (GameCorner, MtMoonB2F, LancesRoom), the link-room pair, and the story-heavy city/lab
-maps that lean on wave C's beat dissolution (OaksLab, PalletTown, Cerulean/Pewter/Vermilion,
-BillsHouse, Museum1F, VermilionGym's transient trash-can state, SafariZoneGate's warp trigger).
+against HEAD: fishtest/towertest/snorlaxtest/crivaltest crash on a 'species' key, flytest
+hangs headless, oaktest/diplomatest hang, route22test's 400-frame budget is marginal,
+parceltest calls an `_oak_text()` that no adapter ever had, and exitwarptest + hideouttest
+never awaited `_do_warp` — those two now fixed with the documented `battle.fast_hp` idiom,
+which also revived the only elevator gate). Remaining for wave B: **eight adapters** —
+OaksLab (blocked on the gh #45 `_oak_text` harness fix), GameCorner + VermilionGym (transient
+RAM-like state: the lucky slot, the trash-can pair), MtMoonB2F (needs npc battle-text wiring),
+PokemonTower5F (the purified-zone re-arm), SafariZoneGate (a `warp` trigger kind), and the
+Cable Club room pair (Colosseum/TradeCenter, dynamic step consumption) — plus wave D's
+extractor lints and the wave-E full-playthrough gate before gh #40 closes.
 **Landed: gh #34** (2026-07-20): Catch + Progression are behind the seam and the
 **config-first knobs are real** — `Gen1Catch` (`attempt` over the byte-exact kernel + the
 safari `bait_rate`/`rock_rate` transitions, which moved out of the host's input handler),

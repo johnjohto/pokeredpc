@@ -1,0 +1,25 @@
+{
+ "$comment": "scripts/PokemonTower2F.asm — the rival battle on the second floor (coords (15,5)/(14,6)).",
+ "id": "event:tower_2f_rival",
+ "trigger": {
+  "kind": "step",
+  "map": "map:PokemonTower2F",
+  "cells": [
+   [
+    15,
+    5
+   ],
+   [
+    14,
+    6
+   ]
+  ],
+  "when": "not BEAT_POKEMON_TOWER_RIVAL"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "tower_rival"
+  }
+ ]
+}

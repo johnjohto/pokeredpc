@@ -1,0 +1,21 @@
+{
+ "$comment": "scripts/PokemonTower6F.asm — the restless MAROWAK ghost blocks the stairs at (10,16).",
+ "id": "event:tower_6f_marowak",
+ "trigger": {
+  "kind": "step",
+  "map": "map:PokemonTower6F",
+  "cells": [
+   [
+    10,
+    16
+   ]
+  ],
+  "when": "not BEAT_GHOST_MAROWAK"
+ },
+ "commands": [
+  {
+   "cmd": "beat",
+   "name": "marowak_ghost"
+  }
+ ]
+}

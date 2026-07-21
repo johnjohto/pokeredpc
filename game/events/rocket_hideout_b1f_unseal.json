@@ -1,0 +1,9 @@
+{
+ "$comment": "scripts/RocketHideoutB1F.asm — the guard falls -> the door swings open on the spot (EndTrainerBattle re-runs the load callback).",
+ "id": "event:rocket_hideout_b1f_unseal",
+ "trigger": {
+  "kind": "battle_end",
+  "map": "map:RocketHideoutB1F",
+  "rerun_enter": true
+ }
+}

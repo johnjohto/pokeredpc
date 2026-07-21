@@ -1,0 +1,51 @@
+{
+ "$comment": "scripts/Museum1F.asm Museum1FScientist1Text — what she says depends on which side of the counter you stand on: snuck in the back way (13,4)/(12,3) -> the amber chat; at the counter front (y==4) -> the ticket flow; inside with the ticket -> the wave-through; else sent around.",
+ "id": "event:museum_receptionist",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:Museum1F",
+  "object": "SPRITE_SCIENTIST@12,4"
+ },
+ "commands": [
+  {
+   "cmd": "if",
+   "cond": "(player_x == 13 and player_y == 4) or (player_x == 12 and player_y == 3)",
+   "then": [
+    {
+     "cmd": "beat",
+     "name": "museum_amber_chat"
+    }
+   ],
+   "else": [
+    {
+     "cmd": "if",
+     "cond": "player_y == 4",
+     "then": [
+      {
+       "cmd": "beat",
+       "name": "museum_ticket"
+      }
+     ],
+     "else": [
+      {
+       "cmd": "if",
+       "cond": "BOUGHT_MUSEUM_TICKET",
+       "then": [
+        {
+         "cmd": "notice",
+         "text": "Take plenty of\ntime to look!"
+        }
+       ],
+       "else": [
+        {
+         "cmd": "notice",
+         "text": "Please go to the\nother side!"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

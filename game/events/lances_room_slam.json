@@ -1,0 +1,17 @@
+{
+ "$comment": "scripts/LancesRoom.asm coords 3 and 4 — the two cells just inside the hall: the doorway slams behind you (EVENT_LANCES_ROOM_LOCK_DOOR latches, the blocks close), so the challenge cannot be abandoned mid-way. IndigoPlateauLobby's reset is what undoes the lock, which is what makes a whiteout recoverable. Non-consuming, and dead once LANCE is beaten (the default script rets early).",
+ "id": "event:lances_room_slam",
+ "trigger": {
+  "kind": "step",
+  "map": "map:LancesRoom",
+  "cells": [[5, 11], [6, 11]],
+  "when": "not defeated_6_1 and not LANCES_ROOM_LOCK_DOOR",
+  "consume": false
+ },
+ "commands": [
+  {"cmd": "set_flag", "flag": "LANCES_ROOM_LOCK_DOOR"},
+  {"cmd": "sfx", "key": "go_inside"},
+  {"cmd": "set_block", "x": 2, "y": 6, "block": 114},
+  {"cmd": "set_block", "x": 3, "y": 6, "block": 115}
+ ]
+}

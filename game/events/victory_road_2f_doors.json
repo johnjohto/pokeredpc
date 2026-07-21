@@ -1,0 +1,38 @@
+{
+ "$comment": "scripts/VictoryRoad2F.asm — loading this floor clears 1F's switch (VictoryRoad2FResetBoulderEventScript), then re-opens the already-switched doors. The 1F ladder drops into a sealed west pocket; switch1 (1,16) is its only door.",
+ "id": "event:victory_road_2f_doors",
+ "trigger": {
+  "kind": "enter",
+  "map": "map:VictoryRoad2F"
+ },
+ "commands": [
+  {
+   "cmd": "clear_flag",
+   "flag": "VR1_SWITCH"
+  },
+  {
+   "cmd": "if",
+   "cond": "VR2_SWITCH1",
+   "then": [
+    {
+     "cmd": "set_block",
+     "x": 3,
+     "y": 4,
+     "block": 21
+    }
+   ]
+  },
+  {
+   "cmd": "if",
+   "cond": "VR2_SWITCH2",
+   "then": [
+    {
+     "cmd": "set_block",
+     "x": 11,
+     "y": 7,
+     "block": 29
+    }
+   ]
+  }
+ ]
+}
