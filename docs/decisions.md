@@ -2,6 +2,51 @@
 
 Newest first. Each entry: context → decision → consequences.
 
+## ADR-020 — Studio MVP: one project, canonical write-through, refuse-loud forms (2026-07-22)
+
+**Context:** v2 Phase 4 (gh #18, ADR-013, plan §4.5) builds the Studio MVP — the standalone
+editor app: project browser, dockable shell, schema-driven content editors
+(species/moves/items/trainers), and live play-test. Phases 1–3 shipped its substrate: the
+schema'd project format (ADR-017), the ruleset seam (ADR-018), and the Event VM (ADR-019);
+maps stay Tiled-external until Phase 5 and event editing is Phase 5's GUI. Design
+conversation held 2026-07-22.
+**Decision:** (1) **One Godot project, a `--studio` launch mode** — Main defers to a
+StudioShell scene on the flag; no second project. ADR-013's "its own `.exe`" is a
+creator-experience promise that Phase 7's packaging satisfies with per-preset main scenes;
+until then Studio shares the harness, ProjectData, CoreSchema, and rendering, and the smoke
+suite is `--studiotest` in the established flag pattern. (2) **Studio never edits the
+extractor-owned `game/project`** (double-extraction byte-identity stays a standing gate);
+the browser opens any project folder, and dev/test flows copy Kanto to a scratch project.
+The invariant with teeth: **canonical write-through** — a Core GDScript writer emits the
+same canonical JSON as the extractor's Python emitter, so *loading and re-saving an
+untouched record is byte-identical* (provable by round-tripping the whole Kanto tree);
+creator git diffs stay minimal and "Studio didn't corrupt anything" is a trivial check.
+(3) **Forms auto-generate from the same `core/schemas/*.schema.json` the validator uses**
+(single source of truth); `x-ref` fields render as ID pickers fed by the validator's id
+registry; custom widgets (the sprite picker, learnset table, type selector, party builder —
+exactly what the four Phase-4 editors demand) register per (content-type, field-path) over
+the default widgets — a registry, not a framework. (4) **Refuse-loud at edit time:** inline
+per-field constraint feedback while typing, full CoreSchema + reference validation on save,
+and an invalid record **cannot be saved** — the boot-refusal philosophy moved into the
+editor (softlock lints stay Phase 5). (5) **Live play-test is a separate process:** Studio
+spawns the engine (`--project=<dir>` — already live) as a child; a crash cannot take Studio
+down, the engine stays unmodified, and in dev it is the same binary re-invoked. Play-test
+saves isolate per-project (the test-save-isolation precedent). In-window embedding is
+revisited with Phase 5's map editor. (6) **MVP editing model:** per-record forms, dirty
+tracking, explicit validated Save and Revert-to-saved; a real undo stack earns its place in
+Phase 5 where map painting demands it. (7) **The gate:** `--studiotest` headless — open a
+scratch Kanto copy → edit through the real form widgets → save → canonical write-through
+asserted (untouched records byte-identical, the edit minimal) → validate 0 errors → launch
+the play-test child and handshake — plus a full-project load/re-save byte-identity sweep;
+the phase finale is a seed-1 GATE GREEN on a Studio-round-tripped project ("a Studio save
+must never produce a project the bot can no longer beat"). Out of Phase 4 by decision:
+event editing (Phase 5) and any importer GUI (the pokered importer stays a CLI recipe until
+Phase 7).
+**Consequences:** Phase 4 decomposes into sub-issues cut from this ADR (the shell + browser
++ launch mode → the canonical writer + round-trip identity → the form engine + refusal →
+the four editors' custom widgets → play-test + `--studiotest` + the phase gate), tracked
+under gh #18.
+
 ## ADR-019 — The Event VM: Kanto's story as schema'd, authored event records (2026-07-21)
 
 **Context:** v2 Phase 3 (gh #17, ADR-013, plan §4.3) replaces the hand-written per-map GDScript

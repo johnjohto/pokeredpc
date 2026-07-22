@@ -333,8 +333,20 @@ holds only engine ceremonies and primitives.
 the eighth seed-1 GATE GREEN, md5s byte-identical to the pre-phase baseline, `--validate`
 0 errors (283 records), audits at zero, `linktest`/`linksoak` 8/8/`linkdrop` ALL GREEN, and
 the cross-OS `determinism` workflow fully green on both runners (the gh #37 macOS flake did
-not recur). **Next: Phase 4 — Studio MVP (gh #18)**, whose design conversation should pin
-its ADR before build-out (the Phase 1–3 pattern).
+not recur). **Next: Phase 4 — Studio MVP (gh #18)**. **Phase 4's design is pinned (ADR-020,
+2026-07-22)**: one Godot project with a `--studio` launch mode (the packaging split is
+Phase 7's); Studio never edits the extractor-owned project — the browser opens any folder,
+dev/test copies Kanto to scratch, and the invariant with teeth is **canonical
+write-through** (a Core GDScript writer matching the extractor's emitter byte-for-byte:
+load + re-save = byte-identical); forms auto-generate from the validator's own schemas with
+x-ref ID pickers and a custom-widget *registry* (sprite picker / learnset table / type
+selector / party builder — only what the four editors demand); **refuse-loud at edit time**
+(an invalid record cannot be saved); live play-test as a separate child process
+(`--project=` — already live) with per-project save isolation; explicit Save/Revert, no
+undo stack until Phase 5; the gate is `--studiotest` headless + the full-project re-save
+identity sweep + a seed-1 GATE GREEN on a Studio-round-tripped project. Sub-issues
+**gh #47–#51** (shell/browser → canonical writer → form engine → the four editors →
+play-test + gate). Out by decision: event editing (Phase 5), importer GUI (Phase 7).
 **Landed: gh #34** (2026-07-20): Catch + Progression are behind the seam and the
 **config-first knobs are real** — `Gen1Catch` (`attempt` over the byte-exact kernel + the
 safari `bait_rate`/`rock_rate` transitions, which moved out of the host's input handler),
