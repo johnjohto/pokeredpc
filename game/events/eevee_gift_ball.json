@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/CeladonMansionRoofHouse.asm — the Eevee gift ball.",
+ "$comment": "scripts/CeladonMansionRoofHouse.asm — the Eevee gift ball, fully authored (wave C): give_mon (party, box overflow, both-full refusal + abort = the retired _receive_mon), the received line, the nickname offer AFTER it (offer_nickname), the flag, and the ball gone (the _shown record persists it).",
  "id": "event:eevee_gift_ball",
  "trigger": {
   "kind": "interact",
@@ -8,9 +8,28 @@
  },
  "commands": [
   {
-   "cmd": "beat",
-   "name": "gift_mon_ball",
-   "args": ["eevee", 25, "GOT_EEVEE", "@npc"]
+   "cmd": "give_mon",
+   "species": "species:eevee",
+   "level": 25
+  },
+  {
+   "cmd": "sfx",
+   "key": "get_item1"
+  },
+  {
+   "cmd": "say",
+   "text": "{player} received\na EEVEE!"
+  },
+  {
+   "cmd": "offer_nickname"
+  },
+  {
+   "cmd": "set_flag",
+   "flag": "GOT_EEVEE"
+  },
+  {
+   "cmd": "hide_object",
+   "object": "SPRITE_POKE_BALL@4,3"
   }
  ]
 }

@@ -15184,6 +15184,34 @@ func _eventtest() -> void:
 	ok = _ev_check("wave C party_count: a six-mon party took the full branch",
 		has_event("EVT_FULL") and not has_event("EVT_ROOM")) and ok
 
+	# 14 — wave C questline 6 (gh #41, gifts): take_money subtracts + the money condition
+	# reads the wallet; give_mon overflows to the box, and a full party AND box refuses +
+	# ABORTS the event (the retired _receive_mon rule — the trailing flag never sets).
+	e = vm2.load_all({"f_gift": {"trigger": {"kind": "step", "map": "map:W", "cells": [[3, 3]]},
+		"commands": [
+			{"cmd": "if", "cond": "money >= 500",
+				"then": [{"cmd": "take_money", "amount": 500}]},
+			{"cmd": "give_mon", "species": "species:magikarp", "level": 5},
+			{"cmd": "set_flag", "flag": "EVT_GAVE"}]}})
+	ok = _ev_check("wave C gift commands load clean", e == "", e) and ok
+	story_events = {}
+	player_money = 700
+	player_party = [make_mon("squirtle", 5, [])]
+	for i in 5:
+		player_party.append(make_mon("pidgey", 5, []))
+	pc_box = []
+	vm2.step_fire("W", Vector2i(3, 3))
+	await _drive_until(func() -> bool: return has_event("EVT_GAVE"), 400)
+	ok = _ev_check("wave C take_money + box overflow: ¥200 left, MAGIKARP in the box",
+		player_money == 200 and pc_box.size() == 1 and has_event("EVT_GAVE")) and ok
+	story_events = {}
+	for i in 19:
+		pc_box.append(make_mon("pidgey", 5, []))
+	vm2.step_fire("W", Vector2i(3, 3))
+	await _drive_until(func() -> bool: return not cutscene_active and modal == null, 400)
+	ok = _ev_check("wave C give_mon both-full: refused, event aborted, box still 20",
+		pc_box.size() == 20 and not has_event("EVT_GAVE")) and ok
+
 	print("[eventtest] %s" % ("ALL GREEN" if ok else "FAIL"))
 	get_tree().quit(0 if ok else 1)
 
@@ -15860,14 +15888,17 @@ func _gifttest() -> void:
 	var lee_ok: bool = player_party.size() == 2 and str(player_party[1]["species"]) == "hitmonlee" \
 		and int(player_party[1]["level"]) == 30
 	var chan_gone: bool = not _npc_by_key("SPRITE_POKE_BALL@5,1").shown    # both balls vanish
-	# Greedy guard: a second Hitmon is refused.
-	cutscene.hitmon_gift("hitmonchan", null)
+	# Greedy guard: a second Hitmon is refused (the record's branch, fired straight at the
+	# VM — the ball itself is hidden now, as a stale save could still reach it).
+	event_vm.interact_fire("FightingDojo", Vector2i(5, 1), _npc_by_key("SPRITE_POKE_BALL@5,1"))
 	await _drive_bill(func() -> bool: return not cutscene_active and modal == null, 400)
 	var no_second: bool = player_party.size() == 2 and not has_event("GOT_HITMONCHAN")
-	# --- Magikarp salesman: L5 for ¥500. ---
+	# --- Magikarp salesman: L5 for ¥500 (the record, via the counter talk-up). ---
 	player_party = [make_mon("charmander", 10, ["SCRATCH"])]
 	player_money = 600
-	cutscene.magikarp_salesman()
+	load_world("MtMoonPokecenter")
+	player.place(Vector2i(10, 7)); player.facing = 1     # face UP -> the salesman at (10,6)
+	interact(player)
 	await _drive_bill(func() -> bool: return has_event("BOUGHT_MAGIKARP") and not cutscene_active and modal == null, 800)
 	var karp_ok: bool = player_money == 100 and player_party.size() == 2 \
 		and str(player_party[1]["species"]) == "magikarp" and int(player_party[1]["level"]) == 5
@@ -17716,11 +17747,12 @@ func _moneyboxtest() -> void:
 	interact(player)
 	var d_seen: bool = await _mb_drive([0], func() -> bool: return daycare_mon.is_empty() and not cutscene_active)
 	var d_ok: bool = d_seen and not moneybox.visible and player_money == 4600
-	# --- Museum ticket: ¥50 ---
+	# --- Museum ticket: ¥50 (the record's counter-front branch) ---
 	player_money = 1000
 	story_events = {}
 	load_world("Museum1F")
-	cutscene.museum_ticket()
+	player.place(Vector2i(11, 4)); player.facing = 3     # face RIGHT -> the receptionist at (12,4)
+	interact(player)
 	var m_seen: bool = await _mb_drive([0], func() -> bool: return not cutscene_active)
 	var m_ok: bool = m_seen and not moneybox.visible and has_event("BOUGHT_MUSEUM_TICKET") \
 		and player_money == 950
@@ -17732,11 +17764,12 @@ func _moneyboxtest() -> void:
 	var s_ok: bool = s_seen and not moneybox.visible and in_safari \
 		and center_label == "SafariZoneCenter" and player_money == 500
 	end_safari_game()
-	# --- MtMoon Magikarp salesman: ¥500, no nickname ---
+	# --- MtMoon Magikarp salesman: ¥500, no nickname (the record) ---
 	player_money = 1000
 	story_events = {}
 	load_world("MtMoonPokecenter")
-	cutscene.magikarp_salesman()
+	player.place(Vector2i(10, 7)); player.facing = 1     # face UP -> the salesman at (10,6)
+	interact(player)
 	var k_seen: bool = await _mb_drive([0, 1], func() -> bool: return not cutscene_active)
 	var k_ok: bool = k_seen and not moneybox.visible and has_event("BOUGHT_MAGIKARP") \
 		and player_money == 500 and player_party.size() == 3 \

@@ -1228,6 +1228,59 @@
      {
       "type": "object",
       "required": [
+       "cmd"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "offer_nickname"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "show_money"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "hide_money"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "amount"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "take_money"
+       },
+       "amount": {
+        "type": "integer",
+        "minimum": 1
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
        "cmd",
        "floors"
       ],

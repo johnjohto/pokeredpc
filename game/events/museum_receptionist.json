@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/Museum1F.asm Museum1FScientist1Text — what she says depends on which side of the counter you stand on: snuck in the back way (13,4)/(12,3) -> the amber chat; at the counter front (y==4) -> the ticket flow; inside with the ticket -> the wave-through; else sent around.",
+ "$comment": "scripts/Museum1F.asm Museum1FScientist1Text — what she says depends on which side of the counter you stand on: snuck in the back way (13,4)/(12,3) -> the amber trivia yes/no; at the counter front (y==4) -> the ¥50 ticket flow (MONEY_BOX up, refusal or empty pockets sends you a step south — pokered simulates PAD_DOWN); inside with the ticket -> the wave-through; else sent around. Fully authored (wave C); museum_aisle carries the same ticket flow for the entrance-aisle step trigger.",
  "id": "event:museum_receptionist",
  "trigger": {
   "kind": "interact",
@@ -12,8 +12,20 @@
    "cond": "(player_x == 13 and player_y == 4) or (player_x == 12 and player_y == 3)",
    "then": [
     {
-     "cmd": "beat",
-     "name": "museum_amber_chat"
+     "cmd": "ask",
+     "text": "You can't sneak\nin the back way!\fOh, whatever!\nDo you know what\nAMBER is?",
+     "then": [
+      {
+       "cmd": "say",
+       "text": "There's a lab\nsomewhere trying\nto resurrect\nancient POKéMON\nfrom AMBER."
+      }
+     ],
+     "else": [
+      {
+       "cmd": "say",
+       "text": "AMBER is fossil-\nized tree sap."
+      }
+     ]
     }
    ],
    "else": [
@@ -22,8 +34,80 @@
      "cond": "player_y == 4",
      "then": [
       {
-       "cmd": "beat",
-       "name": "museum_ticket"
+       "cmd": "if",
+       "cond": "BOUGHT_MUSEUM_TICKET",
+       "then": [
+        {
+         "cmd": "say",
+         "text": "Take plenty of\ntime to look!"
+        }
+       ],
+       "else": [
+        {
+         "cmd": "show_money"
+        },
+        {
+         "cmd": "ask",
+         "text": "It's ¥50 for a\nchild's ticket.\fWould you like to\ncome in?",
+         "then": [
+          {
+           "cmd": "if",
+           "cond": "money >= 50",
+           "then": [
+            {
+             "cmd": "take_money",
+             "amount": 50
+            },
+            {
+             "cmd": "sfx",
+             "key": "purchase"
+            },
+            {
+             "cmd": "say",
+             "text": "Right, ¥50!\nThank you!"
+            },
+            {
+             "cmd": "set_flag",
+             "flag": "BOUGHT_MUSEUM_TICKET"
+            },
+            {
+             "cmd": "hide_money"
+            }
+           ],
+           "else": [
+            {
+             "cmd": "say",
+             "text": "You don't have\nenough money."
+            },
+            {
+             "cmd": "say",
+             "text": "Come again!"
+            },
+            {
+             "cmd": "hide_money"
+            },
+            {
+             "cmd": "walk_player",
+             "dir": "down"
+            }
+           ]
+          }
+         ],
+         "else": [
+          {
+           "cmd": "say",
+           "text": "Come again!"
+          },
+          {
+           "cmd": "hide_money"
+          },
+          {
+           "cmd": "walk_player",
+           "dir": "down"
+          }
+         ]
+        }
+       ]
       }
      ],
      "else": [

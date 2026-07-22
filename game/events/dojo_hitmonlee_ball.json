@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/FightingDojo.asm — the Hitmonlee prize ball: pick one, the other vanishes.",
+ "$comment": "scripts/FightingDojo.asm — the HITMONLEE prize ball: pick ONE, the other vanishes; either GOT_ flag turns further tries into the greedy line. The refusal path just ends the event.",
  "id": "event:dojo_hitmonlee_ball",
  "trigger": {
   "kind": "interact",
@@ -8,9 +8,54 @@
  },
  "commands": [
   {
-   "cmd": "beat",
-   "name": "hitmon_gift",
-   "args": ["hitmonlee", "@npc"]
+   "cmd": "if",
+   "cond": "GOT_HITMONLEE or GOT_HITMONCHAN",
+   "then": [
+    {
+     "cmd": "say",
+     "text": "Better not get\ngreedy..."
+    }
+   ],
+   "else": [
+    {
+     "cmd": "ask",
+     "text": "You want the\nhard kicking\nHITMONLEE?",
+     "then": [
+      {
+       "cmd": "give_mon",
+       "species": "species:hitmonlee",
+       "level": 30
+      },
+      {
+       "cmd": "sfx",
+       "key": "get_item1"
+      },
+      {
+       "cmd": "say",
+       "text": "{player} received\na HITMONLEE!"
+      },
+      {
+       "cmd": "offer_nickname"
+      },
+      {
+       "cmd": "set_flag",
+       "flag": "GOT_HITMONLEE"
+      },
+      {
+       "cmd": "set_flag",
+       "flag": "DEFEATED_FIGHTING_DOJO"
+      },
+      {
+       "cmd": "hide_object",
+       "object": "SPRITE_POKE_BALL@4,1"
+      },
+      {
+       "cmd": "hide_object",
+       "object": "SPRITE_POKE_BALL@5,1"
+      }
+     ]
+    }
+   ]
   }
  ]
 }

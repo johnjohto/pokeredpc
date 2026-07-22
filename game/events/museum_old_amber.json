@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/Museum1F.asm — the side-room scientist hands over the OLD AMBER.",
+ "$comment": "scripts/Museum1F.asm — the side-room scientist's OLD AMBER. give_item's full-bag abort leaves GOT_OLD_AMBER unset (re-offer; the retired beat's one-off 'space for this' refusal normalizes to give_item's 'room for this'). Talking to the side-room SCIENTIST (15,2); the amber prop at (16,2) leaves the desk (the _shown record persists it).",
  "id": "event:museum_old_amber",
  "trigger": {
   "kind": "interact",
@@ -8,8 +8,40 @@
  },
  "commands": [
   {
-   "cmd": "beat",
-   "name": "give_old_amber"
+   "cmd": "if",
+   "cond": "GOT_OLD_AMBER",
+   "then": [
+    {
+     "cmd": "say",
+     "text": "Ssh! Get the OLD\nAMBER checked!"
+    }
+   ],
+   "else": [
+    {
+     "cmd": "say",
+     "text": "Ssh! I think that\nthis chunk of\nAMBER contains\nPOKéMON DNA!\fIt would be great\nif POKéMON could\nbe resurrected\nfrom it!\fBut, my colleagues\njust ignore me!\fSo I have a favor\nto ask!\fTake this to a\nPOKéMON LAB and\nget it examined!"
+    },
+    {
+     "cmd": "give_item",
+     "item": "item:old_amber"
+    },
+    {
+     "cmd": "sfx",
+     "key": "get_item1"
+    },
+    {
+     "cmd": "say",
+     "text": "{player} received\nOLD AMBER!"
+    },
+    {
+     "cmd": "set_flag",
+     "flag": "GOT_OLD_AMBER"
+    },
+    {
+     "cmd": "hide_object",
+     "object": "SPRITE_OLD_AMBER@16,2"
+    }
+   ]
   }
  ]
 }

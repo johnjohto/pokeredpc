@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/Museum1F.asm Museum1FDefaultScript — walking up the entrance aisle to the counter (Y==4, X==9/10) fires the receptionist: the ¥50 gate, or her wave-through once the ticket is bought.",
+ "$comment": "scripts/Museum1F.asm Museum1FDefaultScript — walking up the entrance aisle to the counter (Y==4, X==9/10) fires the receptionist's ¥50 ticket flow (the same body as museum_receptionist's counter branch; refusal steps you back south off the aisle).",
  "id": "event:museum_aisle",
  "trigger": {
   "kind": "step",
@@ -17,8 +17,80 @@
  },
  "commands": [
   {
-   "cmd": "beat",
-   "name": "museum_ticket"
+   "cmd": "if",
+   "cond": "BOUGHT_MUSEUM_TICKET",
+   "then": [
+    {
+     "cmd": "say",
+     "text": "Take plenty of\ntime to look!"
+    }
+   ],
+   "else": [
+    {
+     "cmd": "show_money"
+    },
+    {
+     "cmd": "ask",
+     "text": "It's ¥50 for a\nchild's ticket.\fWould you like to\ncome in?",
+     "then": [
+      {
+       "cmd": "if",
+       "cond": "money >= 50",
+       "then": [
+        {
+         "cmd": "take_money",
+         "amount": 50
+        },
+        {
+         "cmd": "sfx",
+         "key": "purchase"
+        },
+        {
+         "cmd": "say",
+         "text": "Right, ¥50!\nThank you!"
+        },
+        {
+         "cmd": "set_flag",
+         "flag": "BOUGHT_MUSEUM_TICKET"
+        },
+        {
+         "cmd": "hide_money"
+        }
+       ],
+       "else": [
+        {
+         "cmd": "say",
+         "text": "You don't have\nenough money."
+        },
+        {
+         "cmd": "say",
+         "text": "Come again!"
+        },
+        {
+         "cmd": "hide_money"
+        },
+        {
+         "cmd": "walk_player",
+         "dir": "down"
+        }
+       ]
+      }
+     ],
+     "else": [
+      {
+       "cmd": "say",
+       "text": "Come again!"
+      },
+      {
+       "cmd": "hide_money"
+      },
+      {
+       "cmd": "walk_player",
+       "dir": "down"
+      }
+     ]
+    }
+   ]
   }
  ]
 }

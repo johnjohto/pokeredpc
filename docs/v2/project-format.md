@@ -38,10 +38,10 @@ project/
                          are load-time queries, never command runs; `step` dispatch
                          is (map, cell)-indexed at load. Conditions are FormulaExpr
                          over story flags/vars plus the engine-state identifiers
-                         item_<id>/badge_<name>/badge_count/party_count/force_bike/
-                         surfing/in_safari/player_x/player_y/dex_owned/battle_won/
-                         player_starter_<id>/rival_starter_<id>/defeated_<x>_<y>
-                         (EventVM._ident_value is the authority).
+                         item_<id>/badge_<name>/badge_count/party_count/box_count/
+                         money/force_bike/surfing/in_safari/player_x/player_y/
+                         dex_owned/battle_won/player_starter_<id>/rival_starter_<id>/
+                         defeated_<x>_<y> (EventVM._ident_value is the authority).
                          Authored in-repo (game/events/), byte-copied in by the
                          extractor — events cannot be extracted from the asm. The
                          trigger-kind and command enums grow wave by wave with the

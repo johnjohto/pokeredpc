@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/MtMoonPokecenter.asm — the MAGIKARP salesman (L5 for 500).",
+ "$comment": "scripts/MtMoonPokecenter.asm — the MAGIKARP salesman: MONEY_BOX up before the pitch, the ¥500 check, give_mon BEFORE the money leaves (the retired order: _receive_mon → SubBCDPredef → refresh → sfx → received line → the box hidden before the naming screen). The both-full pre-check keeps the money box cleanup on the refusal path (the retired beat's hide-then-return).",
  "id": "event:mtmoon_magikarp_salesman",
  "trigger": {
   "kind": "interact",
@@ -8,8 +8,91 @@
  },
  "commands": [
   {
-   "cmd": "beat",
-   "name": "magikarp_salesman"
+   "cmd": "if",
+   "cond": "BOUGHT_MAGIKARP",
+   "then": [
+    {
+     "cmd": "say",
+     "text": "MAN: How's that\nMAGIKARP?\fGood, isn't it?"
+    }
+   ],
+   "else": [
+    {
+     "cmd": "show_money"
+    },
+    {
+     "cmd": "ask",
+     "text": "MAN: Hello, there!\nHave I got a deal\njust for you!\fI'll let you have\na swell MAGIKARP\nfor just ¥500!\fWhat do you say?",
+     "then": [
+      {
+       "cmd": "if",
+       "cond": "money < 500",
+       "then": [
+        {
+         "cmd": "say",
+         "text": "You'll need more\nmoney than that!"
+        },
+        {
+         "cmd": "hide_money"
+        }
+       ],
+       "else": [
+        {
+         "cmd": "if",
+         "cond": "party_count >= 6 and box_count >= 20",
+         "then": [
+          {
+           "cmd": "say",
+           "text": "Your party and\nbox are full!"
+          },
+          {
+           "cmd": "hide_money"
+          }
+         ],
+         "else": [
+          {
+           "cmd": "give_mon",
+           "species": "species:magikarp",
+           "level": 5
+          },
+          {
+           "cmd": "take_money",
+           "amount": 500
+          },
+          {
+           "cmd": "sfx",
+           "key": "get_item1"
+          },
+          {
+           "cmd": "say",
+           "text": "{player} received\na MAGIKARP!"
+          },
+          {
+           "cmd": "hide_money"
+          },
+          {
+           "cmd": "offer_nickname"
+          },
+          {
+           "cmd": "set_flag",
+           "flag": "BOUGHT_MAGIKARP"
+          }
+         ]
+        }
+       ]
+      }
+     ],
+     "else": [
+      {
+       "cmd": "say",
+       "text": "No? I'm only\ndoing this as a\nfavor to you!"
+      },
+      {
+       "cmd": "hide_money"
+      }
+     ]
+    }
+   ]
   }
  ]
 }

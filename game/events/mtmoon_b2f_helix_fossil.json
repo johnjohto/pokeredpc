@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/MtMoonB2F.asm — picking the HELIX FOSSIL; the other is lost.",
+ "$comment": "scripts/MtMoonB2F.asm — picking the HELIX FOSSIL; either GOT_ flag turns the other into the greedy line, and both boulders leave the floor (the _shown records persist it). give_item's full-bag abort = the retired _gift early return (no flag, re-offerable).",
  "id": "event:mtmoon_b2f_helix_fossil",
  "trigger": {
   "kind": "interact",
@@ -8,13 +8,45 @@
  },
  "commands": [
   {
-   "cmd": "beat",
-   "name": "mtmoon_fossil",
-   "args": [
-    "HELIX FOSSIL",
-    "GOT_HELIX_FOSSIL",
-    "@npc",
-    "SPRITE_FOSSIL@12,6"
+   "cmd": "if",
+   "cond": "GOT_DOME_FOSSIL or GOT_HELIX_FOSSIL",
+   "then": [
+    {
+     "cmd": "say",
+     "text": "You already took\none. Don't be\ngreedy!"
+    }
+   ],
+   "else": [
+    {
+     "cmd": "ask",
+     "text": "You want the\nHELIX FOSSIL?",
+     "then": [
+      {
+       "cmd": "give_item",
+       "item": "item:helix_fossil"
+      },
+      {
+       "cmd": "sfx",
+       "key": "get_key_item"
+      },
+      {
+       "cmd": "say",
+       "text": "{player} took the\nHELIX FOSSIL!"
+      },
+      {
+       "cmd": "set_flag",
+       "flag": "GOT_HELIX_FOSSIL"
+      },
+      {
+       "cmd": "hide_object",
+       "object": "SPRITE_FOSSIL@13,6"
+      },
+      {
+       "cmd": "hide_object",
+       "object": "SPRITE_FOSSIL@12,6"
+      }
+     ]
+    }
    ]
   }
  ]

@@ -17,6 +17,7 @@ class_name EventVM
 var main
 
 var maps := {}           # map label -> true (any event targets this map)
+var _last_given := {}    # the mon added by the most recent give_mon (offer_nickname's target)
 var _by_interact := {}   # "<label>|<object key>" -> [records] (id order)
 var _by_front := {}      # "<label>|<x>,<y>"      -> [records] (faced-cell interactions)
 var _by_visible := {}    # "<label>|<object key>" -> event record
@@ -40,7 +41,8 @@ const CMDS := ["say", "notice", "if", "give_item", "take_item", "set_flag", "cle
 	"ask", "show_dex_entry", "pic", "clear_pic", "set_starter", "set_rival_starter", "give_mon",
 	"show_text", "close_text", "emote", "walk_object", "walk_player_to", "walk_together_to", "warp_to",
 	"place_object", "play_map_music", "give_badge", "defeat_gym_trainers",
-	"fade_out", "fade_in", "refresh_objects"]
+	"fade_out", "fade_in", "refresh_objects",
+	"offer_nickname", "show_money", "hide_money", "take_money"]
 
 ## Player facing indices (Player.facing) by direction word.
 const DIRS := {"down": 0, "up": 1, "left": 2, "right": 3}
@@ -298,6 +300,7 @@ func run(rec: Dictionary, ctx: Dictionary = {}) -> void:
 	main.cutscene_active = true
 	if not prev:
 		main.modal = null
+		_last_given = {}     # offer_nickname reaches only a give_mon from THIS event
 	ctx["_map"] = _bare(str(rec.get("trigger", {}).get("map", "")))
 	await _run_block(rec.get("commands", []), ctx)
 	main.cutscene_active = prev
@@ -342,15 +345,22 @@ func _run_block(cmds: Array, ctx: Dictionary) -> bool:
 			"set_rival_starter":
 				main.rival_starter = _bare(str(c["species"]))
 			"give_mon":
-				# A story-gifted mon joins the party (the starter; later the Eevee/fossil
-				# gifts) — the box takes the overflow, as everywhere else in the port.
+				# A story-gifted mon joins the party (the starter, Eevee, the Hitmons…) —
+				# the box takes the overflow, and a full party AND box refuses + aborts the
+				# event (GivePokemon's failure, Cutscene._receive_mon verbatim — gh #41
+				# questline 6; the flag stays unset so the gift re-offers).
 				var gm: Dictionary = main.make_mon(_bare(str(c["species"])), int(c["level"]), [])
-				if main.player_party.size() < 6:
+				var gm_to_party: bool = main.player_party.size() < 6
+				if gm_to_party:
 					main.player_party.append(gm)
-					if bool(c.get("nickname_offer", false)):
-						await main.cutscene.offer_nickname(gm)
-				else:
+				elif main.pc_box.size() < 20:
 					main.pc_box.append(gm)
+				else:
+					await main.cutscene.say("Your party and\nbox are full!")
+					return false
+				_last_given = gm
+				if gm_to_party and bool(c.get("nickname_offer", false)):
+					await main.cutscene.offer_nickname(gm)
 			"give_item":
 				var display := _item_display(str(c["item"]))
 				if not main.add_item(display, int(c.get("count", 1))):
@@ -577,6 +587,21 @@ func _run_block(cmds: Array, ctx: Dictionary) -> bool:
 				# ShowObject/HideObject sweep mid-scene (this floor's rockets vanish while
 				# the screen is dark; other floors flip at load from the same flags).
 				main.refresh_objects()
+			"offer_nickname":
+				# DisplayNamingScreen for the LAST give_mon'd mon, as a separate command —
+				# the gift beats offer the nickname AFTER the "received" line, unlike the
+				# starter's inline nickname_offer (gh #41 questline 6).
+				if not _last_given.is_empty():
+					await main.cutscene.offer_nickname(_last_given)
+			"show_money":
+				# The MONEY_BOX overlay shown before a priced offer (MtMoonPokecenter.asm /
+				# Museum1F.asm); stays up until hide_money, refreshed by take_money.
+				main.moneybox.show_box()
+			"hide_money":
+				main.moneybox.hide_box()
+			"take_money":
+				main.player_money -= int(c["amount"])
+				main.moneybox.refresh()          # redrawn right after SubBCDPredef
 			"give_badge":
 				# The badge case (the gym dissolution, gh #41): append once, idempotent — the
 				# pokered quirk of the badge playing sound_level_up stays an explicit `sfx`
@@ -752,6 +777,12 @@ func _ident_value(ident: String, label: String):
 	if ident == "party_count":
 		# GivePokemon's full-party test (a gift branches its text BEFORE the give).
 		return main.player_party.size()
+	if ident == "box_count":
+		# The 20-slot BILL's PC box (constants/pokemon_data_constants.asm MONS_PER_BOX;
+		# with party_count: a gift's both-full pre-check).
+		return main.pc_box.size()
+	if ident == "money":
+		return main.player_money
 	if ident == "dex_owned":
 		main._sync_owned()
 		return main.pokedex_owned.size()
