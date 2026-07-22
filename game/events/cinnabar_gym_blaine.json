@@ -1,0 +1,38 @@
+{
+ "$comment": "scripts/CinnabarGym.asm CinnabarGymBlaineText — challenge -> OPP_BLAINE -> VOLCANOBADGE + BEAT_BLAINE + the gym's trainers defeated (gh #109) -> TM38. A full bag forfeits the TM for good (gh #174).",
+ "id": "event:cinnabar_gym_blaine",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:CinnabarGym",
+  "object": "SPRITE_MIDDLE_AGED_MAN@3,3"
+ },
+ "commands": [
+  {
+   "cmd": "if",
+   "cond": "BEAT_BLAINE",
+   "then": [
+    {"cmd": "say", "text": "FIRE BLAST is the\nultimate fire\ntechnique!\fDon't waste it on\nwater POKéMON!"}
+   ],
+   "else": [
+    {"cmd": "say", "text": "Hah!\fI am BLAINE! I\nam the LEADER of\nCINNABAR GYM!\fMy fiery POKéMON\nwill incinerate\nall challengers!\fHah! You better\nhave BURN HEAL!"},
+    {"cmd": "class_battle", "class": "OPP_BLAINE", "party": 1, "npc": "CinnabarGym:3,3"},
+    {
+     "cmd": "if",
+     "cond": "battle_won",
+     "then": [
+      {"cmd": "sfx", "key": "level_up"},
+      {"cmd": "say", "text": "I have\nburnt out!\fYou have earned\nthe VOLCANOBADGE!"},
+      {"cmd": "give_badge", "badge": "VOLCANOBADGE"},
+      {"cmd": "set_flag", "flag": "BEAT_BLAINE"},
+      {"cmd": "defeat_gym_trainers"},
+      {"cmd": "say", "text": "Hah!\fThe VOLCANOBADGE\nheightens the\nSPECIAL abilities\nof your POKéMON!\fHere, you can\nhave this too!"},
+      {"cmd": "give_item", "item": "item:tm_fire_blast"},
+      {"cmd": "sfx", "key": "get_item1"},
+      {"cmd": "say", "text": "{player} received\nTM38!"},
+      {"cmd": "say", "text": "TM38 contains\nFIRE BLAST!\fTeach it to fire-\ntype POKéMON like\nCHARMELEON or\nPONYTA!"}
+     ]
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,38 @@
+{
+ "$comment": "scripts/SaffronGym.asm SaffronGymSabrinaText — challenge -> OPP_SABRINA -> MARSHBADGE + BEAT_SABRINA + the gym's trainers defeated (gh #109) -> TM46. A full bag forfeits the TM for good (gh #174).",
+ "id": "event:saffron_gym_sabrina",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:SaffronGym",
+  "object": "SPRITE_GIRL@9,8"
+ },
+ "commands": [
+  {
+   "cmd": "if",
+   "cond": "BEAT_SABRINA",
+   "then": [
+    {"cmd": "say", "text": "Everyone has\npsychic power!\nPeople just don't\nrealize it!"}
+   ],
+   "else": [
+    {"cmd": "say", "text": "I had a vision of\nyour arrival!\fI have had psychic\npowers since I\nwas a child.\fI dislike fight-\ning, but if you\nwish, I will show\nyou my powers!"},
+    {"cmd": "class_battle", "class": "OPP_SABRINA", "party": 1, "npc": "SaffronGym:9,8"},
+    {
+     "cmd": "if",
+     "cond": "battle_won",
+     "then": [
+      {"cmd": "sfx", "key": "level_up"},
+      {"cmd": "say", "text": "I'm\nshocked!\nBut, a loss is a\nloss.\fI admit I didn't\nwork hard enough\nto win!\fYou earned the\nMARSHBADGE!"},
+      {"cmd": "give_badge", "badge": "MARSHBADGE"},
+      {"cmd": "set_flag", "flag": "BEAT_SABRINA"},
+      {"cmd": "defeat_gym_trainers"},
+      {"cmd": "say", "text": "The MARSHBADGE\nmakes POKéMON up\nto L70 obey you!\fStronger POKéMON\nwill ignore your\norders in battle!\fWait, please take\nthis TM with you!"},
+      {"cmd": "give_item", "item": "item:tm_psywave"},
+      {"cmd": "sfx", "key": "get_item1"},
+      {"cmd": "say", "text": "{player} received\nTM46!"},
+      {"cmd": "say", "text": "TM46 is PSYWAVE!\fIt uses powerful\npsychic waves to\ninflict damage!"}
+     ]
+    }
+   ]
+  }
+ ]
+}

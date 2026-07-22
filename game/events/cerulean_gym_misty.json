@@ -1,0 +1,38 @@
+{
+ "$comment": "scripts/CeruleanGym.asm CeruleanGymMistyText — challenge -> OPP_MISTY -> CASCADEBADGE + BEAT_MISTY + the gym's trainers defeated (gh #109) -> TM11 (no separate 'take this' beat — the badge lecture hands it straight over). A full bag forfeits the TM for good (gh #174).",
+ "id": "event:cerulean_gym_misty",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:CeruleanGym",
+  "object": "SPRITE_BRUNETTE_GIRL@4,2"
+ },
+ "commands": [
+  {
+   "cmd": "if",
+   "cond": "BEAT_MISTY",
+   "then": [
+    {"cmd": "say", "text": "TM11 teaches\nBUBBLEBEAM!\fUse it on an\naquatic POKéMON!"}
+   ],
+   "else": [
+    {"cmd": "say", "text": "Hi, you're a new\nface!\fTrainers who want\nto turn pro have\nto have a policy\nabout POKéMON!\fWhat is your\napproach when you\ncatch POKéMON?\fMy policy is an\nall-out offensive\nwith water-type\nPOKéMON!"},
+    {"cmd": "class_battle", "class": "OPP_MISTY", "party": 1, "npc": "CeruleanGym:4,2"},
+    {
+     "cmd": "if",
+     "cond": "battle_won",
+     "then": [
+      {"cmd": "sfx", "key": "level_up"},
+      {"cmd": "say", "text": "Wow!\nYou're too much!\fAll right!\fYou can have the\nCASCADEBADGE to\nshow you beat me!"},
+      {"cmd": "give_badge", "badge": "CASCADEBADGE"},
+      {"cmd": "set_flag", "flag": "BEAT_MISTY"},
+      {"cmd": "defeat_gym_trainers"},
+      {"cmd": "say", "text": "The CASCADEBADGE\nmakes all POKéMON\nup to L30 obey!\fThat includes\neven outsiders!\fThere's more, you\ncan now use CUT\nany time!\fYou can CUT down\nsmall bushes to\nopen new paths!\fYou can also have\nmy favorite TM!"},
+      {"cmd": "give_item", "item": "item:tm_bubblebeam"},
+      {"cmd": "sfx", "key": "get_item1"},
+      {"cmd": "say", "text": "{player} received\nTM11!"},
+      {"cmd": "say", "text": "TM11 teaches\nBUBBLEBEAM!\fUse it on an\naquatic POKéMON!"}
+     ]
+    }
+   ]
+  }
+ ]
+}

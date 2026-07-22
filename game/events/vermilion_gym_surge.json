@@ -1,0 +1,38 @@
+{
+ "$comment": "scripts/VermilionGym.asm VermilionGymLtSurgeText — challenge -> OPP_LT_SURGE -> THUNDERBADGE + BEAT_LT_SURGE + the gym's trainers defeated (gh #109) -> TM24. A full bag forfeits the TM for good (gh #174).",
+ "id": "event:vermilion_gym_surge",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:VermilionGym",
+  "object": "SPRITE_ROCKER@5,1"
+ },
+ "commands": [
+  {
+   "cmd": "if",
+   "cond": "BEAT_LT_SURGE",
+   "then": [
+    {"cmd": "say", "text": "A little word of\nadvice, kid!\fElectricity is\nsure powerful!\fBut, it's useless\nagainst ground-\ntype POKéMON!"}
+   ],
+   "else": [
+    {"cmd": "say", "text": "Hey, kid! What do\nyou think you're\ndoing here?\fYou won't live\nlong in combat!\nThat's for sure!\fI tell you kid,\nelectric POKéMON\nsaved me during\nthe war!\fThey zapped my\nenemies into\nparalysis!\fThe same as I'll\ndo to you!"},
+    {"cmd": "class_battle", "class": "OPP_LT_SURGE", "party": 1, "npc": "VermilionGym:5,1"},
+    {
+     "cmd": "if",
+     "cond": "battle_won",
+     "then": [
+      {"cmd": "sfx", "key": "level_up"},
+      {"cmd": "say", "text": "Whoa!\fYou're the real\ndeal, kid!\fFine then, take\nthe THUNDERBADGE!"},
+      {"cmd": "give_badge", "badge": "THUNDERBADGE"},
+      {"cmd": "set_flag", "flag": "BEAT_LT_SURGE"},
+      {"cmd": "defeat_gym_trainers"},
+      {"cmd": "say", "text": "The THUNDERBADGE\ncranks up your\nPOKéMON's SPEED!\fIt also lets your\nPOKéMON FLY any\ntime, kid!\fYou're special,\nkid! Take this!"},
+      {"cmd": "give_item", "item": "item:tm_thunderbolt"},
+      {"cmd": "sfx", "key": "get_item1"},
+      {"cmd": "say", "text": "{player} received\nTM24!"},
+      {"cmd": "say", "text": "TM24 contains\nTHUNDERBOLT!\fTeach it to an\nelectric POKéMON!"}
+     ]
+    }
+   ]
+  }
+ ]
+}

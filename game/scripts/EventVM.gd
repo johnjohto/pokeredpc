@@ -39,7 +39,7 @@ const CMDS := ["say", "notice", "if", "give_item", "take_item", "set_flag", "cle
 	"face_player", "play_song", "wait", "walk_object_to", "class_battle", "heal_party",
 	"ask", "show_dex_entry", "pic", "clear_pic", "set_starter", "set_rival_starter", "give_mon",
 	"show_text", "close_text", "emote", "walk_object", "walk_player_to", "walk_together_to", "warp_to",
-	"place_object", "play_map_music"]
+	"place_object", "play_map_music", "give_badge", "defeat_gym_trainers"]
 
 ## Player facing indices (Player.facing) by direction word.
 const DIRS := {"down": 0, "up": 1, "left": 2, "right": 3}
@@ -558,6 +558,21 @@ func _run_block(cmds: Array, ctx: Dictionary) -> bool:
 				main.cutscene_active = true    # re-arm for the rest of the event (as beat does)
 			"heal_party":
 				main.heal_party()
+			"give_badge":
+				# The badge case (the gym dissolution, gh #41): append once, idempotent — the
+				# pokered quirk of the badge playing sound_level_up stays an explicit `sfx`
+				# command in the record.
+				if not str(c["badge"]) in main.badges:
+					main.badges.append(str(c["badge"]))
+			"defeat_gym_trainers":
+				# pokered: beating a gym leader runs SetEvents on that gym's
+				# EVENT_BEAT_<GYM>_TRAINER_* flags so its trainers no longer engage (gh #109).
+				# Mark every trainer object_event on the center map defeated, exactly as the
+				# retired gym_leader_battle beat did (the leader included — it is harmless).
+				for o in main.map.get("object_events", []):
+					var oa: Array = o.get("args", [])
+					if oa.size() >= 4 and str(oa[3]).begins_with("OPP_"):
+						main.defeated_trainers["%s:%d,%d" % [main.center_label, int(o["x"]), int(o["y"])]] = true
 			"hide_object":
 				# pokered's HideObject predef: flip a toggleable object's visibility right now.
 				var h = main._npc_by_key(str(c["object"]))

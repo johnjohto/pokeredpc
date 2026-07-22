@@ -1,0 +1,38 @@
+{
+ "$comment": "scripts/FuchsiaGym.asm FuchsiaGymKogaText — challenge -> OPP_KOGA -> SOULBADGE + BEAT_KOGA + the gym's trainers defeated (gh #109) -> TM06. A full bag forfeits the TM for good (gh #174).",
+ "id": "event:fuchsia_gym_koga",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:FuchsiaGym",
+  "object": "SPRITE_KOGA@4,10"
+ },
+ "commands": [
+  {
+   "cmd": "if",
+   "cond": "BEAT_KOGA",
+   "then": [
+    {"cmd": "say", "text": "A ninja must be\nable to track his\nfoes through any\ndarkness.\fHone your skills!"}
+   ],
+   "else": [
+    {"cmd": "say", "text": "KOGA: Fwahahaha!\fA mere child like\nyou dares to\nchallenge me?\fVery well, I\nshall show you\ntrue terror as a\nninja master!"},
+    {"cmd": "class_battle", "class": "OPP_KOGA", "party": 1, "npc": "FuchsiaGym:4,10"},
+    {
+     "cmd": "if",
+     "cond": "battle_won",
+     "then": [
+      {"cmd": "sfx", "key": "level_up"},
+      {"cmd": "say", "text": "Humph!\nYou have proven\nyour worth!\fHere! Take the\nSOULBADGE!"},
+      {"cmd": "give_badge", "badge": "SOULBADGE"},
+      {"cmd": "set_flag", "flag": "BEAT_KOGA"},
+      {"cmd": "defeat_gym_trainers"},
+      {"cmd": "say", "text": "Now that you have\nthe SOULBADGE,\nthe DEFENSE of\nyour POKéMON\nincreases!\fIt also lets you\nuse SURF outside\nof battle!\fAh! Take this\ntoo!"},
+      {"cmd": "give_item", "item": "item:tm_toxic"},
+      {"cmd": "sfx", "key": "get_item1"},
+      {"cmd": "say", "text": "{player} received\nTM06!"},
+      {"cmd": "say", "text": "TM06 contains\nTOXIC!\fIt badly poisons\nthe foe, dealing\nmore damage each\nturn!"}
+     ]
+    }
+   ]
+  }
+ ]
+}

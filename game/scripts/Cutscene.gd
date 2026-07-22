@@ -3250,82 +3250,14 @@ func trainer_battle(npc, walk_up: bool) -> void:
 
 # ---- gym leaders (scripts/<Gym>.asm) ---------------------------------------
 
-# Per-leader script data. `event` gates re-challenge; winning awards `badge` + `tm` (to the bag).
-# `tm_get` ("Wait! Take this!") is optional — some leaders hand the TM straight after the badge.
+# wGymLeaderNo identity: the 8 gym-leader fights, class -> the leader's own party number.
+# This is engine data — audio/play_battle_music.asm PlayBattleMusic keys the gym-leader
+# theme off it in Main.start_trainer_battle — not story: the leaders' script beats live in
+# the authored gym records (wave C, gh #41). Giovanni counts only in his gym (party 3) —
+# his hideout/Silph encounters use other party numbers.
 const _GYM_LEADERS := {
-	"OPP_BROCK": {
-		"num": 1, "event": "BEAT_BROCK", "badge": "BOULDERBADGE", "tm": "TM34",
-		"pre": "I'm BROCK!\nI'm PEWTER's GYM\nLEADER!\fI believe in rock\nhard defense and\ndetermination!\fThat's why my\nPOKéMON are all\nthe rock-type!\fDo you still want\nto challenge me?\nFine then! Show\nme your best!",
-		"badge_get": "I took\nyou for granted.\fAs proof of your\nvictory, here's\nthe BOULDERBADGE!\f%s received\nthe BOULDERBADGE!",
-		"badge_info": "That's an official\nPOKéMON LEAGUE\nBADGE!\fIts bearer's\nPOKéMON become\nmore powerful!\fThe technique\nFLASH can now be\nused any time!",
-		"tm_get": "Wait! Take this\nwith you!",
-		"tm_received": "%s received\nTM34!",
-		"tm_info": "A TM contains a\ntechnique that\ncan be taught to\nPOKéMON!\fA TM is good only\nonce! So when you\nuse one to teach\na new technique,\npick the POKéMON\ncarefully!\fTM34 contains\nBIDE!\fYour POKéMON will\nabsorb damage in\nbattle then pay\nit back double!",
-		"post": "There are all\nkinds of trainers\nin the world!\fYou appear to be\nvery gifted as a\nPOKéMON trainer!\fGo to the GYM in\nCERULEAN and test\nyour abilities!",
-	},
-	"OPP_MISTY": {
-		"num": 1, "event": "BEAT_MISTY", "badge": "CASCADEBADGE", "tm": "TM11",
-		"pre": "Hi, you're a new\nface!\fTrainers who want\nto turn pro have\nto have a policy\nabout POKéMON!\fWhat is your\napproach when you\ncatch POKéMON?\fMy policy is an\nall-out offensive\nwith water-type\nPOKéMON!",
-		"badge_get": "Wow!\nYou're too much!\fAll right!\fYou can have the\nCASCADEBADGE to\nshow you beat me!",
-		"badge_info": "The CASCADEBADGE\nmakes all POKéMON\nup to L30 obey!\fThat includes\neven outsiders!\fThere's more, you\ncan now use CUT\nany time!\fYou can CUT down\nsmall bushes to\nopen new paths!\fYou can also have\nmy favorite TM!",
-		"tm_received": "%s received\nTM11!",
-		"tm_info": "TM11 teaches\nBUBBLEBEAM!\fUse it on an\naquatic POKéMON!",
-		"post": "TM11 teaches\nBUBBLEBEAM!\fUse it on an\naquatic POKéMON!",
-	},
-	"OPP_LT_SURGE": {
-		"num": 1, "event": "BEAT_LT_SURGE", "badge": "THUNDERBADGE", "tm": "TM24",
-		"pre": "Hey, kid! What do\nyou think you're\ndoing here?\fYou won't live\nlong in combat!\nThat's for sure!\fI tell you kid,\nelectric POKéMON\nsaved me during\nthe war!\fThey zapped my\nenemies into\nparalysis!\fThe same as I'll\ndo to you!",
-		"badge_get": "Whoa!\fYou're the real\ndeal, kid!\fFine then, take\nthe THUNDERBADGE!",
-		"badge_info": "The THUNDERBADGE\ncranks up your\nPOKéMON's SPEED!\fIt also lets your\nPOKéMON FLY any\ntime, kid!\fYou're special,\nkid! Take this!",
-		"tm_received": "%s received\nTM24!",
-		"tm_info": "TM24 contains\nTHUNDERBOLT!\fTeach it to an\nelectric POKéMON!",
-		"post": "A little word of\nadvice, kid!\fElectricity is\nsure powerful!\fBut, it's useless\nagainst ground-\ntype POKéMON!",
-	},
-	"OPP_ERIKA": {
-		"num": 1, "event": "BEAT_ERIKA", "badge": "RAINBOWBADGE", "tm": "TM21",
-		"pre": "Hello. Lovely\nweather isn't it?\nIt's so pleasant.\f...Oh dear...\nI must have dozed\noff. Welcome.\fMy name is ERIKA.\nI am the LEADER\nof CELADON GYM.\fI teach the art of\nflower arranging.\nMy POKéMON are of\nthe grass-type.\fVery well, but I\nshall not lose.",
-		"badge_get": "Oh!\nI concede defeat.\fYou are remarkably\nstrong.\fI must confer you\nthe RAINBOWBADGE.",
-		"badge_info": "The RAINBOWBADGE\nwill make POKéMON\nup to L50 obey.\fIt also allows\nPOKéMON to use\nSTRENGTH in and\nout of battle.\fPlease also take\nthis with you.",
-		"tm_received": "%s received\nTM21!",
-		"tm_info": "TM21 contains\nMEGA DRAIN.\fHalf the damage\nit inflicts is\ndrained to heal\nyour POKéMON!",
-		"post": "You are cataloging\nPOKéMON? I must\nsay I'm impressed.\fI would never\ncollect POKéMON\nif they were\nunattractive.",
-	},
-	"OPP_KOGA": {
-		"num": 1, "event": "BEAT_KOGA", "badge": "SOULBADGE", "tm": "TM06",
-		"pre": "KOGA: Fwahahaha!\fA mere child like\nyou dares to\nchallenge me?\fVery well, I\nshall show you\ntrue terror as a\nninja master!",
-		"badge_get": "Humph!\nYou have proven\nyour worth!\fHere! Take the\nSOULBADGE!",
-		"badge_info": "Now that you have\nthe SOULBADGE,\nthe DEFENSE of\nyour POKéMON\nincreases!\fIt also lets you\nuse SURF outside\nof battle!\fAh! Take this\ntoo!",
-		"tm_received": "%s received\nTM06!",
-		"tm_info": "TM06 contains\nTOXIC!\fIt badly poisons\nthe foe, dealing\nmore damage each\nturn!",
-		"post": "A ninja must be\nable to track his\nfoes through any\ndarkness.\fHone your skills!",
-	},
-	"OPP_SABRINA": {
-		"num": 1, "event": "BEAT_SABRINA", "badge": "MARSHBADGE", "tm": "TM46",
-		"pre": "I had a vision of\nyour arrival!\fI have had psychic\npowers since I\nwas a child.\fI dislike fight-\ning, but if you\nwish, I will show\nyou my powers!",
-		"badge_get": "I'm\nshocked!\nBut, a loss is a\nloss.\fI admit I didn't\nwork hard enough\nto win!\fYou earned the\nMARSHBADGE!",
-		"badge_info": "The MARSHBADGE\nmakes POKéMON up\nto L70 obey you!\fStronger POKéMON\nwill ignore your\norders in battle!\fWait, please take\nthis TM with you!",
-		"tm_received": "%s received\nTM46!",
-		"tm_info": "TM46 is PSYWAVE!\fIt uses powerful\npsychic waves to\ninflict damage!",
-		"post": "Everyone has\npsychic power!\nPeople just don't\nrealize it!",
-	},
-	"OPP_BLAINE": {
-		"num": 1, "event": "BEAT_BLAINE", "badge": "VOLCANOBADGE", "tm": "TM38",
-		"pre": "Hah!\fI am BLAINE! I\nam the LEADER of\nCINNABAR GYM!\fMy fiery POKéMON\nwill incinerate\nall challengers!\fHah! You better\nhave BURN HEAL!",
-		"badge_get": "I have\nburnt out!\fYou have earned\nthe VOLCANOBADGE!",
-		"badge_info": "Hah!\fThe VOLCANOBADGE\nheightens the\nSPECIAL abilities\nof your POKéMON!\fHere, you can\nhave this too!",
-		"tm_received": "%s received\nTM38!",
-		"tm_info": "TM38 contains\nFIRE BLAST!\fTeach it to fire-\ntype POKéMON like\nCHARMELEON or\nPONYTA!",
-		"post": "FIRE BLAST is the\nultimate fire\ntechnique!\fDon't waste it on\nwater POKéMON!",
-	},
-	"OPP_GIOVANNI": {
-		"num": 3, "event": "BEAT_GIOVANNI", "badge": "EARTHBADGE", "tm": "TM27",
-		"pre": "Fwahahaha! This is\nmy hideout!\fI planned to\nresurrect TEAM\nROCKET here!\fBut, you have\ncaught me again!\nThis time, I'm\nnot holding back!\fOnce more, you\nshall face\nGIOVANNI, the\ngreatest trainer!",
-		"badge_get": "Ha!\nThat was a truly\nintense fight!\nYou have won!\fAs proof, here is\nthe EARTHBADGE!",
-		"badge_info": "The EARTHBADGE\nmakes POKéMON of\nany level obey!\fIt is evidence of\nyour mastery as a\nPOKéMON trainer!\fWith it, you can\nenter the POKéMON\nLEAGUE!",
-		"tm_received": "%s received\nTM27!",
-		"tm_info": "TM27 is FISSURE!\fIt will take out\nPOKéMON with just\none hit!",
-		"post": "Having lost, I\ncannot face my\nunderlings!\nTEAM ROCKET is\nfinished forever!\fI will dedicate my\nlife to the study\nof POKéMON!\fLet us meet again\nsome day!\nFarewell!",
-	},
+	"OPP_BROCK": 1, "OPP_MISTY": 1, "OPP_LT_SURGE": 1, "OPP_ERIKA": 1,
+	"OPP_KOGA": 1, "OPP_SABRINA": 1, "OPP_BLAINE": 1, "OPP_GIOVANNI": 3,
 }
 
 
@@ -3333,65 +3265,9 @@ func is_gym_leader(opp_class: String) -> bool:
 	return _GYM_LEADERS.has(opp_class)
 
 
-## Is this trainer battle one of the eight gym-leader fights (wGymLeaderNo)? Giovanni
-## counts only in his gym — his hideout/Silph parties use other party numbers.
+## Is this trainer battle one of the eight gym-leader fights (wGymLeaderNo)?
 func is_gym_leader_battle(opp_class: String, num: int) -> bool:
-	return _GYM_LEADERS.has(opp_class) and int(_GYM_LEADERS[opp_class]["num"]) == num
-
-
-func _fmt(s: String) -> String:
-	return s % main.player_name if "%s" in s else s
-
-
-## Talk to a gym leader: challenge (pre-battle text -> battle -> badge + TM on a win) or, once
-## beaten, the post-battle advice line.
-func _mark_gym_trainers_defeated() -> void:
-	# pokered: beating a gym leader runs SetEvents on that gym's EVENT_BEAT_<GYM>_TRAINER_* flags so its
-	# trainers no longer engage. Mark every trainer object_event on this gym map defeated (gh #109).
-	for o in main.map.get("object_events", []):
-		var a: Array = o.get("args", [])
-		if a.size() >= 4 and str(a[3]).begins_with("OPP_"):
-			main.defeated_trainers["%s:%d,%d" % [main.center_label, int(o["x"]), int(o["y"])]] = true
-
-
-func gym_leader_battle(npc) -> void:
-	var g: Dictionary = _GYM_LEADERS[npc.trainer_class]
-	main.cutscene_active = true
-	main.modal = null
-	main.player.face_to(npc.cell)
-	if main.has_event(str(g["event"])):
-		await say(str(g["post"]))
-		main.cutscene_active = false
-		return
-	await say(str(g["pre"]))
-	main.start_trainer_battle(npc.trainer_class, int(g["num"]), main.trainer_id(npc))
-	await main.battle.finished
-	if not main.battle.won:                          # lost / blacked out — control already restored
-		main.cutscene_active = false
-		return
-	if main.audio:
-		main.audio.play_sfx("level_up")          # pokered quirk: the badge plays sound_level_up
-	await say(_fmt(str(g["badge_get"])))
-	if not str(g["badge"]) in main.badges:
-		main.badges.append(str(g["badge"]))
-	main.set_event(str(g["event"]))
-	_mark_gym_trainers_defeated()             # pokered SetEvents EVENT_BEAT_<GYM>_TRAINER_* (gh #109)
-	await say(str(g["badge_info"]))
-	if g.has("tm_get"):                          # some leaders skip the "Wait! Take this!" line
-		await say(str(g["tm_get"]))
-	var tm: String = str(g["tm"])
-	# gh #174: the TM obeys the 20-slot bag limit. pokered's GiveItem -> `jr nc, .BagFull` shows a no-room
-	# line and does NOT give the TM or set GOT_TMxx; the badge (above) still stands, and re-entering the
-	# gym runs the post-battle line (no re-offer), so a full bag permanently forfeits the TM — as in Gen 1.
-	if not main.add_item(tm):
-		await say("You don't have\nroom for this!")
-		main.cutscene_active = false
-		return
-	if main.audio:
-		main.audio.play_sfx("get_item1")
-	await say(_fmt(str(g["tm_received"])))
-	await say(str(g["tm_info"]))
-	main.cutscene_active = false
+	return _GYM_LEADERS.has(opp_class) and int(_GYM_LEADERS[opp_class]) == num
 
 
 ## Viridian City's sleepy old man blocks the road north until the player has the Pokédex

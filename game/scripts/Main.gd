@@ -1726,10 +1726,8 @@ func interact(p) -> bool:
 		if npc.key.begins_with("SPRITE_GYM_GUIDE@"):
 			_say(_gym_guide_text())
 			return true
-		# Gym leader: pre-battle text -> battle -> badge + TM (or post-battle advice if beaten).
-		if cutscene.is_gym_leader(npc.trainer_class):
-			cutscene.gym_leader_battle(npc)
-			return true
+		# Gym leaders are trainer NPCs whose talk-up is an authored interact record (wave C,
+		# gh #41) — consumed above by map_script().on_interact before this generic handling.
 		# Trainer: undefeated -> before-battle text + fight; defeated -> after-battle line.
 		if npc.trainer_class != "":
 			if not defeated_trainers.has(trainer_id(npc)):
@@ -15134,6 +15132,28 @@ func _eventtest() -> void:
 	await _drive_until(func() -> bool: return not cutscene_active and modal == null, 600)
 	ok = _ev_check("wave C gift re-talk: still exactly 5 balls",
 		int(player_bag.get("POKé BALL", 0)) == 5) and ok
+
+	# 12 — wave C questline 4 (gh #41, gyms): the dissolution's two commands. give_badge
+	# appends the badge case once (idempotent), and defeat_gym_trainers marks every OPP_
+	# object on the center map defeated — pokered's EVENT_BEAT_<GYM>_TRAINER_* SetEvents
+	# (gh #109), the leader included, exactly as the retired gym_leader_battle beat did.
+	e = vm2.load_all({"d_gym": {"trigger": {"kind": "interact", "map": "map:CeruleanGym",
+		"object": "SPRITE_BRUNETTE_GIRL@4,2"},
+		"commands": [{"cmd": "give_badge", "badge": "CASCADEBADGE"},
+			{"cmd": "give_badge", "badge": "CASCADEBADGE"},
+			{"cmd": "defeat_gym_trainers"}]}})
+	ok = _ev_check("wave C gym commands load clean", e == "", e) and ok
+	badges = ["BOULDERBADGE"]
+	defeated_trainers = {}
+	load_world("CeruleanGym")
+	var gym_fired: bool = vm2.interact_fire("CeruleanGym", Vector2i(4, 3),
+		_npc_by_key("SPRITE_BRUNETTE_GIRL@4,2"))
+	await _drive_until(func() -> bool: return not cutscene_active and modal == null, 200)
+	ok = _ev_check("wave C give_badge: appended once, idempotent",
+		gym_fired and badges == ["BOULDERBADGE", "CASCADEBADGE"]) and ok
+	ok = _ev_check("wave C defeat_gym_trainers: the gym's trainers marked (gh #109)",
+		defeated_trainers.has("CeruleanGym:2,3") and defeated_trainers.has("CeruleanGym:8,7")
+		and defeated_trainers.has("CeruleanGym:4,2")) and ok
 
 	print("[eventtest] %s" % ("ALL GREEN" if ok else "FAIL"))
 	get_tree().quit(0 if ok else 1)

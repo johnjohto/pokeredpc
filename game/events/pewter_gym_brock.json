@@ -1,0 +1,39 @@
+{
+ "$comment": "scripts/PewterGym.asm PewterGymBrockText — the challenge (pre text -> the OPP_BROCK fight), the win chain (the badge's sound_level_up quirk, BOULDERBADGE, BEAT_BROCK + the gym's trainers marked defeated (gh #109), the badge lecture, the 'Wait! Take this!' beat, TM34), and the post-battle advice line once beaten. give_item's full-bag abort IS pokered's GiveItem .BagFull: the badge stands, the TM is permanently forfeited, no re-offer (gh #174).",
+ "id": "event:pewter_gym_brock",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:PewterGym",
+  "object": "SPRITE_SUPER_NERD@4,1"
+ },
+ "commands": [
+  {
+   "cmd": "if",
+   "cond": "BEAT_BROCK",
+   "then": [
+    {"cmd": "say", "text": "There are all\nkinds of trainers\nin the world!\fYou appear to be\nvery gifted as a\nPOKéMON trainer!\fGo to the GYM in\nCERULEAN and test\nyour abilities!"}
+   ],
+   "else": [
+    {"cmd": "say", "text": "I'm BROCK!\nI'm PEWTER's GYM\nLEADER!\fI believe in rock\nhard defense and\ndetermination!\fThat's why my\nPOKéMON are all\nthe rock-type!\fDo you still want\nto challenge me?\nFine then! Show\nme your best!"},
+    {"cmd": "class_battle", "class": "OPP_BROCK", "party": 1, "npc": "PewterGym:4,1"},
+    {
+     "cmd": "if",
+     "cond": "battle_won",
+     "then": [
+      {"cmd": "sfx", "key": "level_up"},
+      {"cmd": "say", "text": "I took\nyou for granted.\fAs proof of your\nvictory, here's\nthe BOULDERBADGE!\f{player} received\nthe BOULDERBADGE!"},
+      {"cmd": "give_badge", "badge": "BOULDERBADGE"},
+      {"cmd": "set_flag", "flag": "BEAT_BROCK"},
+      {"cmd": "defeat_gym_trainers"},
+      {"cmd": "say", "text": "That's an official\nPOKéMON LEAGUE\nBADGE!\fIts bearer's\nPOKéMON become\nmore powerful!\fThe technique\nFLASH can now be\nused any time!"},
+      {"cmd": "say", "text": "Wait! Take this\nwith you!"},
+      {"cmd": "give_item", "item": "item:tm_bide"},
+      {"cmd": "sfx", "key": "get_item1"},
+      {"cmd": "say", "text": "{player} received\nTM34!"},
+      {"cmd": "say", "text": "A TM contains a\ntechnique that\ncan be taught to\nPOKéMON!\fA TM is good only\nonce! So when you\nuse one to teach\na new technique,\npick the POKéMON\ncarefully!\fTM34 contains\nBIDE!\fYour POKéMON will\nabsorb damage in\nbattle then pay\nit back double!"}
+     ]
+    }
+   ]
+  }
+ ]
+}

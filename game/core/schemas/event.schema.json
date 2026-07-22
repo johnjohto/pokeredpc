@@ -1159,6 +1159,34 @@
       "type": "object",
       "required": [
        "cmd",
+       "badge"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "give_badge"
+       },
+       "badge": {
+        "type": "string"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "defeat_gym_trainers"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
        "floors"
       ],
       "properties": {

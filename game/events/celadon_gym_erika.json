@@ -1,0 +1,38 @@
+{
+ "$comment": "scripts/CeladonGym.asm CeladonGymErikaText — challenge -> OPP_ERIKA -> RAINBOWBADGE + BEAT_ERIKA + the gym's trainers defeated (gh #109) -> TM21. A full bag forfeits the TM for good (gh #174).",
+ "id": "event:celadon_gym_erika",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:CeladonGym",
+  "object": "SPRITE_SILPH_WORKER_F@4,3"
+ },
+ "commands": [
+  {
+   "cmd": "if",
+   "cond": "BEAT_ERIKA",
+   "then": [
+    {"cmd": "say", "text": "You are cataloging\nPOKéMON? I must\nsay I'm impressed.\fI would never\ncollect POKéMON\nif they were\nunattractive."}
+   ],
+   "else": [
+    {"cmd": "say", "text": "Hello. Lovely\nweather isn't it?\nIt's so pleasant.\f...Oh dear...\nI must have dozed\noff. Welcome.\fMy name is ERIKA.\nI am the LEADER\nof CELADON GYM.\fI teach the art of\nflower arranging.\nMy POKéMON are of\nthe grass-type.\fVery well, but I\nshall not lose."},
+    {"cmd": "class_battle", "class": "OPP_ERIKA", "party": 1, "npc": "CeladonGym:4,3"},
+    {
+     "cmd": "if",
+     "cond": "battle_won",
+     "then": [
+      {"cmd": "sfx", "key": "level_up"},
+      {"cmd": "say", "text": "Oh!\nI concede defeat.\fYou are remarkably\nstrong.\fI must confer you\nthe RAINBOWBADGE."},
+      {"cmd": "give_badge", "badge": "RAINBOWBADGE"},
+      {"cmd": "set_flag", "flag": "BEAT_ERIKA"},
+      {"cmd": "defeat_gym_trainers"},
+      {"cmd": "say", "text": "The RAINBOWBADGE\nwill make POKéMON\nup to L50 obey.\fIt also allows\nPOKéMON to use\nSTRENGTH in and\nout of battle.\fPlease also take\nthis with you."},
+      {"cmd": "give_item", "item": "item:tm_mega_drain"},
+      {"cmd": "sfx", "key": "get_item1"},
+      {"cmd": "say", "text": "{player} received\nTM21!"},
+      {"cmd": "say", "text": "TM21 contains\nMEGA DRAIN.\fHalf the damage\nit inflicts is\ndrained to heal\nyour POKéMON!"}
+     ]
+    }
+   ]
+  }
+ ]
+}

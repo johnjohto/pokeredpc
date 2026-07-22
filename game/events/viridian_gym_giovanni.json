@@ -1,0 +1,38 @@
+{
+ "$comment": "scripts/ViridianGym.asm ViridianGymGiovanniText — challenge -> OPP_GIOVANNI's party 3 (his gym fight; the hideout/Silph encounters use other party numbers and their own records) -> EARTHBADGE + BEAT_GIOVANNI + the gym's trainers defeated (gh #109) -> TM27. A full bag forfeits the TM for good (gh #174).",
+ "id": "event:viridian_gym_giovanni",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:ViridianGym",
+  "object": "SPRITE_GIOVANNI@2,1"
+ },
+ "commands": [
+  {
+   "cmd": "if",
+   "cond": "BEAT_GIOVANNI",
+   "then": [
+    {"cmd": "say", "text": "Having lost, I\ncannot face my\nunderlings!\nTEAM ROCKET is\nfinished forever!\fI will dedicate my\nlife to the study\nof POKéMON!\fLet us meet again\nsome day!\nFarewell!"}
+   ],
+   "else": [
+    {"cmd": "say", "text": "Fwahahaha! This is\nmy hideout!\fI planned to\nresurrect TEAM\nROCKET here!\fBut, you have\ncaught me again!\nThis time, I'm\nnot holding back!\fOnce more, you\nshall face\nGIOVANNI, the\ngreatest trainer!"},
+    {"cmd": "class_battle", "class": "OPP_GIOVANNI", "party": 3, "npc": "ViridianGym:2,1"},
+    {
+     "cmd": "if",
+     "cond": "battle_won",
+     "then": [
+      {"cmd": "sfx", "key": "level_up"},
+      {"cmd": "say", "text": "Ha!\nThat was a truly\nintense fight!\nYou have won!\fAs proof, here is\nthe EARTHBADGE!"},
+      {"cmd": "give_badge", "badge": "EARTHBADGE"},
+      {"cmd": "set_flag", "flag": "BEAT_GIOVANNI"},
+      {"cmd": "defeat_gym_trainers"},
+      {"cmd": "say", "text": "The EARTHBADGE\nmakes POKéMON of\nany level obey!\fIt is evidence of\nyour mastery as a\nPOKéMON trainer!\fWith it, you can\nenter the POKéMON\nLEAGUE!"},
+      {"cmd": "give_item", "item": "item:tm_fissure"},
+      {"cmd": "sfx", "key": "get_item1"},
+      {"cmd": "say", "text": "{player} received\nTM27!"},
+      {"cmd": "say", "text": "TM27 is FISSURE!\fIt will take out\nPOKéMON with just\none hit!"}
+     ]
+    }
+   ]
+  }
+ ]
+}
