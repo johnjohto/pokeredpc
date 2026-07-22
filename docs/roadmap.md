@@ -257,8 +257,21 @@ gh #117 rival-exit choreography authored on the existing `player_x` condition; t
 vocabulary additions (`face_object` dir "player", `play_map_music`); board_ss_anne +
 ss_anne_departs stay native (ADR-019 §1). `--billtest`/`--ssannetest` fully green, md5s
 unchanged, and a third fresh seed-1 **GATE GREEN**. The command library is converging hard:
-questlines needed 20 → 1 → 2 new commands. Next questlines: gyms → Silph/Rocket →
-legendaries/fossils/gifts → endgame.
+questlines needed 20 → 1 → 2 new commands.
+**Questline 4 (gyms) COMPLETE (same session):** the eight leaders' scripts (one parameterized
+beat over `_GYM_LEADERS`) dissolved into eight per-leader interact records — pre text →
+`class_battle` → the sound_level_up badge quirk → badge_get → the BEAT_ flag → badge_info →
+Brock's tm_get → the TM → tm_received/tm_info, post line once beaten; `give_item`'s full-bag
+abort IS the Gen-1 TM forfeit (gh #174: badge stands, no re-offer). Two new commands as scoped
+(`give_badge`, `defeat_gym_trainers` = the gh #109 SetEvents, leader included); `_GYM_LEADERS`
+trimmed to the `{class: party}` wGymLeaderNo identity table (PlayBattleMusic's gym-leader theme
+still keys off `is_gym_leader_battle`), and Main's interact special-case is gone — the whole
+`gym_leader_battle`/`_fmt`/`_mark_gym_trainers_defeated` machinery left Cutscene. Gate:
+`--eventtest` 22 checks ALL GREEN, `--gymtest` all seven gyms end to end through the records
+(re-talk lines, gh #109, Giovanni party 3), `--surgetest` (Vermilion), `--validate` 0 errors
+(283 records), double extraction byte-identical, md5s unchanged, and a fourth fresh seed-1
+NEW GAME → HALL OF FAME **GATE GREEN** (Champion at L71). Command-library convergence:
+20 → 1 → 2 → 2. Next questlines: Silph/Rocket → legendaries/fossils/gifts → endgame.
 **Landed: gh #34** (2026-07-20): Catch + Progression are behind the seam and the
 **config-first knobs are real** — `Gen1Catch` (`attempt` over the byte-exact kernel + the
 safari `bait_rate`/`rock_rate` transitions, which moved out of the host's input handler),
