@@ -578,8 +578,21 @@
          "down",
          "up",
          "left",
-         "right"
+         "right",
+         "player"
         ]
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "play_map_music"
        }
       },
       "additionalProperties": false

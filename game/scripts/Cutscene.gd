@@ -571,39 +571,7 @@ func route22_rival(which: int) -> void:
 
 # ---- Bill's house: the cell-separator event (scripts/BillsHouse.asm) --------
 
-## Talk to Bill-as-a-POKéMON: he explains, you agree to help, and he walks into the teleporter.
-func bill_intro() -> void:
-	main.cutscene_active = true
-	main.modal = null
-	if not await ask("Hiya! I'm a\nPOKéMON...\f...No I'm not!\fCall me BILL!\nI'm a true blue\nPOKéMANIAC! Hey!\fI screwed up an\nexperiment and got\ncombined with a\nPOKéMON!\fSo, how about it?\nHelp me out here!"):
-		await say("No!? Come on, you\ngotta help a guy\nin deep trouble!\fWhat do you say,\nchief? Please?\nOK? All right!")
-	await say("When I'm in the\nTELEPORTER, go to\nmy PC and run the\nCell Separation\nSystem!")
-	var billmon = main._npc_by_key("SPRITE_MONSTER@6,5")
-	if billmon:
-		await walk_forward(billmon, UP, 3)       # step into the teleporter
-		billmon.set_shown(false)
-	main.set_event("BILL_SAID_USE_CELL_SEPARATOR")
-	main.cutscene_active = false
-
-
-## Run the cell separator from Bill's PC: the separation jingle, then Bill (human) steps out.
-func bill_separator() -> void:
-	main.cutscene_active = true
-	main.modal = null
-	await say("%s initiated\nTELEPORTER's Cell\nSeparator!" % main.player_name)
-	for sfx in ["switch", "shrink", "tink", "get_item1"]:
-		if main.audio:
-			main.audio.play_sfx(sfx)
-		await wait(0.45)
-	main.set_event("USED_CELL_SEPARATOR_ON_BILL")
-	var bill = main._npc_by_key("SPRITE_SUPER_NERD@4,4")
-	if bill:                                       # Bill emerges from the teleporter and walks out
-		bill.cell = Vector2i(6, 2); bill.position = Vector2(bill.cell * 16)
-		bill.set_shown(true)
-		await walk(bill, main.find_path(bill.cell, Vector2i(4, 4)))
-		bill.face(DOWN)
-	main.set_event("MET_BILL")
-	main.cutscene_active = false
+# (bill_intro + bill_separator dissolved into the Bill's-house records - wave C, gh #41.)
 
 
 ## gh #174: hand over a one-off gift item, obeying the 20-slot bag limit. Returns true once it's in the
@@ -618,23 +586,7 @@ func _gift(item: String) -> bool:
 	return false
 
 
-## Talk to the real Bill: he thanks you with the S.S.TICKET and points you at the S.S. Anne.
-func bill_ticket() -> void:
-	main.cutscene_active = true
-	main.modal = null
-	var bill = main._npc_by_key("SPRITE_SUPER_NERD@4,4")
-	if bill:
-		bill.face_to(main.player.cell)
-	if not main.has_event("GOT_SS_TICKET"):
-		await say("BILL: Yeehah!\nThanks, bud! I\nowe you one!\fI've got to thank\nyou... Oh here,\nmaybe this'll do.")
-		if not await _gift("S.S.TICKET"):
-			return
-		if main.audio:
-			main.audio.play_sfx("get_key_item")
-		await say("%s received\nan S.S.TICKET!" % main.player_name)
-		main.set_event("GOT_SS_TICKET")
-	await say("That cruise ship,\nS.S.ANNE, is in\nVERMILION CITY.\fThey invited me to\ntheir party, but I\ncan't stand fancy\ndo's. Why don't\nyou go instead of\nme?")
-	main.cutscene_active = false
+# (bill_ticket dissolved into bills_house_bill.json - wave C.)
 
 
 # ---- S.S. Anne (scripts/VermilionCity.asm, SSAnneCaptainsRoom.asm) ----------
@@ -653,78 +605,10 @@ func board_ss_anne(dest_label: String, dest_warp: int) -> void:
 	main.load_world(dest_label, dest_warp)
 
 
-## The seasick captain in his cabin: rub his back, then he hands over HM01 (CUT).
-func ss_anne_captain() -> void:
-	main.cutscene_active = true
-	main.modal = null
-	if main.has_event("GOT_HM01"):
-		await say("CAPTAIN: Whew!\fNow that I'm not\nsick any more, I\nguess it's time.")
-		main.cutscene_active = false
-		return
-	await say("CAPTAIN: Ooargh...\nI feel hideous...\nUrrp! Seasick...\f%s rubbed\nthe CAPTAIN's\nback!\fRub-rub...\nRub-rub..." % main.player_name)
-	if main.audio:
-		main.audio.play_sfx("healing_machine")
-	await wait(0.7)
-	main.set_event("RUBBED_CAPTAINS_BACK")
-	await say("CAPTAIN: Whew!\nThank you! I\nfeel much better!\fYou want to see\nmy CUT technique?\fI could show you\nif I wasn't ill...\fI know! You can\nhave this!\fTeach it to your\nPOKéMON and you\ncan see it CUT\nany time!")
-	if not await _gift("HM01"):
-		return
-	if main.audio:
-		main.audio.play_sfx("get_key_item")
-	await say("%s got\nHM01!" % main.player_name)
-	main.set_event("GOT_HM01")
-	main.cutscene_active = false
+# (ss_anne_captain dissolved into ss_anne_captain.json - wave C.)
 
 
-# Player starter -> OPP_RIVAL2 party for the S.S. Anne battle (scripts/SSAnne2F.asm).
-const _SSANNE_RIVAL_PARTY := {"squirtle": 1, "bulbasaur": 2, "charmander": 3}
-
-
-## The rival catches the player on the S.S. Anne deck: walk-up, battle (OPP_RIVAL2), then he hints
-## at the CUT master (the captain) and leaves. Fired from Main._on_player_moved on 2F.
-func ss_anne_rival() -> void:
-	main.cutscene_active = true
-	main.modal = null
-	var pn: String = main.player_name
-	var rn: String = main.rival_name
-	main.player.face(UP)
-	if main.audio:
-		main.audio.play_song("meetrival")
-	var rival = main._npc_by_key("SPRITE_BLUE@36,4")
-	if rival:
-		rival.set_shown(true)
-		# pokered walks the rival straight down his own column to (36,7) — just above the (36,8) trigger —
-		# NOT to directly above the player. That's what lets the after-battle exit route *around* the player
-		# when they triggered from (37,8): otherwise the rival ends at (37,7) and his walk down goes straight
-		# through them (gh #117).
-		await walk(rival, main.find_path(rival.cell, Vector2i(36, 7)))
-		rival.face_to(main.player.cell)
-	await say(("%s: Bonjour!\n%s!" % [rn, pn])
-		+ "\fImagine seeing\nyou here!"
-		+ ("\f%s, were you\nreally invited?" % pn)
-		+ "\fSo how's your\nPOKéDEX coming?\fI already caught\n40 kinds, pal!")
-	var num: int = _SSANNE_RIVAL_PARTY.get(_rival_st(), 3)
-	main.start_trainer_battle("OPP_RIVAL2", num, "SSAnne2F:36,4")
-	await main.battle.finished
-	if not main.battle.won:
-		main.cutscene_active = false
-		return
-	await say("%s: I heard\nthere was a CUT\nmaster on board.\fBut, he was just a\nseasick, old man!\fBut, CUT itself is\nreally useful!\fYou should go see\nhim! Smell ya!" % rn)
-	if rival:
-		# SSAnne2FRivalAfterBattleScript: the jingle re-strikes and he heads down toward the
-		# stairs — sidestepping right around the player unless they stand clear at x==37.
-		if main.audio:
-			main.audio.play_song("meetrival_alt")
-		if main.player.cell.x != 37:
-			await rival.step(RIGHT)
-			await rival.step(DOWN)
-		for i in 4:
-			await rival.step(DOWN)
-		rival.set_shown(false)
-		if main.audio:
-			main.audio.play_map_music(main.center_label)   # PlayDefaultMusic once he's gone
-	main.set_event("BEAT_SS_ANNE_RIVAL")
-	main.cutscene_active = false
+# (ss_anne_rival dissolved into ss_anne_2f_rival.json - wave C.)
 
 
 ## Leaving the dock after getting HM01: the S.S. Anne sets sail (it can't be boarded again).

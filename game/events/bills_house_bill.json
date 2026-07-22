@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/BillsHouse.asm — the real Bill gives the S.S.TICKET.",
+ "$comment": "scripts/BillsHouse.asm — the real Bill, FULLY AUTHORED (wave C): the one-time S.S.TICKET (give_item's full-bag abort leaves GOT_SS_TICKET unset so he re-offers — pokered's GiveItem .BagFull), then the cruise-ship pointer either way.",
  "id": "event:bills_house_bill",
  "trigger": {
   "kind": "interact",
@@ -8,8 +8,16 @@
  },
  "commands": [
   {
-   "cmd": "beat",
-   "name": "bill_ticket"
-  }
+   "cmd": "if",
+   "cond": "not GOT_SS_TICKET",
+   "then": [
+    {"cmd": "say", "text": "BILL: Yeehah!\nThanks, bud! I\nowe you one!\fI've got to thank\nyou... Oh here,\nmaybe this'll do."},
+    {"cmd": "give_item", "item": "item:s_s_ticket"},
+    {"cmd": "sfx", "key": "get_key_item"},
+    {"cmd": "say", "text": "{player} received\nan S.S.TICKET!"},
+    {"cmd": "set_flag", "flag": "GOT_SS_TICKET"}
+   ]
+  },
+  {"cmd": "say", "text": "That cruise ship,\nS.S.ANNE, is in\nVERMILION CITY.\fThey invited me to\ntheir party, but I\ncan't stand fancy\ndo's. Why don't\nyou go instead of\nme?"}
  ]
 }

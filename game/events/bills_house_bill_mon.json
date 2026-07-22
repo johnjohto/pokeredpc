@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/BillsHouse.asm — Bill-as-a-POKéMON starts the cell-separator event.",
+ "$comment": "scripts/BillsHouse.asm — Bill-as-a-POKéMON, FULLY AUTHORED (wave C): his pitch is a yes/no; refusing gets the guilt-trip and he proceeds anyway; then the teleporter instructions and he steps in.",
  "id": "event:bills_house_bill_mon",
  "trigger": {
   "kind": "interact",
@@ -8,8 +8,16 @@
  },
  "commands": [
   {
-   "cmd": "beat",
-   "name": "bill_intro"
-  }
+   "cmd": "ask",
+   "text": "Hiya! I'm a\nPOKéMON...\f...No I'm not!\fCall me BILL!\nI'm a true blue\nPOKéMANIAC! Hey!\fI screwed up an\nexperiment and got\ncombined with a\nPOKéMON!\fSo, how about it?\nHelp me out here!",
+   "then": [],
+   "else": [
+    {"cmd": "say", "text": "No!? Come on, you\ngotta help a guy\nin deep trouble!\fWhat do you say,\nchief? Please?\nOK? All right!"}
+   ]
+  },
+  {"cmd": "say", "text": "When I'm in the\nTELEPORTER, go to\nmy PC and run the\nCell Separation\nSystem!"},
+  {"cmd": "walk_object", "object": "SPRITE_MONSTER@6,5", "dir": "up", "count": 3},
+  {"cmd": "hide_object", "object": "SPRITE_MONSTER@6,5"},
+  {"cmd": "set_flag", "flag": "BILL_SAID_USE_CELL_SEPARATOR"}
  ]
 }

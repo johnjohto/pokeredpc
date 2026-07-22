@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/SSAnneCaptainsRoom.asm — rub the seasick captain's back -> HM01 (CUT).",
+ "$comment": "scripts/SSAnneCaptainsRoom.asm — the seasick captain, FULLY AUTHORED (wave C): the back rub with the healing-machine cue and a 42-frame beat, then HM01 (give_item's full-bag abort leaves GOT_HM01 unset so he re-offers); recovered, he just muses.",
  "id": "event:ss_anne_captain",
  "trigger": {
   "kind": "interact",
@@ -8,8 +8,22 @@
  },
  "commands": [
   {
-   "cmd": "beat",
-   "name": "ss_anne_captain"
+   "cmd": "if",
+   "cond": "GOT_HM01",
+   "then": [
+    {"cmd": "say", "text": "CAPTAIN: Whew!\fNow that I'm not\nsick any more, I\nguess it's time."}
+   ],
+   "else": [
+    {"cmd": "say", "text": "CAPTAIN: Ooargh...\nI feel hideous...\nUrrp! Seasick...\f{player} rubbed\nthe CAPTAIN's\nback!\fRub-rub...\nRub-rub..."},
+    {"cmd": "sfx", "key": "healing_machine"},
+    {"cmd": "wait", "frames": 42},
+    {"cmd": "set_flag", "flag": "RUBBED_CAPTAINS_BACK"},
+    {"cmd": "say", "text": "CAPTAIN: Whew!\nThank you! I\nfeel much better!\fYou want to see\nmy CUT technique?\fI could show you\nif I wasn't ill...\fI know! You can\nhave this!\fTeach it to your\nPOKéMON and you\ncan see it CUT\nany time!"},
+    {"cmd": "give_item", "item": "item:hm_cut"},
+    {"cmd": "sfx", "key": "get_key_item"},
+    {"cmd": "say", "text": "{player} got\nHM01!"},
+    {"cmd": "set_flag", "flag": "GOT_HM01"}
+   ]
   }
  ]
 }

@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/SSAnne2F.asm — the rival intercepts the player on deck (coords (36,8)/(37,8)).",
+ "$comment": "scripts/SSAnne2F.asm — the rival intercepts the player on deck (coords (36,8)/(37,8)), FULLY AUTHORED (wave C): he walks straight down his own column to (36,7) — just above the trigger row, NOT to directly above the player, which is what lets his exit route around a player standing at (37,8) (gh #117) — the Bonjour taunt, OPP_RIVAL2 (party by the RIVAL's starter), and on a win the CUT-master hint, Music_RivalAlternateStart, the sidestep-around exit (the x==37 special case), and the map music resuming. A loss whites out normally — no after-flow, no flag.",
  "id": "event:ss_anne_2f_rival",
  "trigger": {
   "kind": "step",
@@ -17,9 +17,50 @@
   "when": "not BEAT_SS_ANNE_RIVAL"
  },
  "commands": [
+  {"cmd": "face_player", "dir": "up"},
+  {"cmd": "play_song", "key": "meetrival"},
+  {"cmd": "show_object", "object": "SPRITE_BLUE@36,4"},
+  {"cmd": "walk_object_to", "object": "SPRITE_BLUE@36,4", "to": [36, 7]},
+  {"cmd": "face_object", "object": "SPRITE_BLUE@36,4", "dir": "player"},
+  {"cmd": "say", "text": "{rival}: Bonjour!\n{player}!\fImagine seeing\nyou here!\f{player}, were you\nreally invited?\fSo how's your\nPOKéDEX coming?\fI already caught\n40 kinds, pal!"},
   {
-   "cmd": "beat",
-   "name": "ss_anne_rival"
+   "cmd": "if",
+   "cond": "rival_starter_squirtle",
+   "then": [
+    {"cmd": "class_battle", "class": "OPP_RIVAL2", "party": 1, "npc": "SSAnne2F:36,4"}
+   ],
+   "else": [
+    {
+     "cmd": "if",
+     "cond": "rival_starter_bulbasaur",
+     "then": [
+      {"cmd": "class_battle", "class": "OPP_RIVAL2", "party": 2, "npc": "SSAnne2F:36,4"}
+     ],
+     "else": [
+      {"cmd": "class_battle", "class": "OPP_RIVAL2", "party": 3, "npc": "SSAnne2F:36,4"}
+     ]
+    }
+   ]
+  },
+  {
+   "cmd": "if",
+   "cond": "battle_won",
+   "then": [
+    {"cmd": "say", "text": "{rival}: I heard\nthere was a CUT\nmaster on board.\fBut, he was just a\nseasick, old man!\fBut, CUT itself is\nreally useful!\fYou should go see\nhim! Smell ya!"},
+    {"cmd": "play_song", "key": "meetrival_alt"},
+    {
+     "cmd": "if",
+     "cond": "player_x != 37",
+     "then": [
+      {"cmd": "walk_object", "object": "SPRITE_BLUE@36,4", "dir": "right", "count": 1},
+      {"cmd": "walk_object", "object": "SPRITE_BLUE@36,4", "dir": "down", "count": 1}
+     ]
+    },
+    {"cmd": "walk_object", "object": "SPRITE_BLUE@36,4", "dir": "down", "count": 4},
+    {"cmd": "hide_object", "object": "SPRITE_BLUE@36,4"},
+    {"cmd": "play_map_music"},
+    {"cmd": "set_flag", "flag": "BEAT_SS_ANNE_RIVAL"}
+   ]
   }
  ]
 }

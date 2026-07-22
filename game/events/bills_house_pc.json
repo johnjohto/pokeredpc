@@ -17,10 +17,20 @@
    "cmd": "if",
    "cond": "BILL_SAID_USE_CELL_SEPARATOR and not USED_CELL_SEPARATOR_ON_BILL",
    "then": [
-    {
-     "cmd": "beat",
-     "name": "bill_separator"
-    }
+    {"cmd": "say", "text": "{player} initiated\nTELEPORTER's Cell\nSeparator!"},
+    {"cmd": "sfx", "key": "switch"},
+    {"cmd": "wait", "frames": 27},
+    {"cmd": "sfx", "key": "shrink"},
+    {"cmd": "wait", "frames": 27},
+    {"cmd": "sfx", "key": "tink"},
+    {"cmd": "wait", "frames": 27},
+    {"cmd": "sfx", "key": "get_item1"},
+    {"cmd": "wait", "frames": 27},
+    {"cmd": "set_flag", "flag": "USED_CELL_SEPARATOR_ON_BILL"},
+    {"cmd": "place_object", "object": "SPRITE_SUPER_NERD@4,4", "at": [6, 2]},
+    {"cmd": "walk_object_to", "object": "SPRITE_SUPER_NERD@4,4", "to": [4, 4]},
+    {"cmd": "face_object", "object": "SPRITE_SUPER_NERD@4,4", "dir": "down"},
+    {"cmd": "set_flag", "flag": "MET_BILL"}
    ],
    "else": [
     {

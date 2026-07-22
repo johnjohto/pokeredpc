@@ -39,7 +39,7 @@ const CMDS := ["say", "notice", "if", "give_item", "take_item", "set_flag", "cle
 	"face_player", "play_song", "wait", "walk_object_to", "class_battle", "heal_party",
 	"ask", "show_dex_entry", "pic", "clear_pic", "set_starter", "set_rival_starter", "give_mon",
 	"show_text", "close_text", "emote", "walk_object", "walk_player_to", "walk_together_to", "warp_to",
-	"place_object"]
+	"place_object", "play_map_music"]
 
 ## Player facing indices (Player.facing) by direction word.
 const DIRS := {"down": 0, "up": 1, "left": 2, "right": 3}
@@ -510,16 +510,25 @@ func _run_block(cmds: Array, ctx: Dictionary) -> bool:
 						tnpc2.end_text = str(c["end_text"])
 			"face_object":
 				# Turn a map object in place (wave C: the first choreography primitive —
-				# oak_dont_go_away's Oak turning to call after the player).
+				# oak_dont_go_away's Oak turning to call after the player). dir "player"
+				# resolves toward the player's cell (face_to), for triggers whose player
+				# cell varies (the S.S. Anne deck's two trigger cells).
 				var fo = main._npc_by_key(str(c["object"]))
 				if fo != null:
-					fo.face(DIRS[str(c["dir"])])
+					if str(c["dir"]) == "player":
+						fo.face_to(main.player.cell)
+					else:
+						fo.face(DIRS[str(c["dir"])])
 			"face_player":
 				main.player.facing = DIRS[str(c["dir"])]
 				main.player._update_sprite()
 			"play_song":
 				if main.audio:
 					main.audio.play_song(str(c["key"]))
+			"play_map_music":
+				# PlayDefaultMusic: the center map's own theme resumes (a jingle scene ended).
+				if main.audio:
+					main.audio.play_map_music(main.center_label)
 			"wait":
 				# A timed beat in frames (battle/text DelayFrames domain: 1/60 s each).
 				await main.cutscene.wait(int(c["frames"]) / 60.0)
