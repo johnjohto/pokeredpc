@@ -5,7 +5,9 @@ build-out is tracked as gh #14 with phase issues #15–#21. Phases 1–4 are com
 versioned Project/Core, ruleset seam, authored Event VM, and the Studio MVP. The first
 format-2 native TMX map crosses the shared `MapDocument` seam into both Engine and Studio
 (ADR-021, gh #52), and all 223 Kanto maps now ship through that seam (ADR-023, gh #53).
-Painting and object/event editing follow. The gates that guarded
+Studio can now create maps and paint tiles, optional Gen-1 blocks, and per-cell collision
+with exact undo/redo, targeted source-preserving saves, and direct map play-test (ADR-024,
+gh #54). Object/world and event editing follow. The gates that guarded
 the v2 start remain permanent oracles: 1.0 shipped 2026-07-17 and v1.1 multiplayer shipped
 2026-07-20. ADR-013 records the foundational product decisions.
 
@@ -373,6 +375,33 @@ committed **v1.1** feature that precedes and constrains v2, extended design defe
 by a faithful engine and softlock lints; ownership — primarily a solo build, possibly open-sourced later
 (keep the Core clean/documented, don't front-load contributor infra); **no** sharing hub — the toolkit
 exports a self-contained game and any community is external.
+
+---
+
+## 9. Post-v2 possibility — a modernized Kanto showcase (deferred)
+
+After v2 ships, consider publishing two Kanto-derived player builds:
+
+- **Faithful Kanto** remains the default reference project: extracted data, `gen1` rules, presentation,
+  and behavior stay faithful to pokered, and the legit-play bot continues to protect it as the engine's
+  end-to-end regression oracle.
+- **Modernized Kanto** is an optional showcase project/profile built with the same Engine, Core, and
+  Studio. It demonstrates what creators can add without compromising or replacing the faithful game.
+
+This is deliberately **not** a second engine fork. Modernized features must be reusable project or
+ruleset capabilities exposed through Studio rather than Kanto-specific branches in the runtime. The two
+player builds should come from separate project profiles or content overlays over one maintained engine;
+the exact packaging mechanism waits until the v2 project and export formats are stable.
+
+Candidate demonstrations include widescreen/scalable presentation, modern input and accessibility
+options, multiple saves/autosave, richer battle animation, followers or visible encounters, enhanced
+weather/lighting, smoother map presentation, and additional creator/debug tooling. This list records
+possibilities, not commitments or v2 requirements.
+
+The showcase is also distinct from Phase 7's deliberately different second sample: that sample proves
+the engine can support a game unlike Pokémon Red; modernized Kanto would instead prove that optional
+capabilities can layer cleanly onto a complete faithful project. No implementation or detailed design is
+scheduled before the v2 gate closes.
 
 ---
 

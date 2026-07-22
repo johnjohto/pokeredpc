@@ -609,7 +609,9 @@ func _ready() -> void:
 	grass_overlay.material = gmat
 	add_child(grass_overlay)
 	grass_overlay.draw.connect(_draw_grass_overlay)
-	load_world("PalletTown")
+	var requested_start := _arg_value(OS.get_cmdline_args() + OS.get_cmdline_user_args(),
+		"--start-map=")
+	load_world(requested_start if requested_start != "" else "PalletTown")
 	# The handshake probe exits immediately; do not queue every synth only to block on
 	# Audio._exit_tree waiting for throwaway workers. A real Studio child warms normally.
 	if "--playtest-probe" not in user_args:
@@ -618,12 +620,24 @@ func _ready() -> void:
 	var args := OS.get_cmdline_args() + OS.get_cmdline_user_args()
 	var playtest_handshake := _arg_value(args, "--playtest-handshake=")
 	if playtest_handshake != "":
+		var inspected_cells := {}
+		var inspect_arg := _arg_value(args, "--playtest-inspect=")
+		for raw_cell in inspect_arg.split(";", false):
+			var pieces := str(raw_cell).split(",", false)
+			if pieces.size() == 2 and str(pieces[0]).is_valid_int() \
+					and str(pieces[1]).is_valid_int():
+				var inspect_cell := Vector2i(int(pieces[0]), int(pieces[1]))
+				inspected_cells[str(raw_cell)] = _cell_walkable(inspect_cell)
 		var handshake_error := CanonJSON.write_file(playtest_handshake, {
 			"automated": automated_run,
 			"ok": true,
 			"pid": OS.get_process_id(),
 			"project_dir": _normalized_platform_path(ProjectData.dir),
 			"project_id": str(ProjectData.manifest.get("id", "")),
+			"start_map": center_label,
+			"start_cell": [player.cell.x, player.cell.y],
+			"start_walkable": _cell_walkable(player.cell),
+			"inspected_cells": inspected_cells,
 			"save_path": ProjectSettings.globalize_path(SAVE_PATH),
 			"save_slot": _arg_value(args, "--saveslot="),
 			"token": _arg_value(args, "--playtest-token="),

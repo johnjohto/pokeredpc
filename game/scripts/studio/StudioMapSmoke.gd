@@ -27,6 +27,9 @@ func run(shell: StudioShell) -> bool:
 		and workspace.find_child("MapCanvas", true, false) != null
 		and workspace.find_child("InspectorDock", true, false) != null
 		and workspace.find_child("ActionBar", true, false) != null) and ok
+	ok = _check("tileset palette and enabled editing actions are mounted",
+		workspace.palette_control() != null and workspace.undo_control() != null
+		and workspace.redo_control() != null and workspace.save_control() != null) and ok
 	var canvas: StudioMapCanvas = workspace.canvas_control()
 	var rendered := canvas.render_image()
 	var source := canvas.atlas
@@ -35,6 +38,26 @@ func run(shell: StudioShell) -> bool:
 		and rendered.get_pixel(8, 8).is_equal_approx(source.get_pixel(8, 8))
 		and rendered.get_pixel(24, 8).is_equal_approx(source.get_pixel(24, 8)),
 		"size=%s" % str(rendered.get_size())) and ok
+	workspace.select_tile(1)
+	workspace.select_tool("brush")
+	var painted: bool = workspace.paint_once(Vector2i(0, 0))
+	var painted_state: Dictionary = workspace.document.edit_state()
+	var paint_ok: bool = painted and workspace.document.tile_at(Vector2i(0, 0)) == 1 \
+		and workspace.is_dirty() and not workspace.undo_control().disabled
+	workspace.undo()
+	var undo_ok: bool = workspace.document.tile_at(Vector2i(0, 0)) == 0 and not workspace.is_dirty() \
+		and not workspace.redo_control().disabled
+	workspace.redo()
+	var redo_ok: bool = workspace.document.edit_state() == painted_state
+	workspace.undo()
+	ok = _check("real brush controls have exact map-level undo/redo",
+		paint_ok and undo_ok and redo_ok and not workspace.is_dirty()) and ok
+	workspace.select_tool("solid")
+	var collision_painted: bool = workspace.paint_once(Vector2i(0, 0))
+	var collision_ok: bool = collision_painted and not workspace.document.is_walkable(Vector2i(0, 0))
+	workspace.undo()
+	ok = _check("per-cell collision tool participates in the same undo stack",
+		collision_ok and workspace.document.is_walkable(Vector2i(0, 0)) and not workspace.is_dirty()) and ok
 	var shot_error := rendered.save_png("res://studio_tmx.png")
 	ok = _check("Studio tracer screenshot writes", shot_error == OK,
 		error_string(shot_error)) and ok

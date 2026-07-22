@@ -26,12 +26,19 @@ var _ui_scale_slider: HSlider
 var _ui_scale_label: Label
 var _sidebar: ItemList
 var _records: ItemList
+var _new_map_button: Button
 var _editor_host: ScrollContainer
 var _editor_panel: VBoxContainer
 var _dialog: FileDialog
+var _new_map_dialog: ConfirmationDialog
+var _new_map_name: LineEdit
+var _new_map_width: SpinBox
+var _new_map_height: SpinBox
+var _new_map_tileset: OptionButton
 var _record_names := {}          # kind -> sorted basenames (the sidebar's data)
 var _active_kind := ""
 var _active_form: Control = null
+var _active_map_workspace = null
 var _ui_scale := DEFAULT_UI_SCALE
 
 
@@ -161,10 +168,19 @@ func _build_ui() -> void:
 	_sidebar.custom_minimum_size = Vector2(160, 0)
 	_sidebar.item_selected.connect(_on_type_selected)
 	split.add_child(_sidebar)
+	var records_column := VBoxContainer.new()
+	records_column.custom_minimum_size = Vector2(190, 0)
+	split.add_child(records_column)
+	_new_map_button = Button.new()
+	_new_map_button.text = "New map…"
+	_new_map_button.disabled = true
+	_new_map_button.pressed.connect(_show_new_map_dialog)
+	records_column.add_child(_new_map_button)
 	_records = ItemList.new()
 	_records.custom_minimum_size = Vector2(190, 0)
+	_records.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_records.item_selected.connect(_on_record_selected)
-	split.add_child(_records)
+	records_column.add_child(_records)
 	_editor_host = ScrollContainer.new()
 	_editor_host.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_editor_host.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -185,6 +201,7 @@ func _build_ui() -> void:
 		if err != "":
 			_status.text = "REFUSED: " + err)
 	add_child(_dialog)
+	_build_new_map_dialog()
 
 
 func _refresh_sidebar() -> void:
@@ -199,10 +216,101 @@ func _refresh_sidebar() -> void:
 
 func _on_type_selected(idx: int) -> void:
 	_active_kind = WORKSPACES[idx]
+	_new_map_button.disabled = _active_kind != "maps" \
+		or int(ProjectData.manifest.get("format", 1)) < 2
 	_records.clear()
 	for n in _record_names[_active_kind]:
 		_records.add_item(str(n))
 	_clear_editor()
+
+
+func _build_new_map_dialog() -> void:
+	_new_map_dialog = ConfirmationDialog.new()
+	_new_map_dialog.title = "Create native map"
+	_new_map_dialog.ok_button_text = "Create"
+	var fields := GridContainer.new()
+	fields.columns = 2
+	_new_map_dialog.add_child(fields)
+	fields.add_child(_dialog_label("Map name"))
+	_new_map_name = LineEdit.new()
+	_new_map_name.placeholder_text = "MyTown"
+	fields.add_child(_new_map_name)
+	fields.add_child(_dialog_label("Width (cells)"))
+	_new_map_width = SpinBox.new()
+	_new_map_width.min_value = 1
+	_new_map_width.max_value = 256
+	_new_map_width.value = 20
+	fields.add_child(_new_map_width)
+	fields.add_child(_dialog_label("Height (cells)"))
+	_new_map_height = SpinBox.new()
+	_new_map_height.min_value = 1
+	_new_map_height.max_value = 256
+	_new_map_height.value = 18
+	fields.add_child(_new_map_height)
+	fields.add_child(_dialog_label("Tileset"))
+	_new_map_tileset = OptionButton.new()
+	_new_map_tileset.custom_minimum_size.x = 240
+	fields.add_child(_new_map_tileset)
+	_new_map_dialog.confirmed.connect(_create_map_from_dialog)
+	add_child(_new_map_dialog)
+
+
+func _show_new_map_dialog() -> void:
+	_new_map_tileset.clear()
+	var files := PackedStringArray()
+	for file in DirAccess.get_files_at(project_dir.path_join("tilesets")):
+		if file.to_lower().ends_with(".tsx"):
+			files.append(file)
+	files.sort()
+	for file in files:
+		_new_map_tileset.add_item(file)
+	if files.is_empty():
+		_status.text = "REFUSED: project has no TSX tilesets"
+		return
+	_new_map_name.text = ""
+	_new_map_dialog.popup_centered(Vector2i(480, 300))
+
+
+func _create_map_from_dialog():
+	if _new_map_tileset.item_count == 0:
+		return null
+	var label := _new_map_name.text.strip_edges()
+	var created := MapDocument.create(project_dir, label, int(_new_map_width.value),
+		int(_new_map_height.value), _new_map_tileset.get_item_text(_new_map_tileset.selected))
+	if not bool(created.get("ok", false)):
+		_status.text = "REFUSED: " + str(created.get("error", "cannot create map"))
+		return null
+	_record_names["maps"] = ProjectData.map_labels()
+	var map_workspace_index := WORKSPACES.find("maps")
+	_sidebar.select(map_workspace_index)
+	_on_type_selected(map_workspace_index)
+	var record_index := (_record_names["maps"] as Array).find(label)
+	if record_index >= 0:
+		_records.select(record_index)
+	var workspace = preview_map(project_dir, label)
+	_status.text = "created map/%s — %dx%d cells" % [label,
+		int(_new_map_width.value), int(_new_map_height.value)]
+	return workspace
+
+
+func new_map_control() -> Button:
+	return _new_map_button
+
+
+func new_map_fields() -> Dictionary:
+	return {"dialog": _new_map_dialog, "name": _new_map_name, "width": _new_map_width,
+		"height": _new_map_height, "tileset": _new_map_tileset}
+
+
+func select_workspace(kind: String) -> void:
+	var index := WORKSPACES.find(kind)
+	if index >= 0:
+		_sidebar.select(index)
+		_on_type_selected(index)
+
+
+func active_map_workspace():
+	return _active_map_workspace
 
 
 func _on_record_selected(idx: int) -> void:
@@ -257,6 +365,8 @@ func preview_map(project_root: String, map_label: String):
 		return null
 	workspace.document_saved.connect(func(saved_path: String) -> void:
 		_status.text = "saved " + saved_path)
+	workspace.playtest_requested.connect(_on_map_playtest_requested)
+	_active_map_workspace = workspace
 	_status.text = "previewing map/%s — native TMX" % map_label
 	return workspace
 
@@ -315,6 +425,7 @@ func edit_record(content_type: String, basename: String):
 
 func _clear_editor() -> void:
 	_active_form = null
+	_active_map_workspace = null
 	if _editor_panel == null:
 		return
 	for child in _editor_panel.get_children():
@@ -346,19 +457,22 @@ func _refresh_ui_scale_label() -> void:
 
 ## Public launch seam used by the button and --studiotest. The Engine is always a child
 ## process; `probe` asks it to quit after proving readiness, and is test-only.
-func launch_playtest(probe := false, headless := false):
+func launch_playtest(probe := false, headless := false, start_map := "", inspect_cells: Array = []):
 	if project_dir == "":
 		_status.text = "REFUSED: open a project before play-testing"
 		return null
 	if _active_form != null and _active_form.is_dirty():
 		_status.text = "REFUSED: save or revert the current record before play-testing"
 		return null
+	if _active_map_workspace != null and _active_map_workspace.is_dirty():
+		_status.text = "REFUSED: save or revert the current map before play-testing"
+		return null
 	var report := ProjectValidator.validate_project(project_dir)
 	if not bool(report.get("ok", false)):
 		_status.text = "REFUSED: " + "; ".join(PackedStringArray(report.get("errors", [])))
 		return null
 	var child := preload("res://scripts/studio/StudioPlaytest.gd").new()
-	var error: String = child.launch(project_dir, probe, headless)
+	var error: String = child.launch(project_dir, probe, headless, start_map, inspect_cells)
 	if error != "":
 		_status.text = "REFUSED: " + error
 		return null
@@ -367,12 +481,23 @@ func launch_playtest(probe := false, headless := false):
 
 
 func _on_playtest_pressed() -> void:
-	var child = launch_playtest()
+	var start_map := str(_active_map_workspace.document.label) if _active_map_workspace != null else ""
+	var child = launch_playtest(false, false, start_map)
 	if child == null:
 		return
 	var ack: Dictionary = await child.wait_for_handshake(get_tree())
 	_status.text = ("play-test ready — isolated save %s" % str(ack.get("save_slot", ""))) \
 		if bool(ack.get("ok", false)) else "REFUSED: " + str(ack.get("error", "handshake failed"))
+	child.cleanup_handshake()
+
+
+func _on_map_playtest_requested(map_label: String) -> void:
+	var child = launch_playtest(false, false, map_label)
+	if child == null:
+		return
+	var ack: Dictionary = await child.wait_for_handshake(get_tree())
+	_status.text = ("play-test ready on %s" % map_label) if bool(ack.get("ok", false)) \
+		else "REFUSED: " + str(ack.get("error", "handshake failed"))
 	child.cleanup_handshake()
 
 
@@ -521,6 +646,7 @@ func _studiotest() -> void:
 	ok = preload("res://scripts/studio/StudioFormSmoke.gd").new().run(self, scratch) and ok
 	ok = preload("res://scripts/studio/StudioEditorSmoke.gd").new().run(self, scratch) and ok
 	ok = preload("res://scripts/studio/StudioMapSmoke.gd").new().run(self) and ok
+	ok = await preload("res://scripts/studio/StudioMapAuthoringSmoke.gd").new().run(self, scratch) and ok
 	ok = await preload("res://scripts/studio/StudioPlaytestSmoke.gd").new().run(self, scratch) and ok
 	print("[studiotest] %s" % ("ALL GREEN" if ok else "FAIL"))
 	get_tree().quit(0 if ok else 1)
@@ -530,6 +656,12 @@ func _st_check(name: String, good: bool, detail := "") -> bool:
 	print("[studiotest] %s: %s%s" % [name, "PASS" if good else "FAIL",
 		"" if good or detail == "" else " — " + detail])
 	return good
+
+
+static func _dialog_label(text: String) -> Label:
+	var label := Label.new()
+	label.text = text
+	return label
 
 
 static func _copy_dir(from: String, to: String) -> String:

@@ -1,8 +1,8 @@
 extends RefCounted
 class_name MapDocument
-## Phase-5 native map module (gh #52, ADR-021). Core, Engine, Studio, and the
+## Phase-5 native map module (gh #52/#54, ADR-021/024). Core, Engine, Studio, and the
 ## validator all cross this one seam: open a Tiled TMX map into a normalized
-## 16x16-cell document, or save its untouched source bytes exactly. XML/Tiled
+## 16x16-cell document, or target owned TMX fields without reserializing XML. XML/Tiled
 ## details, path containment, TSX properties, CSV GIDs, and object conventions
 ## stay behind this interface instead of leaking into four callers.
 
@@ -32,6 +32,12 @@ var signs: Array = []
 var objects: Array = []
 var triggers: Array = []
 var properties: Dictionary = {}
+var _first_gid := 1
+var _next_layer_id := 1
+var _has_collision_layer := false
+var _collision_authored := false
+var _saved_tiles := PackedInt32Array()
+var _saved_walkable := PackedByteArray()
 
 
 ## Open maps/<label>.tmx and its external TSX. Returns
@@ -44,16 +50,183 @@ static func open(project_root: String, map_label: String) -> Dictionary:
 		"error": error}
 
 
-## Persist an UNEDITED document. Phase 5.3 grows targeted edit operations; this
-## tracer deliberately writes the original buffer so a Studio no-op save is
-## byte-identical and every unknown Tiled layer/property/comment survives.
+## Create a minimal format-2 TMX map against an existing project TSX, then open it through
+## the normal refusal boundary. Studio owns the UX; Core owns safe paths and valid source.
+static func create(project_root: String, map_label: String, map_width: int, map_height: int,
+		tileset_file: String) -> Dictionary:
+	var label_regex := RegEx.new()
+	label_regex.compile("^[A-Za-z][A-Za-z0-9_]*$")
+	if label_regex.search(map_label) == null:
+		return {"ok": false, "document": null,
+			"error": "map name must start with a letter and use only letters, numbers, or _"}
+	if map_width < 1 or map_height < 1 or map_width > 256 or map_height > 256:
+		return {"ok": false, "document": null, "error": "map size must be between 1 and 256 cells"}
+	if tileset_file.get_file() != tileset_file or not tileset_file.to_lower().ends_with(".tsx"):
+		return {"ok": false, "document": null, "error": "choose a project tileset"}
+	var root := _absolute(project_root)
+	var map_path := root.path_join("maps/%s.tmx" % map_label).simplify_path()
+	var tsx_path := root.path_join("tilesets").path_join(tileset_file).simplify_path()
+	if not _is_inside(root, map_path) or not _is_inside(root, tsx_path):
+		return {"ok": false, "document": null, "error": "new map path escapes the project"}
+	if FileAccess.file_exists(map_path):
+		return {"ok": false, "document": null, "error": "map '%s' already exists" % map_label}
+	var probe := MapDocument.new()
+	probe.project_dir = root
+	var loaded_tsx := probe._load_tsx(tsx_path)
+	if not bool(loaded_tsx.get("ok", false)):
+		return {"ok": false, "document": null, "error": str(loaded_tsx.get("error", "invalid tileset"))}
+	var normalized: Dictionary = loaded_tsx["tileset"]
+	var tile_id := 0
+	for candidate in int(normalized.get("tile_count", 0)):
+		var props: Dictionary = (normalized.get("tile_properties", {}) as Dictionary).get(candidate, {})
+		if bool(props.get("pokeredpc:walkable", false)):
+			tile_id = candidate
+			break
+	var gids := PackedInt32Array()
+	gids.resize(map_width * map_height)
+	gids.fill(tile_id + 1)
+	var rows := PackedStringArray()
+	for y in map_height:
+		var row := PackedStringArray()
+		for x in map_width:
+			row.append(str(gids[y * map_width + x]))
+		rows.append(",".join(row))
+	var csv := ",\n".join(rows)
+	var source := """<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.11" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="%d" height="%d" tilewidth="16" tileheight="16" infinite="0" nextlayerid="2" nextobjectid="1">
+ <properties>
+  <property name="pokeredpc:format" type="int" value="1"/>
+  <property name="pokeredpc:border_tile" type="int" value="%d"/>
+  <property name="pokeredpc:default_spawn" value="0,0"/>
+ </properties>
+ <tileset firstgid="1" source="../tilesets/%s"/>
+ <layer id="1" name="Ground" width="%d" height="%d">
+  <data encoding="csv">
+%s
+  </data>
+ </layer>
+</map>
+""" % [map_width, map_height, tile_id, _xml_escape(tileset_file), map_width, map_height, csv]
+	DirAccess.make_dir_recursive_absolute(map_path.get_base_dir())
+	var file := FileAccess.open(map_path, FileAccess.WRITE)
+	if file == null:
+		return {"ok": false, "document": null, "error": "cannot create '%s' (%s)" % [
+			map_path, error_string(FileAccess.get_open_error())]}
+	file.store_string(source)
+	file.close()
+	return open(root, map_label)
+
+
+## Persist the document. A no-op writes the original bytes exactly. An edit patches only
+## Ground CSV and the owned optional Collision layer; every unrelated byte survives.
 func save(target_path := "") -> String:
 	var out := path if target_path == "" else _absolute(target_path)
+	var emitted := _edited_source()
+	if not bool(emitted.get("ok", false)):
+		return str(emitted.get("error", "cannot serialize map"))
 	var file := FileAccess.open(out, FileAccess.WRITE)
 	if file == null:
 		return "cannot write '%s' (%s)" % [out, error_string(FileAccess.get_open_error())]
-	file.store_buffer(source_bytes)
+	file.store_buffer(emitted["bytes"])
+	file.close()
+	if out == path:
+		source_bytes = emitted["bytes"]
+		_saved_tiles = tiles.duplicate()
+		_saved_walkable = walkable.duplicate()
+		_has_collision_layer = bool(emitted.get("has_collision", _has_collision_layer))
+		_collision_authored = _has_collision_layer
+		_next_layer_id = int(emitted.get("next_layer_id", _next_layer_id))
 	return ""
+
+
+func is_dirty() -> bool:
+	return tiles != _saved_tiles or walkable != _saved_walkable
+
+
+func edit_state() -> Dictionary:
+	return {"tiles": tiles.duplicate(), "walkable": walkable.duplicate(),
+		"collision_authored": _collision_authored}
+
+
+func restore_edit_state(state: Dictionary) -> void:
+	var restored_tiles: PackedInt32Array = state.get("tiles", PackedInt32Array())
+	var restored_walkable: PackedByteArray = state.get("walkable", PackedByteArray())
+	if restored_tiles.size() != width * height or restored_walkable.size() != width * height:
+		return
+	tiles = restored_tiles.duplicate()
+	walkable = restored_walkable.duplicate()
+	_collision_authored = bool(state.get("collision_authored", _has_collision_layer))
+	_refresh_tile_metadata()
+	_rebuild_blocks()
+
+
+func set_tile(cell: Vector2i, tile_id: int) -> bool:
+	if not _contains(cell) or tile_id < 0 or tile_id >= int(tileset.get("tile_count", 0)):
+		return false
+	var index := cell.y * width + cell.x
+	if int(tiles[index]) == tile_id:
+		return false
+	tiles[index] = tile_id
+	var props: Dictionary = (tileset.get("tile_properties", {}) as Dictionary).get(tile_id, {})
+	feet_tiles[index] = int(props.get("pokeredpc:feet_tile", tile_id))
+	if not _collision_authored:
+		walkable[index] = 1 if bool(props.get("pokeredpc:walkable", false)) else 0
+	_rebuild_block_at(Vector2i(cell.x / 2, cell.y / 2))
+	return true
+
+
+func set_walkable(cell: Vector2i, value: bool) -> bool:
+	if not _contains(cell):
+		return false
+	var index := cell.y * width + cell.x
+	var byte := 1 if value else 0
+	if int(walkable[index]) == byte:
+		return false
+	walkable[index] = byte
+	_collision_authored = true
+	return true
+
+
+func fill_tile(start: Vector2i, tile_id: int) -> bool:
+	if not _contains(start) or tile_id < 0 or tile_id >= int(tileset.get("tile_count", 0)):
+		return false
+	var from := tile_at(start)
+	if from == tile_id:
+		return false
+	var pending: Array[Vector2i] = [start]
+	var seen := {}
+	var changed := false
+	while not pending.is_empty():
+		var cell: Vector2i = pending.pop_back()
+		if seen.has(cell) or not _contains(cell) or tile_at(cell) != from:
+			continue
+		seen[cell] = true
+		changed = set_tile(cell, tile_id) or changed
+		pending.append(cell + Vector2i.LEFT)
+		pending.append(cell + Vector2i.RIGHT)
+		pending.append(cell + Vector2i.UP)
+		pending.append(cell + Vector2i.DOWN)
+	return changed
+
+
+func paint_block(cell: Vector2i, block_id: int) -> bool:
+	var groups: Dictionary = tileset.get("block_tiles", {})
+	if not groups.has(block_id):
+		return false
+	var origin := Vector2i(cell.x / 2 * 2, cell.y / 2 * 2)
+	if not _contains(origin) or not _contains(origin + Vector2i.ONE):
+		return false
+	var changed := false
+	var group: Array = groups[block_id]
+	for quadrant in 4:
+		changed = set_tile(origin + Vector2i(quadrant % 2, quadrant / 2),
+			int(group[quadrant])) or changed
+	return changed
+
+
+func block_for_tile(tile_id: int) -> int:
+	var member: Array = (tileset.get("tile_blocks", {}) as Dictionary).get(tile_id, [])
+	return int(member[0]) if member.size() == 2 else -1
 
 
 ## Engine adapter: the native document expressed as the map dictionary Main
@@ -153,6 +326,7 @@ func _load(project_root: String, map_label: String) -> String:
 	if str(root.get("name", "")) != "map":
 		return "%s — expected <map>, got <%s>" % [path, str(root.get("name", ""))]
 	var attrs: Dictionary = root["attrs"]
+	_next_layer_id = maxi(1, _attr_int(attrs, "nextlayerid", 1))
 	if str(attrs.get("orientation", "")) != "orthogonal":
 		return "%s — only orthogonal TMX maps are supported" % path
 	if _attr_int(attrs, "tilewidth", -1) != CELL_SIZE or _attr_int(attrs, "tileheight", -1) != CELL_SIZE:
@@ -187,6 +361,7 @@ func _load(project_root: String, map_label: String) -> String:
 	var first_gid := _attr_int(rattrs, "firstgid", 0)
 	if first_gid < 1:
 		return "%s — tileset firstgid must be positive" % path
+	_first_gid = first_gid
 	var tsx_path := path.get_base_dir().path_join(str(rattrs["source"])).simplify_path()
 	if not _is_inside(project_dir, tsx_path):
 		return "%s — tileset source escapes project: %s" % [path, str(rattrs["source"])]
@@ -203,22 +378,36 @@ func _load(project_root: String, map_label: String) -> String:
 			path, str(default_spawn), width, height]
 
 	var ground: Dictionary = {}
+	var collision_layer: Dictionary = {}
 	for layer in _children(root, "layer"):
-		if str((layer as Dictionary)["attrs"].get("name", "")) == "Ground":
+		var layer_name := str((layer as Dictionary)["attrs"].get("name", ""))
+		if layer_name == "Ground":
 			if not ground.is_empty():
 				return "%s — duplicate tile layer named 'Ground'" % path
 			ground = layer
+		elif layer_name == "Collision":
+			if not collision_layer.is_empty():
+				return "%s — duplicate tile layer named 'Collision'" % path
+			collision_layer = layer
 	if ground.is_empty():
 		return "%s — required tile layer 'Ground' is missing" % path
 	var layer_error := _parse_ground(ground, first_gid)
 	if layer_error != "":
 		return layer_error
+	if not collision_layer.is_empty():
+		layer_error = _parse_collision(collision_layer, first_gid)
+		if layer_error != "":
+			return layer_error
+		_has_collision_layer = true
+		_collision_authored = true
 	var block_error := _parse_blocks()
 	if block_error != "":
 		return block_error
 	var objects_error := _parse_objects(root)
 	if objects_error != "":
 		return objects_error
+	_saved_tiles = tiles.duplicate()
+	_saved_walkable = walkable.duplicate()
 	return ""
 
 
@@ -331,39 +520,92 @@ func _parse_ground(layer: Dictionary, first_gid: int) -> String:
 	return ""
 
 
+func _parse_collision(layer: Dictionary, first_gid: int) -> String:
+	var attrs: Dictionary = layer["attrs"]
+	if _attr_int(attrs, "width", width) != width or _attr_int(attrs, "height", height) != height:
+		return "%s — Collision layer dimensions must match map %dx%d" % [path, width, height]
+	var data_nodes := _children(layer, "data")
+	if data_nodes.size() != 1:
+		return "%s — Collision layer needs exactly one <data>" % path
+	var data: Dictionary = data_nodes[0]
+	if str(data["attrs"].get("encoding", "")) != "csv":
+		return "%s — Collision layer data must use CSV encoding" % path
+	var tokens := str(data.get("text", "")).strip_edges().split(",", false)
+	if tokens.size() != width * height:
+		return "%s — Collision layer has %d GIDs; expected %d" % [
+			path, tokens.size(), width * height]
+	for i in tokens.size():
+		var token := str(tokens[i]).strip_edges()
+		if not token.is_valid_int():
+			return "%s — Collision GID #%d is not an integer: '%s'" % [path, i, token]
+		var gid := int(token)
+		if (gid & GID_FLIP_MASK) != 0:
+			return "%s — flipped/rotated Collision GIDs are not supported (cell %d)" % [path, i]
+		if gid != 0 and (gid < first_gid or gid - first_gid >= int(tileset["tile_count"])):
+			return "%s — Collision GID %d is outside the external tileset" % [path, gid]
+		walkable[i] = 1 if gid == 0 else 0
+	return ""
+
+
 func _parse_blocks() -> String:
-	var tile_blocks: Dictionary = tileset.get("tile_blocks", {})
-	if tile_blocks.is_empty():
+	var groups: Dictionary = tileset.get("block_tiles", {})
+	if groups.is_empty() or border_block < 0:
 		return ""                              # block groups are optional for generic maps
+	if not groups.has(border_block):
+		return "%s — pokeredpc:border_block %d is absent from the tileset" % [path, border_block]
 	if width % 2 != 0 or height % 2 != 0:
-		return "%s — pokeredpc:block metadata requires an even 2x2-cell map" % path
+		return ""                              # odd maps remain valid but cannot expose a full block grid
 	block_width = width / 2
 	block_height = height / 2
+	_rebuild_blocks()
+	return ""
+
+
+func _rebuild_blocks() -> void:
+	if block_width <= 0 or block_height <= 0:
+		blocks = []
+		return
 	blocks = []
 	for by in block_height:
 		var row: Array = []
 		for bx in block_width:
-			var block_id := -1
-			for quadrant in 4:
-				var cx := bx * 2 + quadrant % 2
-				var cy := by * 2 + quadrant / 2
-				var local := int(tiles[cy * width + cx])
-				if not tile_blocks.has(local):
-					return "%s — cell (%d,%d) tile %d has no pokeredpc:block metadata" % [
-						path, cx, cy, local]
-				var member: Array = tile_blocks[local]
-				if int(member[1]) != quadrant:
-					return "%s — cell (%d,%d) uses block quadrant %d; expected %d" % [
-						path, cx, cy, int(member[1]), quadrant]
-				if block_id < 0:
-					block_id = int(member[0])
-				elif block_id != int(member[0]):
-					return "%s — 2x2 cells at block (%d,%d) mix block ids" % [path, bx, by]
-			row.append(block_id)
+			row.append(_coherent_block(Vector2i(bx, by)))
 		blocks.append(row)
-	if border_block < 0 or not (tileset.get("block_tiles", {}) as Dictionary).has(border_block):
-		return "%s — valid pokeredpc:border_block is required with block metadata" % path
-	return ""
+
+
+func _rebuild_block_at(block_cell: Vector2i) -> void:
+	if blocks.is_empty() or block_cell.x < 0 or block_cell.y < 0 \
+			or block_cell.x >= block_width or block_cell.y >= block_height:
+		return
+	blocks[block_cell.y][block_cell.x] = _coherent_block(block_cell)
+
+
+func _coherent_block(block_cell: Vector2i) -> int:
+	var tile_blocks: Dictionary = tileset.get("tile_blocks", {})
+	var block_id := -1
+	for quadrant in 4:
+		var cx := block_cell.x * 2 + quadrant % 2
+		var cy := block_cell.y * 2 + quadrant / 2
+		var local := int(tiles[cy * width + cx])
+		if not tile_blocks.has(local):
+			return -1
+		var member: Array = tile_blocks[local]
+		if int(member[1]) != quadrant:
+			return -1
+		if block_id < 0:
+			block_id = int(member[0])
+		elif block_id != int(member[0]):
+			return -1
+	return block_id
+
+
+func _refresh_tile_metadata() -> void:
+	feet_tiles.resize(width * height)
+	var meta: Dictionary = tileset.get("tile_properties", {})
+	for i in tiles.size():
+		var local := int(tiles[i])
+		var props: Dictionary = meta.get(local, {})
+		feet_tiles[i] = int(props.get("pokeredpc:feet_tile", local))
 
 
 func _parse_objects(root: Dictionary) -> String:
@@ -434,6 +676,113 @@ func _parse_objects(root: Dictionary) -> String:
 				_:
 					return "%s — unknown pokeredpc object class '%s'" % [path, object_class]
 	return ""
+
+
+func _edited_source() -> Dictionary:
+	if not is_dirty():
+		return {"ok": true, "bytes": source_bytes, "has_collision": _has_collision_layer,
+			"next_layer_id": _next_layer_id}
+	var source := source_bytes.get_string_from_utf8()
+	if tiles != _saved_tiles:
+		var ground_patch := _replace_layer_csv(source, "Ground", _tile_csv())
+		if not bool(ground_patch.get("ok", false)):
+			return ground_patch
+		source = str(ground_patch["source"])
+	var has_collision := _has_collision_layer
+	var next_id := _next_layer_id
+	if _has_collision_layer and walkable != _saved_walkable:
+		var collision_csv := _collision_csv()
+		var collision_patch := _replace_layer_csv(source, "Collision", collision_csv)
+		if not bool(collision_patch.get("ok", false)):
+			return collision_patch
+		source = str(collision_patch["source"])
+	elif not _has_collision_layer and not _walkable_matches_tiles():
+		var inserted := _insert_collision_layer(source, _collision_csv(), next_id)
+		if not bool(inserted.get("ok", false)):
+			return inserted
+		source = str(inserted["source"])
+		has_collision = true
+		next_id += 1
+	return {"ok": true, "bytes": source.to_utf8_buffer(), "has_collision": has_collision,
+		"next_layer_id": next_id}
+
+
+func _tile_csv() -> String:
+	var gids := PackedInt32Array()
+	gids.resize(tiles.size())
+	for i in tiles.size():
+		gids[i] = int(tiles[i]) + _first_gid
+	return _csv_rows(gids)
+
+
+func _collision_csv() -> String:
+	var gids := PackedInt32Array()
+	gids.resize(walkable.size())
+	for i in walkable.size():
+		gids[i] = 0 if int(walkable[i]) == 1 else _first_gid
+	return _csv_rows(gids)
+
+
+func _csv_rows(values: PackedInt32Array) -> String:
+	var rows := PackedStringArray()
+	for y in height:
+		var row := PackedStringArray()
+		for x in width:
+			row.append(str(values[y * width + x]))
+		rows.append(",".join(row))
+	return ",\n".join(rows)
+
+
+func _walkable_matches_tiles() -> bool:
+	var meta: Dictionary = tileset.get("tile_properties", {})
+	for i in tiles.size():
+		var props: Dictionary = meta.get(int(tiles[i]), {})
+		var expected := 1 if bool(props.get("pokeredpc:walkable", false)) else 0
+		if int(walkable[i]) != expected:
+			return false
+	return true
+
+
+static func _replace_layer_csv(source: String, layer_name: String, csv: String) -> Dictionary:
+	var regex := RegEx.new()
+	var pattern := "(?s)<layer\\b[^>]*\\bname=\"%s\"[^>]*>.*?<data\\b[^>]*\\bencoding=\"csv\"[^>]*>(.*?)</data>" % layer_name
+	var compile_error := regex.compile(pattern)
+	if compile_error != OK:
+		return {"ok": false, "error": "cannot compile targeted %s layer writer" % layer_name}
+	var matched := regex.search(source)
+	if matched == null:
+		return {"ok": false, "error": "cannot find editable CSV layer '%s' in source" % layer_name}
+	var body_start := matched.get_start(1)
+	var body_end := matched.get_end(1)
+	return {"ok": true, "source": source.substr(0, body_start) + "\n" + csv + "\n" +
+		source.substr(body_end)}
+
+
+func _insert_collision_layer(source: String, csv: String, layer_id: int) -> Dictionary:
+	var map_start := source.find("<map")
+	var map_end := source.find(">", map_start)
+	if map_start < 0 or map_end < 0:
+		return {"ok": false, "error": "cannot find TMX map root"}
+	var next_key := "nextlayerid=\""
+	var next_at := source.find(next_key, map_start)
+	if next_at >= 0 and next_at < map_end:
+		var value_start := next_at + next_key.length()
+		var value_end := source.find("\"", value_start)
+		if value_end < 0 or value_end > map_end:
+			return {"ok": false, "error": "malformed nextlayerid attribute"}
+		source = source.substr(0, value_start) + str(layer_id + 1) + source.substr(value_end)
+	else:
+		source = source.substr(0, map_end) + " nextlayerid=\"%d\"" % (layer_id + 1) + \
+			source.substr(map_end)
+	var marker := source.find("<objectgroup")
+	if marker < 0:
+		marker = source.find("</map>")
+	if marker < 0:
+		return {"ok": false, "error": "cannot find Collision layer insertion point"}
+	var newline := "\r\n" if "\r\n" in source else "\n"
+	var layer := "<layer id=\"%d\" name=\"Collision\" width=\"%d\" height=\"%d\" visible=\"0\">%s  <data encoding=\"csv\">%s%s%s  </data>%s </layer>%s " % [
+		layer_id, width, height, newline, newline, csv, newline, newline, newline]
+	return {"ok": true, "source": source.substr(0, marker) + layer + source.substr(marker)}
 
 
 static func _read_bytes(file_path: String) -> Dictionary:
@@ -537,6 +886,10 @@ static func _block_property(raw: String):
 	if block_id < 0 or quadrant < 0 or quadrant > 3:
 		return null
 	return [block_id, quadrant]
+
+
+static func _xml_escape(value: String) -> String:
+	return value.replace("&", "&amp;").replace("\"", "&quot;").replace("<", "&lt;").replace(">", "&gt;")
 
 
 static func _absolute(file_path: String) -> String:

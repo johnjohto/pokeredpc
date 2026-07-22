@@ -25,12 +25,18 @@ geometry. ADR-023 records this cutover.
 
 ## TMX contract
 
-The tracer accepts:
+The bridge accepts:
 
 - exactly one external `<tileset firstgid="…" source="…tsx"/>`;
 - exactly one full-map tile layer named `Ground`, using CSV GIDs;
+- zero or one full-map tile layer named `Collision`, using CSV GIDs;
 - no empty cells, flipped/rotated GIDs, embedded tilesets, or infinite chunks;
 - referenced TSX/image paths contained by the Project directory.
+
+`Ground` stores local visual cells. `Collision` is an optional per-instance override:
+GID `0` is walkable and any valid GID from the external tileset is solid. When the layer is
+absent, each Ground tile's TSX `pokeredpc:walkable` property supplies collision. Studio only
+adds the hidden override layer when authored collision differs from those defaults.
 
 Map properties owned by pokeredpc:
 
@@ -101,18 +107,25 @@ including comments and unknown layers, objects, properties, ordering, and format
 Unknown Tiled content is outside pokeredpc's runtime model but inside its preservation
 promise.
 
-Phase 5.3 will add targeted edits. Those edits must change only pokeredpc-owned fields and
-preserve unrelated XML rather than formatting the whole document. The external TSX has the
-same preservation requirement when tile/collision tools begin writing it.
+Studio's Phase-5.3 map tools edit through `MapDocument`, which patches only the CSV bodies
+of `Ground` and an existing `Collision` layer. When an override layer is first needed, the
+writer inserts that one owned layer and advances `nextlayerid`; it does not reserialize the
+XML tree. The external TSX is read-only in this slice, so its bytes are never rewritten.
+
+A project may paint arbitrary 16×16 cells even when its TSX carries optional Gen-1 block
+metadata. A coherent 2×2 group exposes its block id and can be stamped with the block brush;
+a mixed group is valid native geometry and simply has no reconstructed block id.
 
 ## Verification
 
 - `--schematest` opens the format-2 fixture, checks normalization, path/refusal cases, typed
-  objects, and exact no-op save.
+  objects, exact no-op save, targeted Ground/Collision writes, and preservation of unknown
+  TMX plus exact TSX bytes.
 - `--tmxtest` drives Main's native placement, collision, atlas quad renderer, and writes
   `game/tmxtest.png`.
 - `--studiotest` mounts the real three-column Studio workspace, renders
-  `game/studio_tmx.png`, and saves through its real document control.
+  `game/studio_tmx.png`, then creates, paints, fills, block-stamps, collides, undo/redoes,
+  saves, reopens, and child-play-tests a scratch map through real controls.
 - The two PNGs must be byte-identical; the fixture currently renders 64×48 pixels.
 - `--projparitytest` deep-compares all 223 native maps with the legacy semantic oracle and
   independently compares all 24 TSX block mappings and composite pixels.

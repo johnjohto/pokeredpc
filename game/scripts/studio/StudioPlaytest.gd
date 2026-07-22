@@ -11,7 +11,8 @@ var handshake_path := ""
 var token := ""
 
 
-func launch(open_project_dir: String, probe := false, headless := false) -> String:
+func launch(open_project_dir: String, probe := false, headless := false, start_map := "",
+		inspect_cells: Array = []) -> String:
 	project_dir = _normalized_project_dir(open_project_dir)
 	if not FileAccess.file_exists(project_dir.path_join("manifest.json")):
 		return "no project at '%s'" % project_dir
@@ -36,6 +37,14 @@ func launch(open_project_dir: String, probe := false, headless := false) -> Stri
 		"--playtest-handshake=" + handshake_path,
 		"--playtest-token=" + token,
 	])
+	if start_map != "":
+		args.append("--start-map=" + start_map)
+	if not inspect_cells.is_empty():
+		var encoded := PackedStringArray()
+		for cell in inspect_cells:
+			var map_cell: Vector2i = cell
+			encoded.append("%d,%d" % [map_cell.x, map_cell.y])
+		args.append("--playtest-inspect=" + ";".join(encoded))
 	if probe:
 		args.append("--playtest-probe")
 	pid = OS.create_process(executable, args, false)

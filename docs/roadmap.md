@@ -12,6 +12,14 @@ real remote human session). **v2** is the fan-game creation toolkit (standalone 
 generic engine + shareable projects) — see [v2/plan.md](v2/plan.md) and ADR-013. Sequence:
 **1.0 → v1.1 multiplayer → v2**. v2 work stays gated on 1.1 *shipping*, not just on the design.
 
+**Post-v2 possibility (deferred; not current scope):** once Studio v2 and its genericity sample
+have shipped, use faithful Kanto as the basis for an optional **modernized Kanto showcase**. The
+faithful project remains the default reference build and regression oracle; the modernized build is
+a separate project/profile on the **same Engine + Core**, never an engine fork. Its purpose would be
+to demonstrate reusable Studio capabilities such as scalable presentation, accessibility and input
+options, richer battle/overworld effects, and modern save conveniences. See
+[v2/plan.md](v2/plan.md) §9.
+
 **Versioning:** SemVer where **`0.9.x` = full audited parity** (every system verified against the
 disassembly) and **`1.0.0` additionally requires a complete playthrough sign-off** — audits prove
 systems in isolation; only a full run proves the game — a **two-stage hybrid gate** (an automated
@@ -414,12 +422,24 @@ SHA-256 (`EF5FE5CCB3A1209D17A0407B06606DB2F5A2374136D8BF733C6C538625F90F9D`);
 validation covered 1,613 files with zero errors; parity covered all 223 maps and all 24 TSX atlas
 mappings/pixels; schema, self, map, warp, event, sight, Cut, TMX, and Studio gates passed; the four
 battle stream hashes remained unchanged; and `--playthrough --seed=1 --ptwatchdog=120` cleared all
-21 checkpoints and entered the Hall of Fame with a level-71 lead. Next: gh #54 — native map
-painting with undo/redo and authored TMX saves.
+21 checkpoints and entered the Hall of Fame with a level-71 lead.
 **Fixed: gh #63** (same day): Studio no longer keeps a stale format-1 manifest when the opened
 project directory is rebuilt in place. `ProjectData` caches by directory plus exact manifest
 bytes, map selection performs the lightweight refresh check, and `--studiomapsweeptest`
 reproduces the live format cutover before mounting all 223 Kanto maps.
+**Landed: gh #54** (same day; ADR-024): Studio's native map workspace now creates maps and
+provides a project-atlas palette, tile/optional 32×32 block/erase/fill brushes, per-cell
+walkable/solid editing, collision overlay, pan/zoom, grouped map-level undo/redo, Save/Revert,
+and direct play-test of the active map. `MapDocument` owns the editable state and patches only
+the `Ground` CSV plus an optional hidden `Collision` override layer; no-op saves remain
+byte-identical and targeted saves preserve unrelated TMX and exact TSX bytes. The automated
+Studio gate creates and edits a scratch map through the real controls, proves exact history,
+reopens the saved document, and verifies one walkable and one solid cell in a separate Engine
+child. Project parity, all 223 Studio map mounts, TMX, schema, self, warp, and Cut gates remain
+green; all four battle-determinism hashes are unchanged; and the final no-resume
+`--playthrough --seed=1 --ptwatchdog=120` cleared all 21 checkpoints, beat the Champion,
+and entered the Hall of Fame with a level-74 lead. Next: gh #55 — native objects plus the
+world graph editor.
 **Landed: gh #34** (2026-07-20): Catch + Progression are behind the seam and the
 **config-first knobs are real** — `Gen1Catch` (`attempt` over the byte-exact kernel + the
 safari `bait_rate`/`rock_rate` transitions, which moved out of the host's input handler),

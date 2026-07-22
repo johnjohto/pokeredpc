@@ -1,7 +1,8 @@
 extends RefCounted
 class_name MapDocumentSmoke
-## Interface-level proof for the deep native-map module (gh #52): callers see
-## normalized cells/objects and exact saves; XML mechanics remain private.
+## Interface-level proof for the deep native-map module (gh #52/#54): callers see
+## normalized cells/objects, editable snapshots, and source-preserving saves; XML mechanics
+## remain private.
 
 
 func run() -> bool:
@@ -44,6 +45,40 @@ func run() -> bool:
 		save_error == "" and original == written
 		and FileAccess.get_file_as_string(exact_path).contains("third-party:weather"),
 		save_error) and ok
+
+	var edit_scratch := OS.get_user_data_dir().path_join("mapdoc_edit")
+	if DirAccess.dir_exists_absolute(edit_scratch):
+		OS.move_to_trash(edit_scratch)
+	var edit_copy := _copy_dir(fixture, edit_scratch)
+	var edit_opened := MapDocument.open(edit_scratch, "TestTown")
+	ok = _check("editable-map scratch opens", edit_copy == "" and bool(edit_opened.get("ok", false)),
+		edit_copy + str(edit_opened.get("error", ""))) and ok
+	if bool(edit_opened.get("ok", false)):
+		var editable: MapDocument = edit_opened["document"]
+		var before := editable.edit_state()
+		var changed := editable.set_tile(Vector2i(0, 0), 1)
+		changed = editable.set_walkable(Vector2i(0, 0), true) or changed
+		var edited_state := editable.edit_state()
+		editable.restore_edit_state(before)
+		var undo_exact := not editable.is_dirty() and editable.tile_at(Vector2i(0, 0)) == 0 \
+			and editable.is_walkable(Vector2i(0, 0))
+		editable.restore_edit_state(edited_state)
+		var tsx_before := FileAccess.get_file_as_bytes(edit_scratch.path_join("tilesets/tracer.tsx"))
+		var targeted_error := editable.save()
+		var reopened := MapDocument.open(edit_scratch, "TestTown")
+		var edited_source := FileAccess.get_file_as_string(editable.path)
+		var tsx_after := FileAccess.get_file_as_bytes(edit_scratch.path_join("tilesets/tracer.tsx"))
+		ok = _check("tile/collision state snapshots undo and redo exactly",
+			changed and undo_exact and editable.tile_at(Vector2i(0, 0)) == 1
+			and editable.is_walkable(Vector2i(0, 0))) and ok
+		ok = _check("targeted TMX save reopens with per-cell collision",
+			targeted_error == "" and bool(reopened.get("ok", false))
+			and (reopened.get("document") as MapDocument).tile_at(Vector2i(0, 0)) == 1
+			and (reopened.get("document") as MapDocument).is_walkable(Vector2i(0, 0))
+			and edited_source.contains("name=\"Collision\"")
+			and edited_source.contains("third-party:weather")
+			and edited_source.contains("third-party:intensity")
+			and tsx_before == tsx_after, targeted_error) and ok
 
 	var scratch := OS.get_user_data_dir().path_join("mapdoc_malformed")
 	if DirAccess.dir_exists_absolute(scratch):

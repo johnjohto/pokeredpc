@@ -10,6 +10,15 @@ milestones, `PATCH` bumps are fixes/polish. See `docs/roadmap.md` for the live p
 
 ### Added
 
+- **Studio can now create, paint, save, and immediately play-test native maps** (gh #54,
+  ADR-024). The map workspace has a project-atlas palette; tile, optional 32×32 Gen-1
+  block, erase, and flood-fill brushes; per-cell walkable/solid editing and overlay;
+  pan/zoom; grouped map-level undo/redo; validated Save/Revert; and direct launch on the
+  active map. `MapDocument` patches only owned Ground/Collision CSV data, retains exact
+  no-op bytes, preserves unrelated TMX and TSX content, and allows intentionally mixed
+  native cells without discarding coherent block identity. The Studio gate creates and
+  edits a scratch map through real controls and verifies its collision in an Engine child.
+
 - **All 223 Kanto maps now ship as native Tiled documents** (gh #53, ADR-023). The
   extractor deterministically emits `maps/*.tmx`, 24 reversible external `tilesets/*.tsx`
   atlases, and `data/world.json`; format-2 projects no longer contain interim map JSON.
@@ -33,7 +42,7 @@ milestones, `PATCH` bumps are fixes/polish. See `docs/roadmap.md` for the live p
   boards. Studio now uses the reference's charcoal surfaces, muted type, mint/cyan selection
   language, and centralized control styling. The native map preview establishes the Phase-5
   tool rail + action bar + dominant canvas + inspector/layers composition, including grid,
-  collision, and typed-object overlays; painting remains the next slice (gh #54).
+  collision, and typed-object overlays; ADR-024 extends that surface with authoring tools.
 
 - **Studio's root controls now explicitly fill the native client area.** The earlier gh #59
   window fix removed the Game Boy stretch but retained offsets derived from the old game

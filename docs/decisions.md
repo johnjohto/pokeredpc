@@ -2,6 +2,35 @@
 
 Newest first. Each entry: context → decision → consequences.
 
+## ADR-024 — Map painting owns cells and an optional collision override layer (2026-07-22)
+
+**Context:** Phase 5.3 (gh #54) must let Studio create and paint maps without making its
+TMX output a second dialect or destroying content authored in Tiled. TSX tile properties
+provide useful default collision, but creators also need to make one instance of a tile
+walkable or solid. Kanto additionally carries reversible 32×32 block metadata, while the
+canonical Project geometry remains a general 16×16 cell grid.
+**Decision:** (1) `MapDocument` is the only mutation boundary. It exposes cell edits,
+flood fill, optional block stamping, collision edits, state snapshots, create, dirty state,
+and save; Studio owns gestures and history, not XML. (2) `Ground` remains the owned visual
+CSV layer. Per-cell collision overrides use an optional hidden full-map CSV layer named
+`Collision`: GID `0` means walkable and any valid tileset GID means solid. Without that
+layer, `pokeredpc:walkable` on the TSX tile is authoritative. Studio adds `Collision` only
+when authored collision differs from those defaults. (3) Save patches only the CSV bodies
+of owned layers (and `nextlayerid` when inserting `Collision`). A no-op emits the original
+bytes; comments, ordering, unknown properties/layers/objects, and the external TSX remain
+untouched. (4) Native cells may intentionally mix Gen-1 block groups. A coherent 2×2 group
+retains its block id; a mixed group reports no block id until a block brush stamps all four
+quadrants. (5) One drag/fill/block gesture is one map-level undo record. Play-test refuses
+dirty state, validates the whole Project, and launches the Engine child directly on the
+authored map.
+**Consequences:** Collision is instance-editable without cloning tiles or mutating a shared
+TSX, and both Studio and Tiled remain valid editors for one source file. The writer is more
+constrained than a general XML serializer by design. Terrain/autotile editing, multiple
+tilesets, object/world editing, and TSX property editing remain later demand-driven slices.
+The Studio smoke creates a scratch map through the real dialog and tools, proves exact
+undo/redo and unrelated-source preservation, then checks walkable and solid cells in a
+separate Engine play-test process.
+
 ## ADR-023 — Kanto maps project to reversible native cells plus a world graph (2026-07-22)
 
 **Context:** ADR-021/gh #52 proved one conservative native TMX map, but Kanto's 223 interim
