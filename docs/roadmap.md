@@ -285,8 +285,22 @@ retired empty-rival_starter counterpart fallback (unreachable in any real save) 
 reproduced. Gate: `--eventtest` 26 checks, `--silphtest`/`--hideouttest`/`--rockettest`/
 `--cardkeytest` green, `--validate` 0 errors, double extraction byte-identical, md5s
 unchanged, `--silphstage --seed 1` PASS, and a fifth fresh seed-1 NEW GAME → HALL OF FAME
-**GATE GREEN** (Champion at L74). Convergence: 20 → 1 → 2 → 2 → 3. Next questlines:
-legendaries/fossils/gifts → endgame.
+**GATE GREEN** (Champion at L74). Convergence: 20 → 1 → 2 → 2 → 3.
+**Questline 6 (gifts/fossils/museum) COMPLETE (2026-07-22, same session):** seven beats
+authored — the Eevee ball, both Dojo Hitmon prizes, the MAGIKARP salesman (MONEY_BOX up before
+the pitch; give before the ¥500 leaves), both Mt. Moon fossils, the museum OLD AMBER, and the
+Museum1F receptionist's ¥50 ticket + back-way amber chat. `revive_fossil` stays native (the
+bag-computed picker — this questline's ADR-019 §1 ceremony invoker, the oak_dex_rating
+precedent); the static legendaries stay engine mechanism (object-data-keyed like item balls —
+the scoping call is noted on gh #41). New vocabulary: `offer_nickname`,
+`show_money`/`hide_money`/`take_money`, and the `money`/`box_count` conditions; `give_mon`
+gained `_receive_mon`'s both-full refusal + abort (pokered's GivePokemon failure — now also
+capping the Lapras record, pokered-faithful). Gate: `--eventtest` 30 checks,
+`--gifttest`/`--fossiltest`/`--museumtest`/`--moneyboxtest`/`--legendtest` green, `--validate`
+0 errors, double extraction byte-identical, md5s unchanged, and a sixth fresh seed-1 NEW GAME →
+HALL OF FAME **GATE GREEN** (Champion at L74; a first attempt wedged in Victory Road under a
+zombie test engine's load — the known gh #30/#38 class — and the clean rerun went straight
+through). Convergence: 20 → 1 → 2 → 2 → 3 → 4. Next questline: endgame.
 **Landed: gh #34** (2026-07-20): Catch + Progression are behind the seam and the
 **config-first knobs are real** — `Gen1Catch` (`attempt` over the byte-exact kernel + the
 safari `bait_rate`/`rock_rate` transitions, which moved out of the host's input handler),
