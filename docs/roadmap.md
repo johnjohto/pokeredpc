@@ -311,11 +311,24 @@ nothing. Gate: `--eventtest` 30 checks, `--champwalktest`/`--e4test`/`--elitetes
 green (elitetest's output byte-identical to HEAD), md5s unchanged, double extraction
 byte-identical, and a seventh fresh seed-1 NEW GAME → HALL OF FAME **GATE GREEN** through the
 authored champion chain (Champion at L71). Convergence: 20 → 1 → 2 → 2 → 3 → 4 → 0.
-Remaining before the wave-C close: one mop-up questline (the Tower arc, the three rival
-ambushes, the escort drags, the gift-item NPCs — ~18 beats, mostly existing vocabulary) with
-~13 beats staying native as ADR-019 §1 ceremonies (hall_of_fame, oak_dex_rating,
-revive_fossil, award_diploma, oldman_demo, daycare_man, prize/coin counters, safari_gate,
-board_ss_anne/ss_anne_departs, the two link tables).
+**The mop-up questline COMPLETE (2026-07-22, same session) — WAVE C IS DONE (gh #41).**
+21 beats dissolved in one wave: the Tower arc (the MAROWAK ghost via the new `wild_battle`
+command — SILPH SCOPE gate, unveil, the win-or-doll-escape rule; Fuji's rescue + the POKé
+FLUTE; the purified zone; the 2F rival's two L-path exits), the Cerulean and both Route 22
+rival ambushes, the Pewter escort drags (the new `walk_both_to` over `Cutscene.walk_both`),
+viridian_oldman_block, and the gift-item NPCs (HM02/HM03/HM04 incl. the GOLD TEETH trade,
+COIN CASE, BIKE VOUCHER → BICYCLE, the three rods, the Game Corner coin clerk + gift via
+`give_coins` + the `coins` condition). Staying native as ADR-019 §1 ceremonies:
+hall_of_fame, oak_dex_rating, revive_fossil, award_diploma, oldman_demo, daycare_man,
+prize_vendor, safari_gate/safari_game_over, board_ss_anne/ss_anne_departs, the two link
+tables, and the computed-count oaks_aide pair. Vocabulary close: 3 commands + 2 conditions
+(convergence 20 → 1 → 2 → 2 → 3 → 4 → 0 → 3). The boot refusal caught an over-cut deletion
+of the trainer-engagement keeper block before anything ran (restored byte-identical). Gate:
+`--eventtest` 33 checks, the nine affected suites green, `--validate` 0 errors, double
+extraction byte-identical, md5s unchanged, audits at zero (9/9 event-backed doors), and an
+eighth fresh seed-1 NEW GAME → HALL OF FAME **GATE GREEN** on the fully dissolved build
+(Champion at L67). Every story beat in the game is now an authored event record; Cutscene.gd
+holds only engine ceremonies and primitives.
 **Landed: gh #34** (2026-07-20): Catch + Progression are behind the seam and the
 **config-first knobs are real** — `Gen1Catch` (`attempt` over the byte-exact kernel + the
 safari `bait_rate`/`rock_rate` transitions, which moved out of the host's input handler),
