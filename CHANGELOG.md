@@ -59,6 +59,14 @@ milestones, `PATCH` bumps are fixes/polish. See `docs/roadmap.md` for the live p
   verification, documentation routes, and the personal-use asset boundary are now visible
   from the repository front page. The personal quotation remains at the end.
 
+### Fixed
+
+- **Studio now refreshes a project rebuilt in place** (gh #63). An editor left open across
+  Kanto's format-1-to-format-2 migration previously kept `ProjectData`'s path-only cache and
+  refused native maps as legacy until restart. The cache now includes the exact manifest
+  bytes, map selection checks it cheaply, and a dedicated gate reproduces the live migration
+  before mounting all 223 Kanto maps through Studio.
+
 ## [1.2.0] — 2026-07-20
 
 Link session resume — the headline — plus the endgame-unblocking engine/bot fixes that

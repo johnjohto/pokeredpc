@@ -4,6 +4,18 @@ class_name StudioMapSmoke
 ## the concept-pinned three-part layout, renders the atlas, and saves exact bytes.
 
 
+func sweep_all(shell: StudioShell) -> bool:
+	var labels: Array = ProjectData.map_labels()
+	var refusals: Array[String] = []
+	for label in labels:
+		var workspace = shell.edit_map(str(label))
+		if workspace == null:
+			refusals.append("%s — %s" % [str(label), shell.status_text()])
+	var detail := "; ".join(PackedStringArray(refusals))
+	return _check("all %d Kanto maps mount in Studio" % labels.size(),
+		labels.size() == 223 and refusals.is_empty(), detail)
+
+
 func run(shell: StudioShell) -> bool:
 	var ok := true
 	var workspace = shell.preview_map("res://core/fixtures/valid_tmx", "TestTown")

@@ -107,6 +107,11 @@ normalized-path-derived `--saveslot`. The child writes a tokened ready handshake
 the project has loaded and reports the resolved save path; separate creator projects therefore
 cannot share play-test progress (ADR-020 d5, gh #51).
 
+Studio permits a build/import to replace the opened Project directory in place. `ProjectData`
+therefore keys its open-project cache by both directory string and exact manifest bytes;
+map selection performs this cheap check before consulting `format`. A changed manifest reloads
+Core, so a live format migration cannot keep presenting native maps as legacy (gh #63).
+
 For format 2, `ProjectData.map_json(label)` opens `MapDocument` and returns its normalized
 runtime adapter: 16×16 tile/collision/semantic rows, typed object arrays, authored spawn,
 project-local tileset metadata, and the selected map's `data/world.json` connections. Main

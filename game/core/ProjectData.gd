@@ -17,15 +17,18 @@ const SUPPORTED_FORMAT := 2
 
 static var dir := ""                  # the opened project directory ("" = not opened)
 static var manifest: Dictionary = {}
+static var _manifest_source := ""     # exact cache key; rebuilds may replace a project in place
 static var _legacy := {}              # old asset filename -> reconstructed data
 static var _world := {}               # format-2 map id -> seamless connection records
 
 
 static func open(project_dir: String) -> String:
-	## Returns "" on success, else the error to show. Idempotent per dir.
-	if dir == project_dir and not _legacy.is_empty():
+	## Returns "" on success, else the error to show. Idempotent per dir + manifest bytes.
+	var manifest_path := project_dir.path_join("manifest.json")
+	var manifest_source := FileAccess.get_file_as_string(manifest_path)
+	if dir == project_dir and not _legacy.is_empty() and manifest_source == _manifest_source:
 		return ""
-	var m = _read_json(project_dir.path_join("manifest.json"))
+	var m = _read_json(manifest_path)
 	if not (m is Dictionary) or m.is_empty():
 		return "no project at '%s' (manifest.json missing or unreadable — run tools/build.ps1)" % project_dir
 	var fmt := int(m.get("format", 0))
@@ -36,6 +39,7 @@ static func open(project_dir: String) -> String:
 	# (linear migrations 1->2->... apply here once format 2 exists; format 1 loads as-is)
 	dir = project_dir
 	manifest = m
+	_manifest_source = manifest_source
 	_legacy = {}
 	_world = _read_json(project_dir.path_join("data/world.json")) if fmt >= 2 else {}
 	_build_legacy()

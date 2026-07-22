@@ -40,6 +40,9 @@ func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	theme = preload("res://scripts/studio/StudioTheme.gd").build()
 	_build_ui()
+	if "--studiomapsweeptest" in OS.get_cmdline_user_args():
+		_studio_map_sweep_test()
+		return
 	if "--studiotest" in OS.get_cmdline_user_args():
 		_studiotest()
 		return
@@ -216,6 +219,13 @@ func _on_record_selected(idx: int) -> void:
 ## read-only here until the Kanto migration in gh #53; format-2 TMX crosses the same
 ## MapDocument seam used by Engine and the validator.
 func edit_map(map_label: String):
+	# A build may replace this Project in place while Studio remains open. ProjectData's
+	# exact-manifest cache makes this a cheap no-op normally and refreshes format/data when
+	# the build identity changes (gh #63).
+	var refresh_error := ProjectData.open(project_dir)
+	if refresh_error != "":
+		_status.text = "REFUSED: " + refresh_error
+		return null
 	if int(ProjectData.manifest.get("format", 1)) < 2:
 		_clear_editor()
 		var note := Label.new()
@@ -249,6 +259,10 @@ func preview_map(project_root: String, map_label: String):
 		_status.text = "saved " + saved_path)
 	_status.text = "previewing map/%s — native TMX" % map_label
 	return workspace
+
+
+func status_text() -> String:
+	return _status.text
 
 
 ## Public shell seam used by record selection and the Studio smoke suite. Returns the
@@ -399,6 +413,43 @@ func _project_arg() -> String:
 
 
 # ---- the gh #47 smoke leg of --studiotest -------------------------------------------
+
+func _studio_map_sweep_test() -> void:
+	await get_tree().process_frame
+	var ok := true
+	var migration_scratch := OS.get_user_data_dir().path_join(
+		"studio_map_migration_%d" % OS.get_process_id())
+	var error := _copy_dir("res://project", migration_scratch)
+	ok = _st_check("map migration test copies the Kanto project", error == "", error) and ok
+	var manifest_path := migration_scratch.path_join("manifest.json")
+	var native_manifest := FileAccess.get_file_as_string(manifest_path)
+	if error == "":
+		var legacy_manifest = JSON.parse_string(native_manifest)
+		legacy_manifest["format"] = 1
+		error = CanonJSON.write_file(manifest_path, legacy_manifest)
+		ok = _st_check("migration test exposes the project as format 1",
+			error == "", error) and ok
+	if error == "":
+		error = open_project(migration_scratch)
+		ok = _st_check("Studio opens the pre-migration project", error == "", error) and ok
+	if error == "":
+		var manifest_out := FileAccess.open(manifest_path, FileAccess.WRITE)
+		if manifest_out == null:
+			error = "cannot restore " + manifest_path
+		else:
+			manifest_out.store_string(native_manifest)
+			manifest_out.close()
+		ok = _st_check("project is rebuilt to format 2 while Studio stays open",
+			error == "", error) and ok
+	if error == "":
+		var migrated_workspace = edit_map("PalletTown")
+		ok = _st_check("the open Studio refreshes a project rebuilt to native TMX",
+			migrated_workspace != null, status_text()) and ok
+	if ok:
+		ok = preload("res://scripts/studio/StudioMapSmoke.gd").new().sweep_all(self)
+	if DirAccess.dir_exists_absolute(migration_scratch):
+		OS.move_to_trash(migration_scratch)
+	get_tree().quit(0 if ok else 1)
 
 ## Headless: copy the repo's Kanto project to a scratch dir (the ADR-020 d2 convention —
 ## Studio never touches the extractor-owned tree), open it, and assert the sidebar knows

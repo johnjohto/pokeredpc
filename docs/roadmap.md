@@ -416,6 +416,10 @@ mappings/pixels; schema, self, map, warp, event, sight, Cut, TMX, and Studio gat
 battle stream hashes remained unchanged; and `--playthrough --seed=1 --ptwatchdog=120` cleared all
 21 checkpoints and entered the Hall of Fame with a level-71 lead. Next: gh #54 — native map
 painting with undo/redo and authored TMX saves.
+**Fixed: gh #63** (same day): Studio no longer keeps a stale format-1 manifest when the opened
+project directory is rebuilt in place. `ProjectData` caches by directory plus exact manifest
+bytes, map selection performs the lightweight refresh check, and `--studiomapsweeptest`
+reproduces the live format cutover before mounting all 223 Kanto maps.
 **Landed: gh #34** (2026-07-20): Catch + Progression are behind the seam and the
 **config-first knobs are real** — `Gen1Catch` (`attempt` over the byte-exact kernel + the
 safari `bait_rate`/`rock_rate` transitions, which moved out of the host's input handler),
