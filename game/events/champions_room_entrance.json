@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/ChampionsRoom.asm — walking in is the trigger, not talking: beating AGATHA arms SCRIPT_CHAMPIONSROOM_PLAYER_ENTERS, and the next load marches the player up to the rival. Without it he can be walked around — the Hall of Fame stairs at (3,0)/(4,0) are reachable from the door. The armed script pointer is consumed by the walk-in.",
+ "$comment": "scripts/ChampionsRoom.asm — walking in is the trigger, not talking: beating AGATHA arms SCRIPT_CHAMPIONSROOM_PLAYER_ENTERS, and the next load marches the player up the room (RivalEntrance_RLEMovement UP1,RIGHT1,UP3 plays in REVERSE of its declaration — the sim joypad consumes from the end down, gh #182 — so UP ×3, RIGHT, UP to (4,3)) straight into the final battle (the same body as champions_room_battle). Without it he can be walked around — the Hall of Fame stairs at (3,0)/(4,0) are reachable from the door. The armed script pointer is consumed by the walk-in.",
  "id": "event:champions_room_entrance",
  "trigger": {
   "kind": "enter",
@@ -7,7 +7,188 @@
   "when": "CHAMPION_ROOM_ENTRY and not BEAT_CHAMPION"
  },
  "commands": [
-  {"cmd": "clear_flag", "flag": "CHAMPION_ROOM_ENTRY"},
-  {"cmd": "beat", "name": "champion_entrance"}
+  {
+   "cmd": "clear_flag",
+   "flag": "CHAMPION_ROOM_ENTRY"
+  },
+  {
+   "cmd": "walk_player",
+   "dir": "up",
+   "count": 3
+  },
+  {
+   "cmd": "walk_player",
+   "dir": "right"
+  },
+  {
+   "cmd": "walk_player",
+   "dir": "up"
+  },
+  {
+   "cmd": "face_object",
+   "object": "SPRITE_BLUE@4,2",
+   "dir": "player"
+  },
+  {
+   "cmd": "play_song",
+   "key": "meetrival"
+  },
+  {
+   "cmd": "say",
+   "text": "{rival}: Hey!\fI was looking\nforward to seeing\nyou, {player}!\fMy rival should\nbe strong to keep\nme sharp!\fAnd now!\fI'm the POKéMON\nLEAGUE champion!\fDo you know what\nthat means?"
+  },
+  {
+   "cmd": "if",
+   "cond": "rival_starter_squirtle",
+   "then": [
+    {
+     "cmd": "class_battle",
+     "class": "OPP_RIVAL3",
+     "party": 1,
+     "npc": "ChampionsRoom:4,2"
+    }
+   ],
+   "else": [
+    {
+     "cmd": "if",
+     "cond": "rival_starter_bulbasaur",
+     "then": [
+      {
+       "cmd": "class_battle",
+       "class": "OPP_RIVAL3",
+       "party": 2,
+       "npc": "ChampionsRoom:4,2"
+      }
+     ],
+     "else": [
+      {
+       "cmd": "class_battle",
+       "class": "OPP_RIVAL3",
+       "party": 3,
+       "npc": "ChampionsRoom:4,2"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "cmd": "if",
+   "cond": "battle_won",
+   "then": [
+    {
+     "cmd": "set_flag",
+     "flag": "BEAT_CHAMPION"
+    },
+    {
+     "cmd": "say",
+     "text": "NO!\nThat can't be!\nYou beat my best!\fAfter all that\nwork to become\nLEAGUE champ?\fMy reign is over\nalready?\nIt's not fair!"
+    },
+    {
+     "cmd": "say",
+     "text": "Why?\nWhy did I lose?\fI never made any\nmistakes raising\nmy POKéMON...\fDarn it! You're\nthe new POKéMON\nLEAGUE champion!\fAlthough I don't\nlike to admit it."
+    },
+    {
+     "cmd": "play_song",
+     "key": "cities1"
+    },
+    {
+     "cmd": "say",
+     "text": "OAK: {player}!"
+    },
+    {
+     "cmd": "show_object",
+     "object": "SPRITE_OAK@3,7"
+    },
+    {
+     "cmd": "walk_object",
+     "object": "SPRITE_OAK@3,7",
+     "dir": "up",
+     "count": 5
+    },
+    {
+     "cmd": "face_player",
+     "dir": "left"
+    },
+    {
+     "cmd": "face_object",
+     "object": "SPRITE_BLUE@4,2",
+     "dir": "left"
+    },
+    {
+     "cmd": "face_object",
+     "object": "SPRITE_OAK@3,7",
+     "dir": "down"
+    },
+    {
+     "cmd": "if",
+     "cond": "player_starter_bulbasaur",
+     "then": [
+      {
+       "cmd": "say",
+       "text": "OAK: So, you won!\nCongratulations!\nYou're the new\nPOKéMON LEAGUE\nchampion!\fYou've grown up so\nmuch since you\nfirst left with\nBULBASAUR!\f{player}, you have\ncome of age!"
+      }
+     ],
+     "else": [
+      {
+       "cmd": "if",
+       "cond": "player_starter_charmander",
+       "then": [
+        {
+         "cmd": "say",
+         "text": "OAK: So, you won!\nCongratulations!\nYou're the new\nPOKéMON LEAGUE\nchampion!\fYou've grown up so\nmuch since you\nfirst left with\nCHARMANDER!\f{player}, you have\ncome of age!"
+        }
+       ],
+       "else": [
+        {
+         "cmd": "say",
+         "text": "OAK: So, you won!\nCongratulations!\nYou're the new\nPOKéMON LEAGUE\nchampion!\fYou've grown up so\nmuch since you\nfirst left with\nSQUIRTLE!\f{player}, you have\ncome of age!"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "cmd": "face_object",
+     "object": "SPRITE_OAK@3,7",
+     "dir": "right"
+    },
+    {
+     "cmd": "say",
+     "text": "OAK: {rival}! I'm\ndisappointed!\fI came when I\nheard you beat\nthe ELITE FOUR!\fBut, when I got\nhere, you had\nalready lost!\f{rival}! Do you\nunderstand why\nyou lost?\fYou have forgotten\nto treat your\nPOKéMON with\ntrust and love!\fWithout them, you\nwill never become\na champ again!"
+    },
+    {
+     "cmd": "face_object",
+     "object": "SPRITE_OAK@3,7",
+     "dir": "down"
+    },
+    {
+     "cmd": "say",
+     "text": "OAK: {player}!\fYou understand\nthat your victory\nwas not just your\nown doing!\fThe bond you share\nwith your POKéMON\nis marvelous!\f{player}!\nCome with me!"
+    },
+    {
+     "cmd": "walk_object",
+     "object": "SPRITE_OAK@3,7",
+     "dir": "up",
+     "count": 2
+    },
+    {
+     "cmd": "hide_object",
+     "object": "SPRITE_OAK@3,7"
+    },
+    {
+     "cmd": "walk_player",
+     "dir": "left"
+    },
+    {
+     "cmd": "walk_player",
+     "dir": "up",
+     "count": 3
+    },
+    {
+     "cmd": "beat",
+     "name": "hall_of_fame"
+    }
+   ]
+  }
  ]
 }

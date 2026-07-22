@@ -16594,7 +16594,7 @@ func _champwalktest() -> void:
 	player.place(Vector2i(3, 7))
 	player.facing = 1
 	set_event("CHAMPION_ROOM_ENTRY")               # armed by beating Lance (the walk-in trigger)
-	map_script(center_label).on_enter()            # fires champion_entrance
+	map_script(center_label).on_enter()            # fires event:champions_room_entrance
 	var rival = _npc_by_key("SPRITE_BLUE@4,2")
 	var oak = _npc_by_key("SPRITE_OAK@3,7")
 	var ptrace: Array = []

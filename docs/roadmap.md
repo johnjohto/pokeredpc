@@ -1224,7 +1224,8 @@ lists at Delay3 cadence; the map music waits for the landing). Verified by `--fl
 
 **The Elite Four + Champion** are in: the four members (Lorelei/Bruno/Agatha/Lance) battle through
 the generic trainer system as you walk up to them in their rooms; the **Champion** is the rival
-(`Cutscene.champion_battle`, OPP_RIVAL3 party by starter). Beating him runs the full ceremony
+(the authored `event:champions_room_battle`/`_entrance` records since wave C questline 7,
+OPP_RIVAL3 party by starter). Beating him runs the full ceremony
 (gh #179, `ChampionsRoom.asm` + `HallOfFame.asm`): the rival's two defeat texts, **OAK arrives**
 (voice first, then ShowObject at the south door + the UP×5 walk to the pair), congratulates the
 player naming the **starter**, scolds the rival, "Come with me!", exits north and the player
