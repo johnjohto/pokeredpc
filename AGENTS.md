@@ -30,8 +30,8 @@ pokered's data → PNG/JSON, reimplement the engine natively. **Not** an emulato
 ```powershell
 pwsh tools/build.ps1            # extract assets + import
 pwsh tools/run.ps1             # play (arrow keys)
-pwsh tools/run.ps1 -- --selftest   # headless collision/map sanity print
-pwsh tools/run.ps1 -- --shot       # render a frame to game/shot.png
+pwsh tools/run.ps1 --selftest   # headless collision/map sanity print
+pwsh tools/run.ps1 --shot       # render a frame to game/shot.png
 ```
 Headless import may exit `0xC0000005` on shutdown — harmless, import still completes.
 

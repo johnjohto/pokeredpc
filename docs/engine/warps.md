@@ -53,7 +53,7 @@ Implemented in `game/scripts/Main.gd` (`load_map`, `_warp_at`, `_on_player_moved
 ## Verified
 
 `--warptest` round-trips PalletTown → (door) → RedsHouse1F → (exit mat / LAST_MAP) →
-PalletTown. Run via `pwsh tools/run.ps1 -- --warptest`.
+PalletTown. Run via `pwsh tools/run.ps1 --warptest`.
 
 ## Not yet done
 

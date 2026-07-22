@@ -4775,7 +4775,7 @@ func _gatedoortest() -> void:
 
 
 ## Debug: drop straight into interactive play on a chosen map (skips the title), so a specific spot can
-## be checked by hand. Usage: `pwsh tools/run.ps1 -- --playmap Route7`. Defaults to Route 7, placed just
+## be checked by hand. Usage: `pwsh tools/run.ps1 --playmap Route7`. Defaults to Route 7, placed just
 ## below the gate/bollards. Free movement with the arrow keys; does not quit.
 func _playmap() -> void:
 	var mapname := _pt_arg_value("--playmap")
@@ -5408,7 +5408,7 @@ func _wraptest() -> void:
 ## every move-slot shape), refuses an unknown schema version, and rejects malformed and
 ## gh #22 (ADR-017): the v2 Core schema suite — the valid fixture project validates clean
 ## (ids registered per prefix) and every broken fixture is rejected with exactly one error
-## naming the file + path. Run: `pwsh tools/run.ps1 -- --schematest`. Headless.
+## naming the file + path. Run: `pwsh tools/run.ps1 --schematest`. Headless.
 func _schematest() -> void:
 	await get_tree().process_frame
 	var ok := true
@@ -5462,7 +5462,7 @@ func _schema_check(name: String, good: bool, detail: String) -> bool:
 ## seam's type resolver must answer exactly as the raw project chart over the full type
 ## cross-product — a PLUMBING proof (the chart reached Gen1Types, delegation works);
 ## the algorithm itself is held by --battledettest's md5s.
-## Run: `pwsh tools/run.ps1 -- --rulesettest`. Headless.
+## Run: `pwsh tools/run.ps1 --rulesettest`. Headless.
 func _rulesettest() -> void:
 	await get_tree().process_frame
 	var ok := true
@@ -5567,7 +5567,7 @@ func _rs_check(name: String, good: bool, detail: String) -> bool:
 ## exactness, precedence, branching, named errors) plus the EQUIVALENCE SWEEP: the
 ## expression-authored Gen-1 kernels (Gen1ExprFormulas) must equal the native
 ## Gen1Formulas outputs over a fixed vector matrix, value for value.
-## Run: `pwsh tools/run.ps1 -- --exprtest`. Headless.
+## Run: `pwsh tools/run.ps1 --exprtest`. Headless.
 func _exprtest() -> void:
 	await get_tree().process_frame
 	var ok := true
@@ -5642,7 +5642,7 @@ func _ex_check(name: String, good: bool, detail: String) -> bool:
 ## legacy res://assets file for EVERY data table (and all 223 interim maps byte-load
 ## identically), with exactly two documented exceptions where emission filters dead
 ## pokered data: Mew's UNUSED TM padding and the UnusedMart/UnusedBikeShop stock.
-## Run: `pwsh tools/run.ps1 -- --projparitytest`. Headless.
+## Run: `pwsh tools/run.ps1 --projparitytest`. Headless.
 func _projparitytest() -> void:
 	await get_tree().process_frame
 	var ok := true
@@ -5733,7 +5733,7 @@ func _deep_diff(a, b, path: String) -> String:
 
 
 ## gh #22: validate any project directory (res:// or an OS path) against the format.
-## Run: `pwsh tools/run.ps1 -- --validate=<dir>`. Exit 0 only when the project is clean.
+## Run: `pwsh tools/run.ps1 --validate=<dir>`. Exit 0 only when the project is clean.
 func _validateproject(dir: String) -> void:
 	await get_tree().process_frame
 	var r: Dictionary = ProjectValidator.validate_project(dir)
@@ -5793,7 +5793,7 @@ func _project_dir() -> String:
 	return "res://project"
 
 
-## field-invalid records without crashing. Run: `pwsh tools/run.ps1 -- --monrecordtest`.
+## field-invalid records without crashing. Run: `pwsh tools/run.ps1 --monrecordtest`.
 func _monrecordtest() -> void:
 	await get_tree().process_frame
 	player_name = "RED"
@@ -6474,7 +6474,7 @@ func _linktest_on_message(msg: Dictionary) -> void:
 ## Scenarios cover status moves, trainer-AI items/switches, player switching, bag items,
 ## multi-turn locks (WRAP/THRASH/HYPER BEAM), confusion, multi-hit, Transform/Mimic/
 ## Metronome/Disable/Substitute, and the wild catch/run rolls.
-## Run: `pwsh tools/run.ps1 -- --battledettest [--verbose]` (verbose echoes every event).
+## Run: `pwsh tools/run.ps1 --battledettest [--verbose]` (verbose echoes every event).
 func _battledettest() -> void:
 	await get_tree().process_frame
 	var scns: Array = [
@@ -9154,7 +9154,7 @@ func _savetest() -> void:
 
 ## PLAYABLE setup for gh #118: stand on the Vermilion Dock with HM01 in hand — the S.S. ANNE
 ## sets sail on arrival (VermilionDock.on_enter) — then keep playing to inspect the dock tiles.
-## Uses the isolated test save. Run: `pwsh tools/run.ps1 -- --dockscene`.
+## Uses the isolated test save. Run: `pwsh tools/run.ps1 --dockscene`.
 func _dockscene() -> void:
 	await get_tree().process_frame
 	if audio:
@@ -15282,7 +15282,7 @@ func _pcaccesstest() -> void:
 ## hand-written adapter is GONE), the `visible` query behind object_shown, and the
 ## authored Daisy TOWN MAP beat — pre-dex line, the gift (+ flag + re-talk line), and
 ## the full-bag refusal aborting the event with no flag set.
-## Run: `pwsh tools/run.ps1 -- --eventtest`. Headless.
+## Run: `pwsh tools/run.ps1 --eventtest`. Headless.
 func _eventtest() -> void:
 	await get_tree().process_frame
 	var ok := true

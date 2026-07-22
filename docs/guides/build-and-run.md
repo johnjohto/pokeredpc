@@ -145,7 +145,8 @@ and so *may* have teleported out of a dungeon via a rebound `LAST_MAP` warp (gh 
 
 ## Debug / verification flags
 
-Passed through after `--`; all handled in `Main.gd` via `OS.get_cmdline_args()` +
+Pass these directly to `tools/run.ps1`; the wrapper inserts Godot's required argument
+separator automatically. They are handled in `Main.gd` via `OS.get_cmdline_args()` +
 `OS.get_cmdline_user_args()`. Each drives a scripted scenario, saves a PNG to `game/`
 where noted (git-ignored), prints results, and quits — used to verify features headlessly.
 
@@ -310,7 +311,7 @@ where noted (git-ignored), prints results, and quits — used to verify features
 | `--scrolltest` | Cursor-menu windowing: a 12-item list scrolls a 7-row window with the cursor. Headless. |
 
 ```powershell
-pwsh tools/run.ps1 -- --selftest          # GUI build; or use the _console build headless:
+pwsh tools/run.ps1 --selftest             # GUI build; or use the _console build headless:
 & tools/godot/Godot_v4.7-stable_win64_console.exe --headless --path game -- --selftest
 ```
 

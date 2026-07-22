@@ -94,5 +94,5 @@ the extracted data alone → `build/preview/move_anims_preview.png` (Thunder's b
 flame column, Razor Leaf's toss-then-slice, etc. should be recognizably Gen-1). The json is
 also self-checked at extraction: table lengths vs the asm asserts, every referenced
 subanim/frame-block/base-coord id in range, and every drawn tile within its commanded
-tileset's tile count. In-engine: `pwsh tools/run.ps1 -- --moveanimtest` (frame counts, the
+tileset's tile count. In-engine: `pwsh tools/run.ps1 --moveanimtest` (frame counts, the
 enemy-turn transform, a timed `{"moveanim"}` marker, posed screenshots).

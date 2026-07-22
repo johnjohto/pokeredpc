@@ -55,7 +55,7 @@ exports, multiplayer, verification flags, and troubleshooting.
 After building the project:
 
 ```powershell
-pwsh tools/run.ps1 -- --studio
+pwsh tools/run.ps1 --studio
 ```
 
 Studio opens as a native, resizable 1280×800 desktop application with a persistent 80–200%
@@ -67,7 +67,7 @@ extractor-owned `game/project` in place; copy it to a creator workspace and open
 Developers can open the focused Phase-5 native-map tracer directly:
 
 ```powershell
-pwsh tools/run.ps1 -- --studio-map-fixture
+pwsh tools/run.ps1 --studio-map-fixture
 ```
 
 The map surface is intentionally read-only in this tracer. Painting, collision editing,
@@ -125,10 +125,10 @@ round trips: opening and saving untouched project content must not create a diff
 Useful fast checks include:
 
 ```powershell
-pwsh tools/run.ps1 -- --selftest
-pwsh tools/run.ps1 -- --schematest
-pwsh tools/run.ps1 -- --tmxtest
-pwsh tools/run.ps1 -- --studiotest
+pwsh tools/run.ps1 --selftest
+pwsh tools/run.ps1 --schematest
+pwsh tools/run.ps1 --tmxtest
+pwsh tools/run.ps1 --studiotest
 ```
 
 ## Assets and distribution

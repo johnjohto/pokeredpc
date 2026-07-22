@@ -40,6 +40,11 @@ milestones, `PATCH` bumps are fixes/polish. See `docs/roadmap.md` for the live p
 
 ### Changed
 
+- **The run wrapper now accepts project flags directly.** Commands such as
+  `pwsh tools/run.ps1 --studio` and `pwsh tools/run.ps1 --selftest` no longer expose
+  Godot's standalone user-argument separator. Existing `-- --flag` invocations remain
+  compatible, and direct Godot commands retain their native syntax.
+
 - **README rewritten around both products:** the shipped native port and the active Studio
   toolkit. Setup, current phase status, Studio launch/tracer commands, architecture,
   verification, documentation routes, and the personal-use asset boundary are now visible
