@@ -3,7 +3,7 @@
 # Godot's exporter by design, keeping the files md5-stable with no import artifacts; the
 # runtime falls back to <exe dir>/project in exported builds).
 #
-# Personal-use project (CLAUDE.md): do NOT distribute the exported build or the extracted
+# Personal-use project (AGENTS.md): do NOT distribute the exported build or the extracted
 # assets — the export is for playing your own copy without the toolchain.
 #
 # Run:  pwsh tools/export.ps1     (after tools/build.ps1 has extracted + imported)
@@ -24,7 +24,7 @@ $before = if (Test-Path $exe) { (Get-Item $exe).LastWriteTime } else { [datetime
 # the script would race past a still-running export. Piping forces a synchronous drain.
 & $godot --headless --path (Join-Path $root "game") --export-release "Windows Desktop" 2>&1 | Out-Host
 # Judge by the artifact, not the exit code: headless Godot may exit 0xC0000005 on shutdown
-# after a completed export (the known-harmless import quirk, see CLAUDE.md).
+# after a completed export (the known-harmless import quirk, see AGENTS.md).
 if (-not (Test-Path $exe) -or (Get-Item $exe).LastWriteTime -le $before) {
     Write-Error "godot export produced no new $exe"
     exit 1

@@ -2,6 +2,17 @@
 
 Newest first. Each entry: context → decision → consequences.
 
+## ADR-021 — Agent-agnostic instructions: `AGENTS.md` is canonical (2026-07-22)
+
+**Context:** The repo brief lived in `CLAUDE.md`, which only Claude Code reads. Other coding
+agents (Codex, Cursor, Gemini CLI, Copilot, …) have converged on the cross-tool `AGENTS.md`
+convention; the repo already delegates to a Codex subagent and shouldn't be tied to one harness.
+**Decision:** Move the canonical instructions to `AGENTS.md` (git-mv, history preserved).
+`CLAUDE.md` stays as a two-line stub whose `@AGENTS.md` import makes Claude Code load the same
+content. All docs/tooling references now point at `AGENTS.md`.
+**Consequences:** One source of truth for every agent; edits go to `AGENTS.md` only. If a
+future tool needs its own filename (e.g. `GEMINI.md`), add another one-line pointer, never a fork.
+
 ## ADR-020 — Studio MVP: one project, canonical write-through, refuse-loud forms (2026-07-22)
 
 **Context:** v2 Phase 4 (gh #18, ADR-013, plan §4.5) builds the Studio MVP — the standalone

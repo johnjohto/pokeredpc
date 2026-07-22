@@ -9,7 +9,7 @@ How the engineering skills should consume this repo's domain documentation when 
 
 If any of these files don't exist, **proceed silently**. Don't flag their absence; don't suggest creating them upfront. The `/domain-modeling` skill (reached via `/grill-with-docs` and `/improve-codebase-architecture`) creates them lazily when terms or decisions actually get resolved.
 
-> **Note (pokeredpc):** this repo already keeps a running decision log at `docs/decisions.md` (ADRs for non-obvious engine choices, per CLAUDE.md), and its knowledge base lives under `docs/` (start at `docs/index.md`). Those remain the primary references. `docs/adr/` is the skills' conventional location for machine-managed ADRs and is created only if/when `/domain-modeling` writes one — the two can coexist.
+> **Note (pokeredpc):** this repo already keeps a running decision log at `docs/decisions.md` (ADRs for non-obvious engine choices, per AGENTS.md), and its knowledge base lives under `docs/` (start at `docs/index.md`). Those remain the primary references. `docs/adr/` is the skills' conventional location for machine-managed ADRs and is created only if/when `/domain-modeling` writes one — the two can coexist.
 
 ## File structure
 

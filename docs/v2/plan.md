@@ -296,7 +296,7 @@ list is the concrete spec for §4.3.
 7. **Performance of data-driven mechanics** — interpreting events/formulas vs compiled code. Fine for a
    turn-based RPG; watch the Event VM in tight overworld loops.
 8. **Legal / IP (important).** v1 uses **extracted Nintendo assets — personal-use only** (per
-   `CLAUDE.md`). A *distributable* toolkit **cannot ship those** — but it can preserve v1's clean model:
+   `AGENTS.md`). A *distributable* toolkit **cannot ship those** — but it can preserve v1's clean model:
    the **Engine + Studio are original code** (freely shippable), and the faithful **Kanto pack is
    delivered as the pokered *importer* (a recipe), not as bundled assets** — each creator supplies their
    own `pokered/` clone and extracts locally for personal use, so the toolkit never redistributes the IP.

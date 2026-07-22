@@ -4,7 +4,7 @@
     Delegate a task to an OpenAI Codex "subagent" (codex exec) and return its final answer.
 
 .DESCRIPTION
-    Thin wrapper around `codex exec` so Claude Code (or a human) can hand a self-contained
+    Thin wrapper around `codex exec` so a coding agent (or a human) can hand a self-contained
     task to a Codex agent running on OpenAI models, then read back just the final message.
 
     Codex authenticates via the ChatGPT sign-in already stored in ~/.codex (no API key).
