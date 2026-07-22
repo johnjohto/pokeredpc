@@ -387,6 +387,10 @@ of Fame. **Landed: gh #59** (same day): Studio now breaks away from the game's 1
 viewport before it builds any controls, opening as a native resizable 1280×800 desktop window
 (900×600 minimum); the game keeps its faithful 3× stretch, and `--studiotest` asserts that the two
 window profiles cannot drift back together. Next: Phase 5 — map + event editors (gh #19).
+**Studio polish follow-up: gh #61** records the hands-on review that the schema-driven data
+editor is usable but still needs the map workspace's stronger hierarchy, spacing, grouping,
+record browsing, and visual finish. It may proceed independently without replacing the
+shared form/schema model or delaying Phase 5.
 **Phase 5 activated** (2026-07-22) as approved tracer-bullet issues **gh #52–#58** (native
 TMX tracer → Kanto cutover → painting → objects/world graph → event editor → softlock
 lints → phase gate). **Landed: gh #52** (same day; ADR-021): Project format 2 claims
