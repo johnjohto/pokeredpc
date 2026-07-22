@@ -226,6 +226,24 @@ recurred — gh #37, environmental). gh #40 then closed with OaksLab (wave B10 a
 **Next: wave C (gh #41)** — dissolving Cutscene's story beats into authored events by
 questline — is all that stands between here and the gh #17 Phase-3 close (gh #42 and #43 are
 done; the strangler-fig `beat` seam is exactly where wave C picks up).
+**Wave C questline 1 (opening/Oak) COMPLETE (2026-07-21, same session, four gated
+increments):** every opening story beat is deleted from Cutscene and authored —
+oak_dont_go_away (the first dissolution; `face_object` arrives), the 5-ball gift
+(`give_item` count), rival_challenge (the choreography set: `face_player`/`play_song`/
+`wait`/`walk_object_to` with player-relative targets/`class_battle` with per-starter
+branches + `no_blackout`/`heal_party`, and the `battle_won` condition), choose_starter +
+rival_takes_starter (each ball record fully static: `ask`/`pic`/`show_dex_entry`/
+`set_starter`/`give_mon` + the counterpart grab), and finally oak_intercept + lab_intro as
+ONE cross-map record (`show_text`/`close_text` held text, `emote`'s 60-frame hold,
+`walk_object`/`walk_player` counts, `walk_together_to`, `warp_to` — and the wave-D lint
+learned that a record's command stream crosses maps exactly at `warp_to`, walking objects
+against a current-map context). `oak_dex_rating` stays as the one ceremony invoker (ADR-019
+§1). Per-increment gates held: `--eventtest` grew wave-C checks (19 total), `--schematest`,
+`--rivallosstest`/`--starterballtest` (both now drive the records' real triggers),
+`--oaktest` end to end windowed after every increment, `--validate` 0 errors, the four md5s
+never moved — and the finale: a fresh `--playthrough --seed 1` NEW GAME → **HALL OF FAME**,
+`validate_gate.py` → **GATE GREEN**, through the fully authored opening. Next questlines:
+parcel/dex → Bill/S.S. Anne → gyms → Silph/Rocket → legendaries/fossils/gifts → endgame.
 **Landed: gh #34** (2026-07-20): Catch + Progression are behind the seam and the
 **config-first knobs are real** — `Gen1Catch` (`attempt` over the byte-exact kernel + the
 safari `bait_rate`/`rock_rate` transitions, which moved out of the host's input handler),
