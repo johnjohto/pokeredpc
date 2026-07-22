@@ -329,6 +329,12 @@ extraction byte-identical, md5s unchanged, audits at zero (9/9 event-backed door
 eighth fresh seed-1 NEW GAME → HALL OF FAME **GATE GREEN** on the fully dissolved build
 (Champion at L67). Every story beat in the game is now an authored event record; Cutscene.gd
 holds only engine ceremonies and primitives.
+**PHASE 3 COMPLETE — gh #17 closed 2026-07-22.** The close battery on the final commit:
+the eighth seed-1 GATE GREEN, md5s byte-identical to the pre-phase baseline, `--validate`
+0 errors (283 records), audits at zero, `linktest`/`linksoak` 8/8/`linkdrop` ALL GREEN, and
+the cross-OS `determinism` workflow fully green on both runners (the gh #37 macOS flake did
+not recur). **Next: Phase 4 — Studio MVP (gh #18)**, whose design conversation should pin
+its ADR before build-out (the Phase 1–3 pattern).
 **Landed: gh #34** (2026-07-20): Catch + Progression are behind the seam and the
 **config-first knobs are real** — `Gen1Catch` (`attempt` over the byte-exact kernel + the
 safari `bait_rate`/`rock_rate` transitions, which moved out of the host's input handler),
