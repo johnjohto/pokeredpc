@@ -51,6 +51,8 @@ still require reimplementing the GB's PPU/APU/timing and yields an unmaintainabl
 | Battle | `game/scripts/Battle.gd` | battle modal: Gen-1 rules/presentation, the determinism oracle, link lockstep mode |
 | Link layer | `game/scripts/Link.gd` | THE one networking seam (v1.1): ENet transport, link identity handshake, session messages ([engine/link.md](engine/link.md)) |
 | Mon record | `game/scripts/MonRecord.gd` | the `mon/1` wire codec, mapped only at the link boundary ([data-formats/mon-record.md](data-formats/mon-record.md)) |
+| Project format core | `game/core/Schema.gd`, `ProjectValidator.gd`, `CanonJSON.gd` | schema validation, cross-record identity/reference checks, editor context, and canonical persistence for v2 project data |
+| Studio | `game/scripts/studio/StudioShell.gd`, `SchemaForm.gd`, `FormWidgetRegistry.gd` | project browser plus schema-generated record forms; specialized controls plug in by content type and JSON-pointer path |
 | Engine binary | `tools/godot/` | portable Godot 4.7 (not installed system-wide) |
 
 As systems grow, `Main.gd` will split into focused nodes/scripts (MapManager, Battle,

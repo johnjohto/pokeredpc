@@ -97,21 +97,31 @@ func _rebuild() -> void:
 	_error_labels.clear()
 	for child in get_children():
 		child.queue_free()
+	# Keep an explicit form-level target for schema/context failures that cannot be
+	# attached to a particular generated field.
+	_add_error_label(self, "")
 	_build_object(self, _schema, _draft, "")
 	_validate_draft()
 
 
 func _build_object(parent: Control, schema: Dictionary, value: Dictionary, path: String) -> void:
 	var properties: Dictionary = schema.get("properties", {})
+	var required: Array = schema.get("required", [])
 	for field in properties:
 		var field_schema: Dictionary = properties[field]
 		var field_path := path + "/" + str(field)
 		if not value.has(field):
-			if not (schema.get("required", []) as Array).has(field):
+			if required.has(field):
+				# A malformed record must remain repairable in Studio. Render the
+				# schema-shaped control without silently inserting data into the draft;
+				# its first edit creates the missing value.
+				_build_field(parent, str(field), field_schema,
+					_default_value(field_schema), field_path)
+			else:
 				_build_missing_optional(parent, str(field), field_schema, field_path)
 			continue
 		_build_field(parent, str(field), field_schema, value[field], field_path)
-		if not (schema.get("required", []) as Array).has(field):
+		if not required.has(field):
 			var remove := Button.new()
 			remove.text = "Remove %s" % field
 			remove.pressed.connect(func() -> void: _remove_optional(field_path))
@@ -144,6 +154,15 @@ func _build_field(parent: Control, field: String, schema: Dictionary, value, pat
 			return
 	var kind := str(schema.get("type", ""))
 	if kind == "object":
+		if _is_freeform_object(schema):
+			var json_input := TextEdit.new()
+			json_input.custom_minimum_size.y = 96
+			json_input.text = CanonJSON.serialize(value)
+			json_input.text_changed.connect(func() -> void:
+				var parsed = JSON.parse_string(json_input.text)
+				_set_draft_value(path, parsed if parsed is Dictionary else json_input.text))
+			_mount_input(parent, field, json_input, path)
+			return
 		var section := VBoxContainer.new()
 		parent.add_child(section)
 		var heading := Label.new()
@@ -160,6 +179,11 @@ func _build_field(parent: Control, field: String, schema: Dictionary, value, pat
 	if input == null:
 		return
 	_mount_input(parent, field, input, path)
+
+
+func _is_freeform_object(schema: Dictionary) -> bool:
+	return (schema.get("properties", {}) as Dictionary).is_empty() \
+		and schema.get("additionalProperties", true) != false
 
 
 func _mount_input(parent: Control, field: String, input: Control, path: String) -> void:
@@ -269,7 +293,8 @@ func _make_input(schema: Dictionary, value, path: String) -> Control:
 func _append_array(path: String, item_schema: Dictionary) -> void:
 	var value = _draft_value(path)
 	if not (value is Array):
-		return
+		_set_draft_value(path, [])
+		value = _draft_value(path)
 	(value as Array).append(_default_value(item_schema))
 	_set_dirty(CanonJSON.serialize(_draft) != CanonJSON.serialize(_saved))
 	_rebuild()
@@ -306,7 +331,17 @@ func _remove_optional(path: String) -> void:
 func _draft_value(path: String):
 	var node = _draft
 	for segment in path.split("/", false):
-		node = node[int(segment)] if node is Array else node[str(segment)]
+		if node is Array:
+			var index := int(segment)
+			if index < 0 or index >= (node as Array).size():
+				return null
+			node = node[index]
+		elif node is Dictionary:
+			if not (node as Dictionary).has(str(segment)):
+				return null
+			node = node[str(segment)]
+		else:
+			return null
 	return node
 
 
@@ -359,10 +394,29 @@ func _set_draft_value(path: String, value) -> void:
 	var node = _draft
 	for i in segments.size() - 1:
 		var segment := str(segments[i])
-		node = node[int(segment)] if node is Array else node[segment]
+		var make_array := str(segments[i + 1]).is_valid_int()
+		if node is Array:
+			var index := int(segment)
+			while (node as Array).size() <= index:
+				(node as Array).append(null)
+			var child = node[index]
+			if not (child is Array or child is Dictionary):
+				child = [] if make_array else {}
+				node[index] = child
+			node = child
+		elif node is Dictionary:
+			if not (node as Dictionary).has(segment) \
+					or not (node[segment] is Array or node[segment] is Dictionary):
+				node[segment] = [] if make_array else {}
+			node = node[segment]
+		else:
+			return
 	var leaf := str(segments[-1])
 	if node is Array:
-		node[int(leaf)] = value
+		var leaf_index := int(leaf)
+		while (node as Array).size() <= leaf_index:
+			(node as Array).append(null)
+		node[leaf_index] = value
 	else:
 		node[leaf] = value
 	_set_dirty(CanonJSON.serialize(_draft) != CanonJSON.serialize(_saved))
@@ -386,6 +440,15 @@ func _validate_draft() -> Array:
 		var split_at := message.find(" — ")
 		var path := message.substr(0, split_at) if split_at >= 0 else ""
 		var target := path
+		# CoreSchema correctly reports a missing property against its containing
+		# object. Route that diagnostic to the repair control generated above.
+		var missing_marker := "missing required field '"
+		var missing_at := message.find(missing_marker)
+		if missing_at >= 0:
+			var field_start := missing_at + missing_marker.length()
+			var field_end := message.find("'", field_start)
+			if field_end > field_start:
+				target = path + "/" + message.substr(field_start, field_end - field_start)
 		while target != "" and not _error_labels.has(target):
 			target = target.substr(0, target.rfind("/"))
 		if _error_labels.has(target):

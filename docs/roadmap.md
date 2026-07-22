@@ -359,7 +359,9 @@ registry context Studio consumes; `SchemaForm` recursively generates scalar, enu
 boolean, nested-object, array, and `x-ref` picker controls from those schemas (including
 optional-field and array add/remove), reports CoreSchema/reference errors inline, tracks
 dirty state, and validates before canonical Save so an invalid draft never touches the
-last good bytes; explicit Revert restores the last save. `FormWidgetRegistry` is the tiny
+last good bytes; malformed records retain repair controls (including nested required
+containers), unmapped failures have a form-level diagnostic, free-form `custom` objects use
+an editable JSON control, and explicit Revert restores the last save. `FormWidgetRegistry` is the tiny
 `(content-type, JSON-pointer path)` override seam for #50's sprite/learnset/type/party
 widgets, including whole object/array overrides, and the shell's record pane now mounts
 the real generated form with Save/Revert. `--studiotest` drives the real controls through
