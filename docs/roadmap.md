@@ -271,7 +271,22 @@ still keys off `is_gym_leader_battle`), and Main's interact special-case is gone
 (re-talk lines, gh #109, Giovanni party 3), `--surgetest` (Vermilion), `--validate` 0 errors
 (283 records), double extraction byte-identical, md5s unchanged, and a fourth fresh seed-1
 NEW GAME → HALL OF FAME **GATE GREEN** (Champion at L71). Command-library convergence:
-20 → 1 → 2 → 2. Next questlines: Silph/Rocket → legendaries/fossils/gifts → endgame.
+20 → 1 → 2 → 2.
+**Questline 5 (Silph/Rocket) COMPLETE (same session):** the seven hideout/Silph beats
+dissolved — the 7F rival (both triggers; the talk-up drops the approach walk the retired beat
+always clamped to zero; parties keyed by the RIVAL's starter; the y-keyed exit), the Lapras
+gift (the full-party box branch via the new `party_count` condition, gh #157), the 9F nurse's
+white-flash heal, Giovanni #2 (flag → parting line → the fade-black `refresh_objects` rocket
+exodus, gh #158), the president's MASTER BALL, hideout Giovanni (→ the SILPH SCOPE ball), and
+the lift-key drop (ball only after the text). New vocabulary: `fade_out`/`fade_in`
+(black|white = the two home/fade.asm pairs), `refresh_objects`, `party_count`;
+project-format.md's condition list synced to `EventVM._ident_value`. One accepted delta: the
+retired empty-rival_starter counterpart fallback (unreachable in any real save) is not
+reproduced. Gate: `--eventtest` 26 checks, `--silphtest`/`--hideouttest`/`--rockettest`/
+`--cardkeytest` green, `--validate` 0 errors, double extraction byte-identical, md5s
+unchanged, `--silphstage --seed 1` PASS, and a fifth fresh seed-1 NEW GAME → HALL OF FAME
+**GATE GREEN** (Champion at L74). Convergence: 20 → 1 → 2 → 2 → 3. Next questlines:
+legendaries/fossils/gifts → endgame.
 **Landed: gh #34** (2026-07-20): Catch + Progression are behind the seam and the
 **config-first knobs are real** — `Gen1Catch` (`attempt` over the byte-exact kernel + the
 safari `bait_rate`/`rock_rate` transitions, which moved out of the host's input handler),
