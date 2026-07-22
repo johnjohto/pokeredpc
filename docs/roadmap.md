@@ -383,7 +383,10 @@ the full **write-to-disk** 515-record identity sweep, restores its edited fixtur
 and verifies a headless child handshake + clean exit. **PHASE 4 COMPLETE — gh #18:** the restored
 scratch tree matched Kanto across all 1,565 files, then `--playthrough --seed=1` on that exact
 Studio-round-tripped project cleared all 21 checkpoints, beat the Champion, and entered the Hall
-of Fame. Next: Phase 5 — map + event editors (gh #19).
+of Fame. **Landed: gh #59** (same day): Studio now breaks away from the game's 160×144 pixel-art
+viewport before it builds any controls, opening as a native resizable 1280×800 desktop window
+(900×600 minimum); the game keeps its faithful 3× stretch, and `--studiotest` asserts that the two
+window profiles cannot drift back together. Next: Phase 5 — map + event editors (gh #19).
 **Landed: gh #34** (2026-07-20): Catch + Progression are behind the seam and the
 **config-first knobs are real** — `Gen1Catch` (`attempt` over the byte-exact kernel + the
 safari `bait_rate`/`rock_rate` transitions, which moved out of the host's input handler),

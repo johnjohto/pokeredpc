@@ -11,6 +11,8 @@ class_name StudioShell
 ## Tiled-external (Phase 5) and events get their own GUI (Phase 5).
 const CONTENT_TYPES := ["species", "moves", "items", "trainers"]
 const RECENTS_CFG := "user://studio.cfg"
+const DEFAULT_WINDOW_SIZE := Vector2i(1280, 800)
+const MIN_WINDOW_SIZE := Vector2i(900, 600)
 
 var project_dir := ""
 var _path_label: Label
@@ -27,6 +29,7 @@ var _active_form: Control = null
 
 
 func _ready() -> void:
+	_configure_window()
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	_build_ui()
 	if "--studiotest" in OS.get_cmdline_user_args():
@@ -43,6 +46,20 @@ func _ready() -> void:
 		if not recents.is_empty() and open_project(recents[0]) == "":
 			return
 		_dialog.popup_centered_ratio(0.7)
+
+
+## Studio shares a Godot project with the game, but it must not share the game's
+## 160x144 pixel-art viewport. Rendering desktop controls into that tiny canvas and
+## stretching it 3x clips the project browser to a handful of giant controls (gh #59).
+## Disable content scaling before building the UI and give the standalone editor a
+## practical, resizable native window; game mode retains project.godot's faithful size.
+func _configure_window() -> void:
+	var window := get_window()
+	window.content_scale_mode = Window.CONTENT_SCALE_MODE_DISABLED
+	window.content_scale_size = Vector2i.ZERO
+	window.min_size = MIN_WINDOW_SIZE
+	if window.mode == Window.MODE_WINDOWED:
+		window.size = DEFAULT_WINDOW_SIZE
 
 
 ## Open a project folder through the same Core loader + refusal path the engine boots with
@@ -270,6 +287,15 @@ func _project_arg() -> String:
 ## (write-through, refusal, play-test).
 func _studiotest() -> void:
 	var ok := true
+	var window := get_window()
+	ok = _st_check("Studio uses a native resizable desktop window",
+		window.content_scale_mode == Window.CONTENT_SCALE_MODE_DISABLED
+		and window.content_scale_size == Vector2i.ZERO
+		and window.min_size == MIN_WINDOW_SIZE
+		and window.size.x >= MIN_WINDOW_SIZE.x and window.size.y >= MIN_WINDOW_SIZE.y,
+		"size=%s min=%s scale-mode=%d scale-size=%s" % [
+			str(window.size), str(window.min_size), window.content_scale_mode,
+			str(window.content_scale_size)]) and ok
 	var scratch := OS.get_user_data_dir().path_join("studio_scratch")
 	if DirAccess.dir_exists_absolute(scratch):
 		OS.move_to_trash(scratch)

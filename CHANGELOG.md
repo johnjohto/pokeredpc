@@ -48,6 +48,13 @@ with genuine Wi-Fi drops, signed off 2026-07-20).
   lockstep and journal semantics are unchanged; reconcile only reads them.
 
 ### Fixed
+- **Studio no longer renders its desktop UI through the game's 160×144 viewport** (gh #59).
+  The shared Godot project made `--studio` inherit the Game Boy canvas plus 3× viewport
+  stretch, magnifying ordinary controls until the project browser was clipped and unusable.
+  Studio now disables content scaling before constructing its UI and opens as a native,
+  resizable 1280×800 desktop window with a 900×600 minimum; game mode retains its faithful
+  160×144 render and 480×432 default window. `--studiotest` locks the two profiles apart.
+
 - **A stage failure inside Victory Road now walks back out for its retry, and `_pt_warp_out`
   can no longer teleport out of a cave** (gh #30). Two recovery weaknesses the gh #28 failures
   exposed: the victoryroad stage's retry loop assumed a whiteout (which lands in a Center) and
