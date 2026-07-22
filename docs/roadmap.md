@@ -438,8 +438,23 @@ reopens the saved document, and verifies one walkable and one solid cell in a se
 child. Project parity, all 223 Studio map mounts, TMX, schema, self, warp, and Cut gates remain
 green; all four battle-determinism hashes are unchanged; and the final no-resume
 `--playthrough --seed=1 --ptwatchdog=120` cleared all 21 checkpoints, beat the Champion,
-and entered the Hall of Fame with a level-74 lead. Next: gh #55 — native objects plus the
-world graph editor.
+and entered the Hall of Fame with a level-74 lead.
+**Landed: gh #55** (same day; ADR-025): the Studio map workspace now places and edits typed
+warps, NPCs, signs, and rectangular trigger regions through stable-ID/property inspectors;
+imported Kanto objects with exact legacy payloads remain visibly read-only. A project-level
+world inspector creates, updates, and removes cardinal links as one exact reciprocal pair,
+and map plus graph changes share a single undo/redo and Save/Revert history. `MapDocument`
+targets only Studio-owned Tiled objects by private numeric anchor while preserving unrelated
+TMX; `WorldDocument` canonically writes `data/world.json` and rejects duplicate directions,
+missing/incorrect reciprocals, and edges with no geometric overlap. Project validation also
+checks map/event references and destination-warp bounds. `--schematest` covers object and
+graph mutation/refusal; `--studiotest` creates two maps through the real controls, places all
+four object kinds, saves/reopens without drift, then a child Engine walks through the authored
+warp and back across the authored seamless edge. Kanto still validates all 1,613 files with
+zero errors; all 223 maps mount in Studio and retain semantic parity; all four battle stream
+hashes are unchanged; and the final no-resume `--playthrough --seed=1 --ptwatchdog=120`
+cleared all 21 checkpoints and entered the Hall of Fame with a level-71 lead. Next: gh #56 —
+the event command/trigger editor.
 **Landed: gh #34** (2026-07-20): Catch + Progression are behind the seam and the
 **config-first knobs are real** — `Gen1Catch` (`attempt` over the byte-exact kernel + the
 safari `bait_rate`/`rock_rate` transitions, which moved out of the host's input handler),

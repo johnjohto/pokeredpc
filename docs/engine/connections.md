@@ -4,13 +4,23 @@ Implemented in `game/scripts/Main.gd` as a multi-map **world**: the active ("cen
 plus its connected neighbors are loaded, placed at block offsets, rendered seamlessly, and
 collided across the seam. Walking off the center map **rebases** the world onto the neighbor.
 
-## Connection data (per map JSON)
+## Connection data (Project format 2)
 
 ```json
-"connections": [ {"dir": "north", "map": "Route1", "offset": 0}, ... ]
+{"maps": {"map:PalletTown": [
+  {"direction": "north", "map": "map:Route1", "offset": 0}
+]}}
 ```
 
-Derived from `data/maps/headers/<Map>.asm`'s `connection <dir>, <Map>, <CONST>, <offset>`.
+`data/world.json` owns these map-to-map relationships; TMX owns only local geometry.
+`ProjectData` translates the active map's records to the runtime's historical
+`{dir,map,offset}` shape. Kanto's extractor derives them from
+`data/maps/headers/<Map>.asm`'s `connection <dir>, <Map>, <CONST>, <offset>`.
+
+Studio edits one logical pair through `WorldDocument`: `A east → B` at offset `n` requires
+`B west → A` at offset `-n` (likewise north/south). Core refuses duplicate directions,
+missing/mismatched reciprocals, missing maps, and placements whose perpendicular spans do
+not overlap. This keeps rebase geometry valid before the Engine sees the project.
 
 ## Neighbor placement (block offset of neighbor origin vs center origin)
 

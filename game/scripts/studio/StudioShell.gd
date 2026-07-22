@@ -359,7 +359,20 @@ func preview_map(project_root: String, map_label: String):
 	workspace.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	workspace.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_editor_panel.add_child(workspace)
-	var error: String = workspace.bind_document(opened["document"])
+	var world = null
+	var world_path := ProjectSettings.globalize_path(project_root).path_join("data/world.json")
+	if FileAccess.file_exists(world_path):
+		var world_opened := preload("res://core/WorldDocument.gd").open(project_root)
+		if not bool(world_opened.get("ok", false)):
+			_status.text = "REFUSED: " + str(world_opened.get("error", "cannot open world graph"))
+			return null
+		world = world_opened["document"]
+	var map_labels: Array = []
+	for map_file in DirAccess.get_files_at(ProjectSettings.globalize_path(project_root).path_join("maps")):
+		if map_file.to_lower().ends_with(".tmx"):
+			map_labels.append(map_file.get_basename())
+	map_labels.sort()
+	var error: String = workspace.bind_document(opened["document"], world, map_labels)
 	if error != "":
 		_status.text = "REFUSED: " + error
 		return null
@@ -457,7 +470,8 @@ func _refresh_ui_scale_label() -> void:
 
 ## Public launch seam used by the button and --studiotest. The Engine is always a child
 ## process; `probe` asks it to quit after proving readiness, and is test-only.
-func launch_playtest(probe := false, headless := false, start_map := "", inspect_cells: Array = []):
+func launch_playtest(probe := false, headless := false, start_map := "", inspect_cells: Array = [],
+		traverse: Dictionary = {}):
 	if project_dir == "":
 		_status.text = "REFUSED: open a project before play-testing"
 		return null
@@ -472,7 +486,7 @@ func launch_playtest(probe := false, headless := false, start_map := "", inspect
 		_status.text = "REFUSED: " + "; ".join(PackedStringArray(report.get("errors", [])))
 		return null
 	var child := preload("res://scripts/studio/StudioPlaytest.gd").new()
-	var error: String = child.launch(project_dir, probe, headless, start_map, inspect_cells)
+	var error: String = child.launch(project_dir, probe, headless, start_map, inspect_cells, traverse)
 	if error != "":
 		_status.text = "REFUSED: " + error
 		return null
@@ -647,6 +661,7 @@ func _studiotest() -> void:
 	ok = preload("res://scripts/studio/StudioEditorSmoke.gd").new().run(self, scratch) and ok
 	ok = preload("res://scripts/studio/StudioMapSmoke.gd").new().run(self) and ok
 	ok = await preload("res://scripts/studio/StudioMapAuthoringSmoke.gd").new().run(self, scratch) and ok
+	ok = await preload("res://scripts/studio/StudioWorldAuthoringSmoke.gd").new().run(self, scratch) and ok
 	ok = await preload("res://scripts/studio/StudioPlaytestSmoke.gd").new().run(self, scratch) and ok
 	print("[studiotest] %s" % ("ALL GREEN" if ok else "FAIL"))
 	get_tree().quit(0 if ok else 1)

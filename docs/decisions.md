@@ -2,6 +2,37 @@
 
 Newest first. Each entry: context → decision → consequences.
 
+## ADR-025 — Object edits keep stable names; world links are reciprocal transactions (2026-07-22)
+
+**Context:** Phase 5.4 (gh #55) must let creators place local gameplay objects and connect
+maps without turning Studio into a second TMX dialect. Tiled exposes both author-facing
+names and mutable numeric object ids; Kanto objects additionally carry exact legacy runtime
+payloads. Seamless connections are two directed records in `data/world.json`, although the
+creator thinks of them as one spatial relationship. Independent edits could leave stale
+event links, disagreeing legacy payloads, one-way edges, or geometry that never overlaps.
+**Decision:** (1) The stable Tiled `name` is the gameplay object id. The numeric Tiled `id`
+is a private serialization anchor used to target only that object during save; new ids are
+allocated from `nextobjectid`. `MapDocument` owns add/update/remove and validation for four
+types: point warps, NPCs, signs, and cell-aligned rectangular triggers. (2) Imported records
+with `pokeredpc:legacy` are visibly read-only in Studio. New generic objects may coexist on
+those maps, but changing a legacy common field is refused until Core can regenerate its
+exact payload. (3) `WorldDocument` owns `data/world.json`. Setting `A east → B, n` also sets
+`B west → A, -n`; removal deletes both. It validates one direction per map, exact reciprocal
+count/direction/offset, existing maps, and positive shared-edge overlap. (4) Studio snapshots
+the map and world documents together, so one gesture/link is one undo record and Save/Revert
+cannot split their histories. (5) Whole-project validation resolves map/event ids and checks
+each 1-based destination warp against the destination map. Play-test remains a fresh child
+process; the acceptance probe drives real Player input through both an authored warp and an
+authored seamless edge.
+**Consequences:** The creator edits one logical connection and cannot save a half-edge;
+Engine placement continues to consume the same ordered records. Tiled remains a peer editor:
+no-op bytes stay exact, object saves replace/remove one owned object or append to `Gameplay`,
+and unrelated XML/TSX survives. Canonical world JSON may reformat only when the graph is
+actually saved. The deliberate legacy lock trades immediate Kanto-object editing for one
+runtime authority; a later migration may remove it by translating every legacy-only field
+into generic typed properties. The Studio gate authors two maps and all four object types,
+proves unified undo/save/reopen, and traverses both connection mechanisms in an Engine child.
+
 ## ADR-024 — Map painting owns cells and an optional collision override layer (2026-07-22)
 
 **Context:** Phase 5.3 (gh #54) must let Studio create and paint maps without making its

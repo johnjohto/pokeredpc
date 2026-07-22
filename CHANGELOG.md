@@ -10,6 +10,16 @@ milestones, `PATCH` bumps are fixes/polish. See `docs/roadmap.md` for the live p
 
 ### Added
 
+- **Studio can place gameplay objects and connect authored maps** (gh #55, ADR-025).
+  Warp, NPC, sign, and rectangular trigger tools share a typed inspector with stable IDs,
+  cell coordinates, event links, and kind-specific fields. A world inspector edits cardinal
+  adjacency as one exact reciprocal pair; map and world changes share undo/redo and
+  Save/Revert. `MapDocument` targets only its owned Tiled objects while retaining unrelated
+  XML, and `WorldDocument` validates reciprocal direction/offset and shared-edge geometry.
+  Project validation also rejects dangling map/event references and out-of-range destination
+  warp numbers. The Studio gate authors two maps through real controls, reopens them without
+  drift, then has a separate Engine child cross their warp and seamless edge.
+
 - **Studio can now create, paint, save, and immediately play-test native maps** (gh #54,
   ADR-024). The map workspace has a project-atlas palette; tile, optional 32×32 Gen-1
   block, erase, and flood-fill brushes; per-cell walkable/solid editing and overlay;

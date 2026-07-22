@@ -4,7 +4,7 @@ Implemented in `game/scripts/Main.gd` (`load_map`, `_warp_at`, `_on_player_moved
 `_do_warp`). Source data comes from `data/maps/objects/<Map>.asm` (see
 [../data-formats/maps.md](../data-formats/maps.md)).
 
-## Warp data (per map JSON)
+## Warp data (native TMX runtime view)
 
 ```json
 "warps": [ { "x": 5, "y": 5, "dest_const": "REDS_HOUSE_1F", "dest_warp": 1,
@@ -15,6 +15,8 @@ Implemented in `game/scripts/Main.gd` (`load_map`, `_warp_at`, `_on_player_moved
 - `dest_warp` is **1-based** into the destination map's warp list (engine subtracts 1).
 - `dest_map` is the resolved label of `dest_const` (added by the extractor). For
   `dest_const == "LAST_MAP"` (`$ff`) there is no fixed label — see below.
+- Project validation resolves `dest_map` and verifies that `dest_warp` exists in the
+  destination TMX document before launch.
 
 ## Rules (mirrors pokered)
 

@@ -15,8 +15,8 @@ project/
 ```
 
 The TMX map is finite, orthogonal, and uses 16×16 tiles. One tile is one movement/collision
-cell. Pixel coordinates therefore convert directly as `cell = pixel / 16`; objects must be
-point objects aligned to that grid. Maps may have odd cell dimensions.
+cell. Pixel coordinates therefore convert directly as `cell = pixel / 16`; point objects
+and trigger-region corners/sizes must align to that grid. Maps may have odd cell dimensions.
 
 Gen-1's 32×32 blocks are optional authoring groups, not geometry. Kanto's importer maps
 each block to four native cells and attaches reversible `pokeredpc:block` metadata so
@@ -80,25 +80,38 @@ the destination is an `x-ref`-validated `map:<label>`, and offset remains in 32p
 units to preserve pokered's connection headers. `ProjectData` injects the selected map's
 connections into the runtime view; a TMX document remains local geometry.
 
+Every authored connection is an exact pair. If `A east → B` has offset `n`, `B west → A`
+has offset `-n`; north/south follow the same rule. `WorldDocument` creates, updates, or
+removes both records as one edit. It refuses duplicate directions, missing or mismatched
+reciprocals, missing maps, and offsets that leave the two map edges with no positive overlap.
+Studio presents the pair once from the active map and includes it in the same undo history
+as local map edits.
+
 ## Gameplay objects
 
-Gameplay objects are grid-aligned named Tiled points. Their stable `name` is the object ID;
-their Tiled `class` (or legacy `type`) selects one of these records:
+Gameplay objects are grid-aligned named Tiled objects. Their stable `name` is the object ID;
+their positive numeric Tiled `id` is only a private targeted-write anchor. Warps, NPCs, and
+signs are points; triggers may be cell-aligned rectangles (a point trigger means 1×1 cell).
+The Tiled `class` (or legacy `type`) selects one of these records:
 
 | Class | Required/recognized properties |
 |---|---|
 | `pokeredpc:warp` | `pokeredpc:dest_map` (`map:<label>`) or explicit `pokeredpc:dest_const` ruleset sentinel; `pokeredpc:dest_warp` (int) |
 | `pokeredpc:npc` | `pokeredpc:sprite`, optional `pokeredpc:movement`, `pokeredpc:facing`, `pokeredpc:event` |
 | `pokeredpc:sign` | optional `pokeredpc:text`, `pokeredpc:event` |
-| `pokeredpc:trigger` | optional `pokeredpc:event` |
+| `pokeredpc:trigger` | optional `pokeredpc:event`; rectangle width/height define its cell region |
 
-Map and event references are validated with the same stable ID registry as JSON content.
-An unknown `pokeredpc:*` class refuses; a third-party class is preserved but ignored by the
-runtime.
+Map and event references are validated with the same stable ID registry as JSON content;
+warp numbers are additionally checked against the destination map's 1-based warp list.
+Gameplay names must be unique within a map. An unknown `pokeredpc:*` class refuses; a
+third-party class is preserved but ignored by the runtime.
 
 Extractor-authored Kanto objects additionally carry `pokeredpc:legacy`, compact JSON of the
 exact former runtime record. This preserves ordered macro arguments and trainer-dialogue
-control characters while common fields remain visible as typed Tiled properties.
+control characters while common fields remain visible as typed Tiled properties. Those
+records are visible but read-only in Studio: rewriting a common field without regenerating
+the exact compatibility payload would make the editor and Engine disagree. New objects on
+the same Kanto map remain editable.
 
 ## Round trips and ownership
 
@@ -112,6 +125,12 @@ of `Ground` and an existing `Collision` layer. When an override layer is first n
 writer inserts that one owned layer and advances `nextlayerid`; it does not reserialize the
 XML tree. The external TSX is read-only in this slice, so its bytes are never rewritten.
 
+Phase 5.4 object edits replace/remove only the selected `pokeredpc:*` object identified by
+its numeric Tiled id, or append a new object to `Gameplay` (creating that group when absent).
+The writer advances `nextobjectid`/`nextlayerid` as needed; other objects, groups, layers,
+properties, and the TSX remain untouched. `data/world.json` is canonical JSON rather than
+source-preserving XML, and its optional `custom` bag survives graph edits.
+
 A project may paint arbitrary 16×16 cells even when its TSX carries optional Gen-1 block
 metadata. A coherent 2×2 group exposes its block id and can be stamped with the block brush;
 a mixed group is valid native geometry and simply has no reconstructed block id.
@@ -119,13 +138,16 @@ a mixed group is valid native geometry and simply has no reconstructed block id.
 ## Verification
 
 - `--schematest` opens the format-2 fixture, checks normalization, path/refusal cases, typed
-  objects, exact no-op save, targeted Ground/Collision writes, and preservation of unknown
-  TMX plus exact TSX bytes.
+  object add/edit/remove, exact snapshots, world-pair mutation/refusal, exact no-op save,
+  targeted Ground/Collision/object writes, and preservation of unknown TMX plus exact TSX
+  bytes.
 - `--tmxtest` drives Main's native placement, collision, atlas quad renderer, and writes
   `game/tmxtest.png`.
 - `--studiotest` mounts the real three-column Studio workspace, renders
   `game/studio_tmx.png`, then creates, paints, fills, block-stamps, collides, undo/redoes,
-  saves, reopens, and child-play-tests a scratch map through real controls.
+  saves, reopens, and child-play-tests a scratch map through real controls. It then creates
+  a second map, places all four gameplay-object kinds, edits a reciprocal world link, and
+  proves a child Engine can traverse the authored warp and seamless edge.
 - The two PNGs must be byte-identical; the fixture currently renders 64×48 pixels.
 - `--projparitytest` deep-compares all 223 native maps with the legacy semantic oracle and
   independently compares all 24 TSX block mappings and composite pixels.

@@ -618,6 +618,38 @@ func _ready() -> void:
 		audio.presynth_all()        # background-build every track so later changes are instant
 
 	var args := OS.get_cmdline_args() + OS.get_cmdline_user_args()
+	# Studio's gh #55 acceptance probe drives real Player input through one authored warp
+	# and one seamless edge before acknowledging readiness. It is deliberately a narrow
+	# child-process contract, not an alternate runtime traversal implementation.
+	var traversed_maps: Array = [center_label]
+	var traverse_ok := true
+	var traverse_error := ""
+	var traverse_arg := _arg_value(args, "--playtest-traverse=")
+	if traverse_arg != "":
+		var legs := traverse_arg.split(";", false)
+		var direction_index := {"down": 0, "up": 1, "left": 2, "right": 3}
+		if legs.size() != 3 or _cell_property_for_probe(str(legs[0])) == null \
+				or _cell_property_for_probe(str(legs[1])) == null \
+				or not direction_index.has(str(legs[2])):
+			traverse_ok = false
+			traverse_error = "invalid play-test traversal route"
+		else:
+			var first_map := center_label
+			var warp_cell: Vector2i = _cell_property_for_probe(str(legs[0]))
+			if not await _pt_walk_to(warp_cell, 120) or center_label == first_map:
+				traverse_ok = false
+				traverse_error = "authored warp did not change maps"
+			else:
+				traversed_maps.append(center_label)
+				var warp_destination := center_label
+				var edge_cell: Vector2i = _cell_property_for_probe(str(legs[1]))
+				if not await _pt_walk_to(edge_cell, 120) \
+						or not await _pt_step(int(direction_index[str(legs[2])])) \
+						or center_label == warp_destination:
+					traverse_ok = false
+					traverse_error = "authored seamless edge did not change maps"
+				else:
+					traversed_maps.append(center_label)
 	var playtest_handshake := _arg_value(args, "--playtest-handshake=")
 	if playtest_handshake != "":
 		var inspected_cells := {}
@@ -638,6 +670,9 @@ func _ready() -> void:
 			"start_cell": [player.cell.x, player.cell.y],
 			"start_walkable": _cell_walkable(player.cell),
 			"inspected_cells": inspected_cells,
+			"traverse_ok": traverse_ok,
+			"traverse_error": traverse_error,
+			"traversed_maps": traversed_maps,
 			"save_path": ProjectSettings.globalize_path(SAVE_PATH),
 			"save_slot": _arg_value(args, "--saveslot="),
 			"token": _arg_value(args, "--playtest-token="),
@@ -5537,6 +5572,7 @@ func _schematest() -> void:
 		and int((tmx.get("ids", {}) as Dictionary).get("event", 0)) == 1,
 		"; ".join(PackedStringArray(tmx.get("errors", [])))) and ok
 	ok = preload("res://core/MapDocumentSmoke.gd").new().run() and ok
+	ok = preload("res://core/WorldDocumentSmoke.gd").new().run() and ok
 	var cases := [
 		["broken_unknown_field", "unknown field 'prise'"],
 		["broken_wrong_type", "expected integer"],
@@ -5943,6 +5979,14 @@ func _arg_value(args, prefix: String) -> String:
 		if str(arg).begins_with(prefix):
 			return str(arg).substr(prefix.length())
 	return ""
+
+
+func _cell_property_for_probe(raw: String):
+	var pieces := raw.split(",", false)
+	if pieces.size() != 2 or not str(pieces[0]).is_valid_int() \
+			or not str(pieces[1]).is_valid_int():
+		return null
+	return Vector2i(int(pieces[0]), int(pieces[1]))
 
 
 func _is_automated_run(user_args) -> bool:

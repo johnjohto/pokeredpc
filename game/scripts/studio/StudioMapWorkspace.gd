@@ -7,6 +7,7 @@ signal document_saved(path: String)
 signal playtest_requested(map_label: String)
 
 var document: MapDocument
+var world_document = null
 var canvas: StudioMapCanvas
 var palette
 var _status: Label
@@ -21,7 +22,27 @@ var _tool_buttons := {}
 var _undo: Array[Dictionary] = []
 var _redo: Array[Dictionary] = []
 var _stroke_before: Dictionary = {}
-var _saved_state: Dictionary = {}
+var _map_labels: Array = []
+var _object_list: OptionButton
+var _object_id: LineEdit
+var _object_x: SpinBox
+var _object_y: SpinBox
+var _object_event: LineEdit
+var _object_detail_a: LineEdit
+var _object_detail_b: LineEdit
+var _object_detail_c: LineEdit
+var _object_number_a: SpinBox
+var _object_number_b: SpinBox
+var _object_apply: Button
+var _object_delete: Button
+var _selected_object_kind := ""
+var _selected_object_id := ""
+var _connection_list: OptionButton
+var _connection_direction: OptionButton
+var _connection_map: OptionButton
+var _connection_offset: SpinBox
+var _connection_apply: Button
+var _connection_delete: Button
 
 
 func _ready() -> void:
@@ -31,12 +52,13 @@ func _ready() -> void:
 	size_flags_vertical = Control.SIZE_EXPAND_FILL
 
 
-func bind_document(value: MapDocument) -> String:
+func bind_document(value: MapDocument, world = null, map_labels: Array = []) -> String:
 	document = value
+	world_document = world
+	_map_labels = map_labels.duplicate()
 	_undo.clear()
 	_redo.clear()
 	_stroke_before = {}
-	_saved_state = document.edit_state()
 	_selected_tile = clampi(_selected_tile, 0, int(document.tileset.get("tile_count", 1)) - 1)
 	_build_ui()
 	var error := canvas.bind_document(document)
@@ -78,7 +100,7 @@ func select_tool(tool: String) -> void:
 
 func begin_stroke() -> void:
 	if _stroke_before.is_empty():
-		_stroke_before = document.edit_state()
+		_stroke_before = _capture_state()
 
 
 func apply_cell(cell: Vector2i) -> bool:
@@ -92,8 +114,10 @@ func apply_cell(cell: Vector2i) -> bool:
 		"fill": changed = document.fill_tile(cell, _selected_tile)
 		"walkable": changed = document.set_walkable(cell, true)
 		"solid": changed = document.set_walkable(cell, false)
+		"warp", "npc", "sign", "trigger": changed = _place_object(_tool, cell)
 	if changed:
 		canvas.queue_redraw()
+		_refresh_object_list()
 		_update_state()
 	return changed
 
@@ -101,7 +125,7 @@ func apply_cell(cell: Vector2i) -> bool:
 func end_stroke() -> void:
 	if _stroke_before.is_empty():
 		return
-	var after := document.edit_state()
+	var after := _capture_state()
 	if not _states_equal(_stroke_before, after):
 		_undo.append(_stroke_before)
 		_redo.clear()
@@ -119,18 +143,22 @@ func paint_once(cell: Vector2i) -> bool:
 func undo() -> void:
 	if _undo.is_empty():
 		return
-	_redo.append(document.edit_state())
-	document.restore_edit_state(_undo.pop_back())
+	_redo.append(_capture_state())
+	_restore_state(_undo.pop_back())
 	canvas.queue_redraw()
+	_refresh_object_list()
+	_refresh_connections()
 	_update_state()
 
 
 func redo() -> void:
 	if _redo.is_empty():
 		return
-	_undo.append(document.edit_state())
-	document.restore_edit_state(_redo.pop_back())
+	_undo.append(_capture_state())
+	_restore_state(_redo.pop_back())
 	canvas.queue_redraw()
+	_refresh_object_list()
+	_refresh_connections()
 	_update_state()
 
 
@@ -138,8 +166,9 @@ func save_to(target_path := "") -> String:
 	if document == null:
 		return "no map document"
 	var error := document.save(target_path)
+	if error == "" and world_document != null and target_path == "":
+		error = world_document.save()
 	if error == "":
-		_saved_state = document.edit_state()
 		_status.text = "Saved · %s" % document.path
 		document_saved.emit(document.path if target_path == "" else target_path)
 	else:
@@ -154,11 +183,20 @@ func revert_document() -> String:
 		var error := str(opened.get("error", "cannot reopen map"))
 		_status.text = "REFUSED — " + error
 		return error
-	return bind_document(opened["document"])
+	var reopened_world = null
+	if world_document != null:
+		var world_opened := preload("res://core/WorldDocument.gd").open(document.project_dir)
+		if not bool(world_opened.get("ok", false)):
+			var world_error := str(world_opened.get("error", "cannot reopen world graph"))
+			_status.text = "REFUSED — " + world_error
+			return world_error
+		reopened_world = world_opened["document"]
+	return bind_document(opened["document"], reopened_world, _map_labels)
 
 
 func is_dirty() -> bool:
-	return document != null and not _states_equal(document.edit_state(), _saved_state)
+	return document != null and (document.is_dirty() \
+		or (world_document != null and world_document.is_dirty()))
 
 
 func undo_control() -> Button:
@@ -233,6 +271,12 @@ func _build_ui() -> void:
 	_add_tool(tool_column, "solid", "Solid")
 	_add_tool(tool_column, "pan", "Pan")
 	tool_column.add_child(HSeparator.new())
+	tool_column.add_child(_section("OBJECTS"))
+	_add_tool(tool_column, "warp", "Place warp")
+	_add_tool(tool_column, "npc", "Place NPC")
+	_add_tool(tool_column, "sign", "Place sign")
+	_add_tool(tool_column, "trigger", "Place trigger")
+	tool_column.add_child(HSeparator.new())
 	tool_column.add_child(_section("TILESET"))
 	var palette_scroll := ScrollContainer.new()
 	palette_scroll.name = "PaletteScroll"
@@ -263,7 +307,7 @@ func _build_ui() -> void:
 
 	var inspector := VBoxContainer.new()
 	inspector.name = "InspectorDock"
-	inspector.custom_minimum_size.x = 190
+	inspector.custom_minimum_size.x = 275
 	body.add_child(inspector)
 	var facts_panel := PanelContainer.new()
 	inspector.add_child(facts_panel)
@@ -275,16 +319,25 @@ func _build_ui() -> void:
 	facts.add_child(_fact("Spawn", str(document.default_spawn)))
 	facts.add_child(_fact("Objects", str(document.objects.size() + document.warps.size()
 		+ document.signs.size() + document.triggers.size())))
-	var layers_panel := PanelContainer.new()
-	layers_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	inspector.add_child(layers_panel)
+	var inspector_scroll := ScrollContainer.new()
+	inspector_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	inspector_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	inspector.add_child(inspector_scroll)
 	var layers := VBoxContainer.new()
-	layers_panel.add_child(layers)
+	layers.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	inspector_scroll.add_child(layers)
 	layers.add_child(_section("LAYERS"))
 	layers.add_child(_layer("▰  Ground", true))
 	layers.add_child(_layer("◇  Collision", false))
 	layers.add_child(_layer("●  Objects", false))
 	layers.add_child(_layer("◆  Triggers", false))
+	layers.add_child(HSeparator.new())
+	_build_object_inspector(layers)
+	if world_document != null:
+		layers.add_child(HSeparator.new())
+		_build_connection_inspector(layers)
+	_refresh_object_list()
+	_refresh_connections()
 
 	_status = Label.new()
 	_status.add_theme_color_override("font_color", StudioTheme.MUTED)
@@ -298,6 +351,282 @@ func _add_tool(parent: Control, key: String, label: String) -> void:
 	button.pressed.connect(func() -> void: select_tool(key))
 	parent.add_child(button)
 	_tool_buttons[key] = button
+
+
+func _place_object(kind: String, cell: Vector2i) -> bool:
+	var suffix := 1
+	var object_id := "%s_%03d" % [kind, suffix]
+	var used := {}
+	for candidate_kind in ["warp", "npc", "sign", "trigger"]:
+		for record in document.records_for_kind(candidate_kind):
+			used[str(record.get("id", ""))] = true
+	while used.has(object_id):
+		suffix += 1
+		object_id = "%s_%03d" % [kind, suffix]
+	var fields := {}
+	match kind:
+		"warp": fields = {"dest_map": document.label, "dest_const": "", "dest_warp": 1}
+		"npc": fields = {"sprite": "SPRITE_RED", "args": ["STAY", "DOWN"], "event": ""}
+		"sign": fields = {"text": "", "event": ""}
+		"trigger": fields = {"width": 1, "height": 1, "event": ""}
+	var error := document.add_typed_object(kind, object_id, cell, fields)
+	if error != "":
+		_status.text = "REFUSED — " + error
+		return false
+	_selected_object_kind = kind
+	_selected_object_id = object_id
+	return true
+
+
+func _build_object_inspector(parent: VBoxContainer) -> void:
+	parent.add_child(_section("OBJECT INSPECTOR"))
+	_object_list = OptionButton.new()
+	_object_list.item_selected.connect(_on_object_selected)
+	parent.add_child(_object_list)
+	_object_id = _inspector_line(parent, "Stable id")
+	_object_x = _inspector_spin(parent, "Cell X", 0, maxi(0, document.width - 1))
+	_object_y = _inspector_spin(parent, "Cell Y", 0, maxi(0, document.height - 1))
+	_object_event = _inspector_line(parent, "Event id")
+	_object_event.placeholder_text = "event:my_event (optional)"
+	_object_detail_a = _inspector_line(parent, "Detail A")
+	_object_detail_b = _inspector_line(parent, "Detail B")
+	_object_detail_c = _inspector_line(parent, "Detail C")
+	_object_number_a = _inspector_spin(parent, "Number A", 1, 256)
+	_object_number_b = _inspector_spin(parent, "Number B", 1, 256)
+	var actions := HBoxContainer.new()
+	parent.add_child(actions)
+	_object_apply = _button("Apply", true)
+	_object_apply.pressed.connect(_apply_object_inspector)
+	actions.add_child(_object_apply)
+	_object_delete = _button("Delete", true)
+	_object_delete.pressed.connect(_delete_selected_object)
+	actions.add_child(_object_delete)
+
+
+func _refresh_object_list() -> void:
+	if _object_list == null:
+		return
+	_object_list.clear()
+	var wanted := -1
+	for kind in ["warp", "npc", "sign", "trigger"]:
+		for record in document.records_for_kind(kind):
+			var object_id := str(record.get("id", ""))
+			_object_list.add_item("%s · %s" % [kind.capitalize(), object_id])
+			var index := _object_list.item_count - 1
+			_object_list.set_item_metadata(index, {"kind": kind, "id": object_id})
+			if kind == _selected_object_kind and object_id == _selected_object_id:
+				wanted = index
+	if _object_list.item_count == 0:
+		_selected_object_kind = ""
+		_selected_object_id = ""
+		_set_object_fields_enabled(false)
+		return
+	if wanted < 0:
+		wanted = 0
+	_object_list.select(wanted)
+	_on_object_selected(wanted)
+
+
+func _on_object_selected(index: int) -> void:
+	if index < 0 or index >= _object_list.item_count:
+		return
+	var metadata: Dictionary = _object_list.get_item_metadata(index)
+	_selected_object_kind = str(metadata.get("kind", ""))
+	_selected_object_id = str(metadata.get("id", ""))
+	var selected: Dictionary = {}
+	for record in document.records_for_kind(_selected_object_kind):
+		if str(record.get("id", "")) == _selected_object_id:
+			selected = record
+			break
+	if selected.is_empty():
+		return
+	_object_id.text = _selected_object_id
+	_object_x.value = int(selected.get("x", 0))
+	_object_y.value = int(selected.get("y", 0))
+	_object_event.text = str(selected.get("event", ""))
+	_object_detail_a.text = ""
+	_object_detail_b.text = ""
+	_object_detail_c.text = ""
+	_object_number_a.value = 1
+	_object_number_b.value = 1
+	_configure_object_field(_object_event, "Event id", _selected_object_kind != "warp")
+	_configure_object_field(_object_detail_a, "Detail A", false)
+	_configure_object_field(_object_detail_b, "Detail B", false)
+	_configure_object_field(_object_detail_c, "Detail C", false)
+	_configure_object_field(_object_number_a, "Number A", false)
+	_configure_object_field(_object_number_b, "Number B", false)
+	match _selected_object_kind:
+		"warp":
+			_configure_object_field(_object_detail_a, "Destination map", true)
+			_configure_object_field(_object_detail_b, "Ruleset destination", true)
+			_configure_object_field(_object_number_a, "Destination warp", true)
+			_object_detail_b.placeholder_text = "optional constant"
+			_object_detail_a.text = str(selected.get("dest_map", ""))
+			_object_detail_b.text = str(selected.get("dest_const", ""))
+			_object_number_a.value = int(selected.get("dest_warp", 1))
+		"npc":
+			_configure_object_field(_object_detail_a, "Sprite", true)
+			_configure_object_field(_object_detail_b, "Movement", true)
+			_configure_object_field(_object_detail_c, "Facing", true)
+			var args: Array = selected.get("args", ["STAY", "NONE"])
+			_object_detail_a.text = str(selected.get("sprite", ""))
+			_object_detail_b.text = str(args[0])
+			_object_detail_c.text = str(args[1])
+		"sign":
+			_configure_object_field(_object_detail_a, "Inline text", true)
+			_object_detail_a.placeholder_text = "optional when an event is set"
+			_object_detail_a.text = str(selected.get("text", ""))
+		"trigger":
+			_configure_object_field(_object_number_a, "Region width (cells)", true)
+			_configure_object_field(_object_number_b, "Region height (cells)", true)
+			_object_number_a.value = int(selected.get("width", 1))
+			_object_number_b.value = int(selected.get("height", 1))
+	var locked := bool(selected.get("_legacy_locked", false))
+	_set_object_fields_enabled(not locked)
+	if locked and _status != null:
+		_status.text = "Imported legacy object · read-only compatibility payload"
+
+
+func _set_object_fields_enabled(enabled: bool) -> void:
+	for control in [_object_id, _object_x, _object_y, _object_event, _object_detail_a,
+			_object_detail_b, _object_detail_c, _object_number_a, _object_number_b]:
+		if control != null:
+			control.editable = enabled
+	if _object_apply != null:
+		_object_apply.disabled = not enabled
+	if _object_delete != null:
+		_object_delete.disabled = not enabled
+
+
+func _apply_object_inspector() -> void:
+	if _selected_object_kind == "" or _selected_object_id == "":
+		return
+	var before := _capture_state()
+	var values := {"id": _object_id.text.strip_edges(), "x": int(_object_x.value),
+		"y": int(_object_y.value), "event": _object_event.text.strip_edges()}
+	match _selected_object_kind:
+		"warp":
+			values.merge({"dest_map": _object_detail_a.text.strip_edges(),
+				"dest_const": _object_detail_b.text.strip_edges(),
+				"dest_warp": int(_object_number_a.value)})
+		"npc": values.merge({"sprite": _object_detail_a.text.strip_edges(),
+			"args": [_object_detail_b.text.strip_edges(), _object_detail_c.text.strip_edges()]})
+		"sign": values["text"] = _object_detail_a.text
+		"trigger": values.merge({"width": int(_object_number_a.value),
+			"height": int(_object_number_b.value)})
+	var new_id := str(values["id"])
+	var error := document.update_typed_object(_selected_object_kind, _selected_object_id, values)
+	if error != "":
+		_status.text = "REFUSED — " + error
+		return
+	_selected_object_id = new_id
+	_commit_discrete_edit(before)
+	canvas.queue_redraw()
+	_refresh_object_list()
+
+
+func _delete_selected_object() -> void:
+	if _selected_object_kind == "" or _selected_object_id == "":
+		return
+	var before := _capture_state()
+	var error := document.remove_typed_object(_selected_object_kind, _selected_object_id)
+	if error != "":
+		_status.text = "REFUSED — " + error
+		return
+	_selected_object_kind = ""
+	_selected_object_id = ""
+	_commit_discrete_edit(before)
+	canvas.queue_redraw()
+	_refresh_object_list()
+
+
+func _build_connection_inspector(parent: VBoxContainer) -> void:
+	parent.add_child(_section("WORLD CONNECTIONS"))
+	_connection_list = OptionButton.new()
+	_connection_list.item_selected.connect(_on_connection_selected)
+	parent.add_child(_connection_list)
+	_connection_direction = OptionButton.new()
+	for direction in ["north", "south", "west", "east"]:
+		_connection_direction.add_item(direction.capitalize())
+		_connection_direction.set_item_metadata(_connection_direction.item_count - 1, direction)
+	parent.add_child(_connection_direction)
+	_connection_map = OptionButton.new()
+	for map_label in _map_labels:
+		if str(map_label) != document.label:
+			_connection_map.add_item(str(map_label))
+	parent.add_child(_connection_map)
+	_connection_offset = _inspector_spin(parent, "Block offset", -256, 256)
+	_connection_offset.value = 0
+	var actions := HBoxContainer.new()
+	parent.add_child(actions)
+	_connection_apply = _button("Link / Update", _connection_map.item_count == 0)
+	_connection_apply.pressed.connect(_apply_connection)
+	actions.add_child(_connection_apply)
+	_connection_delete = _button("Unlink", true)
+	_connection_delete.pressed.connect(_delete_connection)
+	actions.add_child(_connection_delete)
+
+
+func _refresh_connections() -> void:
+	if _connection_list == null or world_document == null:
+		return
+	_connection_list.clear()
+	for connection in world_document.connections(document.label):
+		_connection_list.add_item("%s · %s · offset %d" % [
+			str(connection.get("direction", "")).capitalize(),
+			str(connection.get("map", "")).trim_prefix("map:"), int(connection.get("offset", 0))])
+		_connection_list.set_item_metadata(_connection_list.item_count - 1, connection)
+	_connection_delete.disabled = _connection_list.item_count == 0
+	if _connection_list.item_count > 0:
+		_connection_list.select(0)
+		_on_connection_selected(0)
+
+
+func _on_connection_selected(index: int) -> void:
+	if index < 0 or index >= _connection_list.item_count:
+		return
+	var connection: Dictionary = _connection_list.get_item_metadata(index)
+	_select_option_metadata(_connection_direction, str(connection.get("direction", "")))
+	_select_option_text(_connection_map, str(connection.get("map", "")).trim_prefix("map:"))
+	_connection_offset.value = int(connection.get("offset", 0))
+
+
+func _apply_connection() -> void:
+	if world_document == null or _connection_map.item_count == 0:
+		return
+	var before := _capture_state()
+	var direction := str(_connection_direction.get_item_metadata(_connection_direction.selected))
+	var destination := _connection_map.get_item_text(_connection_map.selected)
+	var error: String = world_document.set_connection(document.label, direction, destination,
+		int(_connection_offset.value))
+	if error != "":
+		_status.text = "REFUSED — " + error
+		return
+	_commit_discrete_edit(before)
+	_refresh_connections()
+
+
+func _delete_connection() -> void:
+	if world_document == null or _connection_list.selected < 0:
+		return
+	var connection: Dictionary = _connection_list.get_item_metadata(_connection_list.selected)
+	var before := _capture_state()
+	if world_document.remove_connection(document.label, str(connection.get("direction", ""))):
+		_commit_discrete_edit(before)
+		_refresh_connections()
+
+
+func object_controls() -> Dictionary:
+	return {"list": _object_list, "id": _object_id, "x": _object_x, "y": _object_y,
+		"event": _object_event, "detail_a": _object_detail_a, "detail_b": _object_detail_b,
+		"detail_c": _object_detail_c, "number_a": _object_number_a,
+		"number_b": _object_number_b, "apply": _object_apply, "delete": _object_delete}
+
+
+func connection_controls() -> Dictionary:
+	return {"list": _connection_list, "direction": _connection_direction,
+		"map": _connection_map, "offset": _connection_offset, "apply": _connection_apply,
+		"delete": _connection_delete}
 
 
 func _request_playtest() -> void:
@@ -320,10 +649,76 @@ func _update_state() -> void:
 		_tool.capitalize(), _selected_tile, "DIRTY" if dirty else "SAVED"]
 
 
+func _capture_state() -> Dictionary:
+	return {"map": document.edit_state() if document != null else {},
+		"world": world_document.edit_state() if world_document != null else {}}
+
+
+func _restore_state(state: Dictionary) -> void:
+	if document != null:
+		document.restore_edit_state(state.get("map", {}))
+	if world_document != null:
+		world_document.restore_edit_state(state.get("world", {}))
+
+
+func _commit_discrete_edit(before: Dictionary) -> void:
+	var after := _capture_state()
+	if not _states_equal(before, after):
+		_undo.append(before)
+		_redo.clear()
+	_update_state()
+
+
 static func _states_equal(a: Dictionary, b: Dictionary) -> bool:
-	return a.get("tiles", PackedInt32Array()) == b.get("tiles", PackedInt32Array()) \
-		and a.get("walkable", PackedByteArray()) == b.get("walkable", PackedByteArray()) \
-		and bool(a.get("collision_authored", false)) == bool(b.get("collision_authored", false))
+	return a == b
+
+
+static func _inspector_line(parent: VBoxContainer, label_text: String) -> LineEdit:
+	var label := Label.new()
+	label.text = label_text
+	label.add_theme_color_override("font_color", StudioTheme.MUTED)
+	parent.add_child(label)
+	var line := LineEdit.new()
+	line.set_meta("field_label", label)
+	parent.add_child(line)
+	return line
+
+
+static func _inspector_spin(parent: VBoxContainer, label_text: String,
+		minimum: float, maximum: float) -> SpinBox:
+	var label := Label.new()
+	label.text = label_text
+	label.add_theme_color_override("font_color", StudioTheme.MUTED)
+	parent.add_child(label)
+	var spin := SpinBox.new()
+	spin.set_meta("field_label", label)
+	spin.min_value = minimum
+	spin.max_value = maximum
+	spin.step = 1
+	parent.add_child(spin)
+	return spin
+
+
+static func _configure_object_field(control: Control, label_text: String, shown: bool) -> void:
+	control.visible = shown
+	var label = control.get_meta("field_label", null)
+	if label is Label:
+		label.text = label_text
+		label.visible = shown
+
+
+static func _select_option_text(option: OptionButton, wanted: String) -> void:
+	for index in option.item_count:
+		if option.get_item_text(index) == wanted:
+			option.select(index)
+			return
+
+
+static func _select_option_metadata(option: OptionButton, wanted: String) -> void:
+	for index in option.item_count:
+		if str(option.get_item_metadata(index)) == wanted:
+			option.select(index)
+			return
 
 
 static func _button(text: String, disabled: bool) -> Button:

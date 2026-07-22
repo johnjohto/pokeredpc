@@ -34,10 +34,13 @@ var triggers: Array = []
 var properties: Dictionary = {}
 var _first_gid := 1
 var _next_layer_id := 1
+var _next_object_id := 1
 var _has_collision_layer := false
 var _collision_authored := false
 var _saved_tiles := PackedInt32Array()
 var _saved_walkable := PackedByteArray()
+var _saved_objects: Dictionary = {}
+var _saved_next_object_id := 1
 
 
 ## Open maps/<label>.tmx and its external TSX. Returns
@@ -133,6 +136,8 @@ func save(target_path := "") -> String:
 		source_bytes = emitted["bytes"]
 		_saved_tiles = tiles.duplicate()
 		_saved_walkable = walkable.duplicate()
+		_saved_objects = _object_state()
+		_saved_next_object_id = _next_object_id
 		_has_collision_layer = bool(emitted.get("has_collision", _has_collision_layer))
 		_collision_authored = _has_collision_layer
 		_next_layer_id = int(emitted.get("next_layer_id", _next_layer_id))
@@ -140,12 +145,14 @@ func save(target_path := "") -> String:
 
 
 func is_dirty() -> bool:
-	return tiles != _saved_tiles or walkable != _saved_walkable
+	return tiles != _saved_tiles or walkable != _saved_walkable \
+		or _objects_dirty() or _next_object_id != _saved_next_object_id
 
 
 func edit_state() -> Dictionary:
 	return {"tiles": tiles.duplicate(), "walkable": walkable.duplicate(),
-		"collision_authored": _collision_authored}
+		"collision_authored": _collision_authored, "objects": _object_state(),
+		"next_object_id": _next_object_id}
 
 
 func restore_edit_state(state: Dictionary) -> void:
@@ -156,8 +163,80 @@ func restore_edit_state(state: Dictionary) -> void:
 	tiles = restored_tiles.duplicate()
 	walkable = restored_walkable.duplicate()
 	_collision_authored = bool(state.get("collision_authored", _has_collision_layer))
+	var object_state: Dictionary = state.get("objects", {})
+	warps = (object_state.get("warp", []) as Array).duplicate(true)
+	signs = (object_state.get("sign", []) as Array).duplicate(true)
+	objects = (object_state.get("npc", []) as Array).duplicate(true)
+	triggers = (object_state.get("trigger", []) as Array).duplicate(true)
+	_next_object_id = int(state.get("next_object_id", _next_object_id))
 	_refresh_tile_metadata()
 	_rebuild_blocks()
+
+
+## Typed gameplay-object edits. Stable names are the author-facing identity; numeric Tiled
+## ids are private serialization anchors. Imported pokered objects carry an exact legacy
+## payload and remain read-only until that compatibility payload can be regenerated safely.
+func records_for_kind(kind: String) -> Array:
+	return _records_for_kind(kind).duplicate(true)
+
+
+func add_typed_object(kind: String, object_id: String, cell: Vector2i,
+		fields: Dictionary = {}) -> String:
+	if not _records_ref(kind) is Array:
+		return "unknown object kind '%s'" % kind
+	if _find_record(object_id).size() > 0:
+		return "object id '%s' is already in use" % object_id
+	var record := fields.duplicate(true)
+	record["id"] = object_id
+	record["x"] = cell.x
+	record["y"] = cell.y
+	record["_kind"] = kind
+	record["_tiled_id"] = _next_object_id
+	var error := _validate_object(record)
+	if error != "":
+		return error
+	_next_object_id += 1
+	(_records_ref(kind) as Array).append(record)
+	return ""
+
+
+func update_typed_object(kind: String, object_id: String, values: Dictionary) -> String:
+	var records = _records_ref(kind)
+	if not records is Array:
+		return "unknown object kind '%s'" % kind
+	var index := _record_index(records, object_id)
+	if index < 0:
+		return "object '%s' does not exist" % object_id
+	var current: Dictionary = records[index]
+	if bool(current.get("_legacy_locked", false)):
+		return "'%s' is imported legacy data and is read-only" % object_id
+	var edited := current.duplicate(true)
+	for key in values:
+		edited[key] = values[key]
+	edited["_kind"] = kind
+	var new_id := str(edited.get("id", ""))
+	var duplicate := _find_record(new_id)
+	if new_id != object_id and not duplicate.is_empty():
+		return "object id '%s' is already in use" % new_id
+	var error := _validate_object(edited)
+	if error != "":
+		return error
+	records[index] = edited
+	return ""
+
+
+func remove_typed_object(kind: String, object_id: String) -> String:
+	var records = _records_ref(kind)
+	if not records is Array:
+		return "unknown object kind '%s'" % kind
+	var index := _record_index(records, object_id)
+	if index < 0:
+		return "object '%s' does not exist" % object_id
+	var record: Dictionary = records[index]
+	if bool(record.get("_legacy_locked", false)):
+		return "'%s' is imported legacy data and is read-only" % object_id
+	records.remove_at(index)
+	return ""
 
 
 func set_tile(cell: Vector2i, tile_id: int) -> bool:
@@ -255,7 +334,7 @@ func runtime_map() -> Dictionary:
 		"border_tile": border_tile, "default_spawn": [default_spawn.x, default_spawn.y],
 		"warps": _runtime_records(warps), "connections": [],
 		"bg_events": _runtime_records(signs), "object_events": _runtime_records(objects),
-		"triggers": triggers.duplicate(true), "_tileset": tileset.duplicate(true)}
+		"triggers": _runtime_records(triggers), "_tileset": tileset.duplicate(true)}
 	if not blocks.is_empty():
 		out["width"] = block_width
 		out["height"] = block_height
@@ -279,8 +358,92 @@ static func _runtime_records(records: Array) -> Array:
 	var out: Array = []
 	for record in records:
 		var normalized: Dictionary = record
-		out.append((normalized.get("_runtime", normalized) as Dictionary).duplicate(true))
+		var runtime: Dictionary = (normalized.get("_runtime", normalized) as Dictionary).duplicate(true)
+		for key in runtime.keys():
+			if str(key).begins_with("_"):
+				runtime.erase(key)
+		out.append(runtime)
 	return out
+
+
+func _object_state() -> Dictionary:
+	return {"warp": warps.duplicate(true), "sign": signs.duplicate(true),
+		"npc": objects.duplicate(true), "trigger": triggers.duplicate(true)}
+
+
+func _objects_dirty() -> bool:
+	return warps != (_saved_objects.get("warp", []) as Array) \
+		or signs != (_saved_objects.get("sign", []) as Array) \
+		or objects != (_saved_objects.get("npc", []) as Array) \
+		or triggers != (_saved_objects.get("trigger", []) as Array)
+
+
+func _records_for_kind(kind: String) -> Array:
+	match kind:
+		"warp": return warps
+		"sign": return signs
+		"npc": return objects
+		"trigger": return triggers
+	return []
+
+
+func _records_ref(kind: String):
+	match kind:
+		"warp": return warps
+		"sign": return signs
+		"npc": return objects
+		"trigger": return triggers
+	return null
+
+
+func _find_record(object_id: String) -> Dictionary:
+	for kind in ["warp", "sign", "npc", "trigger"]:
+		for record in _records_for_kind(kind):
+			if str(record.get("id", "")) == object_id:
+				return record
+	return {}
+
+
+static func _record_index(records: Array, object_id: String) -> int:
+	for index in records.size():
+		if str((records[index] as Dictionary).get("id", "")) == object_id:
+			return index
+	return -1
+
+
+func _validate_object(record: Dictionary) -> String:
+	var object_id := str(record.get("id", ""))
+	var id_regex := RegEx.new()
+	id_regex.compile("^[A-Za-z][A-Za-z0-9_.:@,-]*$")
+	if id_regex.search(object_id) == null:
+		return "object id must start with a letter and use only letters, numbers, or . _ : @ , -"
+	var cell := Vector2i(int(record.get("x", -1)), int(record.get("y", -1)))
+	if not _contains(cell):
+		return "object '%s' at %s is outside the map" % [object_id, str(cell)]
+	var event_id := str(record.get("event", ""))
+	if event_id != "" and not event_id.begins_with("event:"):
+		return "object '%s' event must use the event: prefix" % object_id
+	match str(record.get("_kind", "")):
+		"warp":
+			var destination := str(record.get("dest_map", ""))
+			var destination_constant := str(record.get("dest_const", ""))
+			if destination == "" and destination_constant == "":
+				return "warp '%s' needs a destination map or ruleset destination" % object_id
+			if int(record.get("dest_warp", 0)) < 1:
+				return "warp '%s' destination warp must be at least 1" % object_id
+		"npc":
+			if str(record.get("sprite", "")) == "":
+				return "NPC '%s' needs a sprite" % object_id
+			var args: Array = record.get("args", [])
+			if args.size() < 2:
+				return "NPC '%s' needs movement and facing values" % object_id
+		"trigger":
+			var region := Vector2i(int(record.get("width", 1)), int(record.get("height", 1)))
+			if region.x < 1 or region.y < 1 or cell.x + region.x > width or cell.y + region.y > height:
+				return "trigger '%s' region must be positive and stay inside the map" % object_id
+		"sign": pass
+		_: return "unknown object kind '%s'" % str(record.get("_kind", ""))
+	return ""
 
 
 func tile_at(cell: Vector2i) -> int:
@@ -327,6 +490,7 @@ func _load(project_root: String, map_label: String) -> String:
 		return "%s — expected <map>, got <%s>" % [path, str(root.get("name", ""))]
 	var attrs: Dictionary = root["attrs"]
 	_next_layer_id = maxi(1, _attr_int(attrs, "nextlayerid", 1))
+	_next_object_id = maxi(1, _attr_int(attrs, "nextobjectid", 1))
 	if str(attrs.get("orientation", "")) != "orthogonal":
 		return "%s — only orthogonal TMX maps are supported" % path
 	if _attr_int(attrs, "tilewidth", -1) != CELL_SIZE or _attr_int(attrs, "tileheight", -1) != CELL_SIZE:
@@ -408,6 +572,8 @@ func _load(project_root: String, map_label: String) -> String:
 		return objects_error
 	_saved_tiles = tiles.duplicate()
 	_saved_walkable = walkable.duplicate()
+	_saved_objects = _object_state()
+	_saved_next_object_id = _next_object_id
 	return ""
 
 
@@ -613,12 +779,19 @@ func _parse_objects(root: Dictionary) -> String:
 		for object_node in _children(group_node, "object"):
 			var node: Dictionary = object_node
 			var attrs: Dictionary = node["attrs"]
+			var tiled_id := _attr_int(attrs, "id", -1)
+			if tiled_id >= 0:
+				_next_object_id = maxi(_next_object_id, tiled_id + 1)
 			var object_class := str(attrs.get("class", attrs.get("type", "")))
 			if not object_class.begins_with("pokeredpc:"):
 				continue                         # third-party/Tiled objects round-trip untouched
+			if tiled_id < 1:
+				return "%s — %s object needs a positive Tiled id" % [path, object_class]
 			var object_name := str(attrs.get("name", ""))
 			if object_name == "":
 				return "%s — %s object needs a stable Tiled name" % [path, object_class]
+			if not _find_record(object_name).is_empty():
+				return "%s — duplicate gameplay object id '%s'" % [path, object_name]
 			var px := float(attrs.get("x", "0"))
 			var py := float(attrs.get("y", "0"))
 			var cx := roundi(px / CELL_SIZE)
@@ -637,6 +810,8 @@ func _parse_objects(root: Dictionary) -> String:
 					return "%s — object '%s' has invalid pokeredpc:legacy JSON" % [path, object_name]
 				if int(legacy.get("x", -1)) != cx or int(legacy.get("y", -1)) != cy:
 					return "%s — object '%s' legacy position disagrees with Tiled point" % [path, object_name]
+			var metadata := {"_tiled_id": tiled_id, "_kind": object_class.trim_prefix("pokeredpc:"),
+				"_legacy_locked": legacy != null}
 			match object_class:
 				"pokeredpc:warp":
 					var dest := str(props.get("pokeredpc:dest_map", ""))
@@ -649,6 +824,7 @@ func _parse_objects(root: Dictionary) -> String:
 						"dest_map": dest.substr(4) if dest != "" else "",
 						"dest_const": dest_const,
 						"dest_warp": int(props.get("pokeredpc:dest_warp", 1))}
+					warp.merge(metadata)
 					if legacy != null:
 						warp["_runtime"] = legacy
 					warps.append(warp)
@@ -656,6 +832,7 @@ func _parse_objects(root: Dictionary) -> String:
 					var sign := {"id": object_name, "x": cx, "y": cy,
 						"text": str(props.get("pokeredpc:text", "")),
 						"event": str(props.get("pokeredpc:event", ""))}
+					sign.merge(metadata)
 					if legacy != null:
 						sign["_runtime"] = legacy
 					signs.append(sign)
@@ -667,12 +844,28 @@ func _parse_objects(root: Dictionary) -> String:
 						"args": [str(props.get("pokeredpc:movement", "STAY")),
 							str(props.get("pokeredpc:facing", "NONE"))],
 						"event": str(props.get("pokeredpc:event", ""))}
+					object.merge(metadata)
 					if legacy != null:
 						object["_runtime"] = legacy
 					objects.append(object)
 				"pokeredpc:trigger":
-					triggers.append({"id": object_name, "x": cx, "y": cy,
-						"event": str(props.get("pokeredpc:event", ""))})
+					var pixel_width := float(attrs.get("width", "0"))
+					var pixel_height := float(attrs.get("height", "0"))
+					var region_width := 1 if is_zero_approx(pixel_width) else roundi(pixel_width / CELL_SIZE)
+					var region_height := 1 if is_zero_approx(pixel_height) else roundi(pixel_height / CELL_SIZE)
+					if (not is_zero_approx(pixel_width) and not is_equal_approx(pixel_width,
+							float(region_width * CELL_SIZE))) or (not is_zero_approx(pixel_height)
+							and not is_equal_approx(pixel_height, float(region_height * CELL_SIZE))):
+						return "%s — trigger '%s' must align to the %dpx cell grid" % [
+							path, object_name, CELL_SIZE]
+					var trigger := {"id": object_name, "x": cx, "y": cy,
+						"width": region_width, "height": region_height,
+						"event": str(props.get("pokeredpc:event", ""))}
+					trigger.merge(metadata)
+					var trigger_error := _validate_object(trigger)
+					if trigger_error != "":
+						return "%s — %s" % [path, trigger_error]
+					triggers.append(trigger)
 				_:
 					return "%s — unknown pokeredpc object class '%s'" % [path, object_class]
 	return ""
@@ -703,8 +896,162 @@ func _edited_source() -> Dictionary:
 		source = str(inserted["source"])
 		has_collision = true
 		next_id += 1
+	if _objects_dirty() or _next_object_id != _saved_next_object_id:
+		var object_patch := _patch_objects(source, next_id)
+		if not bool(object_patch.get("ok", false)):
+			return object_patch
+		source = str(object_patch["source"])
+		next_id = int(object_patch.get("next_layer_id", next_id))
 	return {"ok": true, "bytes": source.to_utf8_buffer(), "has_collision": has_collision,
 		"next_layer_id": next_id}
+
+
+func _patch_objects(source: String, next_layer_id: int) -> Dictionary:
+	var saved_by_tiled_id := _records_by_tiled_id(_saved_objects)
+	var current_state := _object_state()
+	var current_by_tiled_id := _records_by_tiled_id(current_state)
+	# Existing owned objects are individually replaced/removed by their private numeric id;
+	# other object groups and third-party objects never enter this loop.
+	for tiled_id in saved_by_tiled_id:
+		var old_record: Dictionary = saved_by_tiled_id[tiled_id]
+		if not current_by_tiled_id.has(tiled_id):
+			var removed := _replace_tiled_object(source, int(tiled_id), "")
+			if not bool(removed.get("ok", false)):
+				return removed
+			source = str(removed["source"])
+		elif (current_by_tiled_id[tiled_id] as Dictionary) != old_record:
+			var replaced := _replace_tiled_object(source, int(tiled_id),
+				_object_xml(current_by_tiled_id[tiled_id]))
+			if not bool(replaced.get("ok", false)):
+				return replaced
+			source = str(replaced["source"])
+	var additions: Array = []
+	for kind in ["warp", "sign", "npc", "trigger"]:
+		for record in current_state.get(kind, []):
+			if not saved_by_tiled_id.has(int(record.get("_tiled_id", -1))):
+				additions.append(record)
+	if not additions.is_empty():
+		var inserted := _insert_gameplay_objects(source, additions, next_layer_id)
+		if not bool(inserted.get("ok", false)):
+			return inserted
+		source = str(inserted["source"])
+		next_layer_id = int(inserted.get("next_layer_id", next_layer_id))
+	var next_patch := _set_root_int_attribute(source, "nextobjectid", _next_object_id)
+	if not bool(next_patch.get("ok", false)):
+		return next_patch
+	return {"ok": true, "source": next_patch["source"], "next_layer_id": next_layer_id}
+
+
+static func _records_by_tiled_id(state: Dictionary) -> Dictionary:
+	var out := {}
+	for kind in ["warp", "sign", "npc", "trigger"]:
+		for record in state.get(kind, []):
+			var tiled_id := int(record.get("_tiled_id", -1))
+			if tiled_id >= 1:
+				out[tiled_id] = record
+	return out
+
+
+static func _replace_tiled_object(source: String, tiled_id: int, replacement: String) -> Dictionary:
+	var regex := RegEx.new()
+	var error := regex.compile("(?s)<object\\b[^>]*\\bid=\"%d\"[^>]*(?:/>|>.*?</object>)" % tiled_id)
+	if error != OK:
+		return {"ok": false, "error": "cannot compile targeted object writer"}
+	var matched := regex.search(source)
+	if matched == null:
+		return {"ok": false, "error": "cannot find editable Tiled object id %d" % tiled_id}
+	return {"ok": true, "source": source.substr(0, matched.get_start()) + replacement +
+		source.substr(matched.get_end())}
+
+
+func _insert_gameplay_objects(source: String, additions: Array, next_layer_id: int) -> Dictionary:
+	var newline := "\r\n" if "\r\n" in source else "\n"
+	var object_source := ""
+	for record in additions:
+		object_source += "  " + _object_xml(record).replace("\n", newline + "  ") + newline
+	var group_regex := RegEx.new()
+	group_regex.compile("<objectgroup\\b[^>]*\\bname=\"Gameplay\"[^>]*>")
+	var group := group_regex.search(source)
+	if group != null:
+		var group_end := source.find("</objectgroup>", group.get_end())
+		if group_end < 0:
+			return {"ok": false, "error": "malformed Gameplay object group"}
+		return {"ok": true, "source": source.substr(0, group_end) + object_source +
+			source.substr(group_end), "next_layer_id": next_layer_id}
+	var map_end := source.find("</map>")
+	if map_end < 0:
+		return {"ok": false, "error": "cannot find Gameplay insertion point"}
+	var layer_patch := _set_root_int_attribute(source, "nextlayerid", next_layer_id + 1)
+	if not bool(layer_patch.get("ok", false)):
+		return layer_patch
+	source = str(layer_patch["source"])
+	map_end = source.find("</map>")
+	var group_source := " <objectgroup id=\"%d\" name=\"Gameplay\">%s%s </objectgroup>%s" % [
+		next_layer_id, newline, object_source, newline]
+	return {"ok": true, "source": source.substr(0, map_end) + group_source +
+		source.substr(map_end), "next_layer_id": next_layer_id + 1}
+
+
+func _object_xml(record: Dictionary) -> String:
+	var kind := str(record.get("_kind", ""))
+	var attrs := "<object id=\"%d\" name=\"%s\" class=\"pokeredpc:%s\" x=\"%d\" y=\"%d\"" % [
+		int(record.get("_tiled_id", -1)), _xml_escape(str(record.get("id", ""))), kind,
+		int(record.get("x", 0)) * CELL_SIZE, int(record.get("y", 0)) * CELL_SIZE]
+	if kind == "trigger":
+		attrs += " width=\"%d\" height=\"%d\"" % [
+			int(record.get("width", 1)) * CELL_SIZE, int(record.get("height", 1)) * CELL_SIZE]
+	var lines := PackedStringArray([attrs + ">"])
+	if kind != "trigger":
+		lines.append(" <point/>")
+	lines.append(" <properties>")
+	match kind:
+		"warp":
+			if str(record.get("dest_const", "")) != "":
+				lines.append(_property_xml("pokeredpc:dest_const", record.get("dest_const", "")))
+			if str(record.get("dest_map", "")) != "":
+				lines.append(_property_xml("pokeredpc:dest_map", "map:" + str(record.get("dest_map", ""))))
+			lines.append(_property_xml("pokeredpc:dest_warp", int(record.get("dest_warp", 1)), "int"))
+		"npc":
+			var args: Array = record.get("args", ["STAY", "NONE"])
+			lines.append(_property_xml("pokeredpc:sprite", record.get("sprite", "")))
+			lines.append(_property_xml("pokeredpc:movement", args[0]))
+			lines.append(_property_xml("pokeredpc:facing", args[1]))
+			if str(record.get("event", "")) != "":
+				lines.append(_property_xml("pokeredpc:event", record.get("event", "")))
+		"sign":
+			if str(record.get("text", "")) != "":
+				lines.append(_property_xml("pokeredpc:text", record.get("text", "")))
+			if str(record.get("event", "")) != "":
+				lines.append(_property_xml("pokeredpc:event", record.get("event", "")))
+		"trigger":
+			if str(record.get("event", "")) != "":
+				lines.append(_property_xml("pokeredpc:event", record.get("event", "")))
+	lines.append(" </properties>")
+	lines.append("</object>")
+	return "\n".join(lines)
+
+
+static func _property_xml(name: String, value: Variant, type := "") -> String:
+	return "  <property name=\"%s\"%s value=\"%s\"/>" % [_xml_escape(name),
+		" type=\"%s\"" % type if type != "" else "", _xml_escape(str(value))]
+
+
+static func _set_root_int_attribute(source: String, attribute: String, value: int) -> Dictionary:
+	var map_start := source.find("<map")
+	var map_end := source.find(">", map_start)
+	if map_start < 0 or map_end < 0:
+		return {"ok": false, "error": "cannot find TMX map root"}
+	var key := attribute + "=\""
+	var at := source.find(key, map_start)
+	if at >= 0 and at < map_end:
+		var value_start := at + key.length()
+		var value_end := source.find("\"", value_start)
+		if value_end < 0 or value_end > map_end:
+			return {"ok": false, "error": "malformed %s attribute" % attribute}
+		return {"ok": true, "source": source.substr(0, value_start) + str(value) +
+			source.substr(value_end)}
+	return {"ok": true, "source": source.substr(0, map_end) + " %s=\"%d\"" % [
+		attribute, value] + source.substr(map_end)}
 
 
 func _tile_csv() -> String:

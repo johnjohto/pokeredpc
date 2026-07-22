@@ -45,6 +45,8 @@ static func validate_project(dir: String) -> Dictionary:
 	var ids := {}                       # prefix -> {full_id: true}
 	var refs: Array = []                # {prefix, value, path(file-qualified)}
 	var events: Array = []              # event records, for the semantic pass (gh #42)
+	var native_maps := {}               # map id -> MapDocument, for destination-warp bounds
+	var native_warps: Array = []        # deferred until every destination map has loaded
 	var project_format := 0
 
 	# The manifest gates everything: read it first so a format refusal leads the report.
@@ -79,11 +81,13 @@ static func validate_project(dir: String) -> Dictionary:
 				continue
 			_register_native_map(entry, rel, ids)
 			var document: MapDocument = opened["document"]
+			native_maps["map:" + map_label] = document
 			for warp in document.warps:
 				var dest_map := str(warp.get("dest_map", ""))
 				if dest_map != "":               # LAST_MAP is a ruleset sentinel, not a map id
 					refs.append({"prefix": "map", "value": "map:" + dest_map,
 						"path": "%s: warp '%s'/pokeredpc:dest_map" % [rel, str(warp.get("id", ""))]})
+					native_warps.append({"rel": rel, "warp": warp})
 			for object in document.objects + document.signs + document.triggers:
 				var event_id := str(object.get("event", ""))
 				if event_id != "":
@@ -113,6 +117,10 @@ static func validate_project(dir: String) -> Dictionary:
 			_register_declared(entry["declares"], inst, ids)
 
 	_check_events(dir, events, errors)
+	if project_format >= 2:
+		var world = _load_json_file(dir.path_join("data/world.json"), [])
+		if world is Dictionary:
+			errors.append_array(preload("res://core/WorldDocument.gd").validate_data(dir, world))
 
 	for r in refs:
 		var prefix := str(r["prefix"])
@@ -120,6 +128,17 @@ static func validate_project(dir: String) -> Dictionary:
 		if not have.has(str(r["value"])):
 			errors.append("%s — dangling reference '%s' — no %s with that id"
 				% [r["path"], r["value"], prefix])
+	for pending in native_warps:
+		var warp: Dictionary = pending["warp"]
+		var destination_id := "map:" + str(warp.get("dest_map", ""))
+		if not native_maps.has(destination_id):
+			continue # The generic reference pass already names a missing destination map.
+		var destination: MapDocument = native_maps[destination_id]
+		var destination_warp := int(warp.get("dest_warp", 0))
+		if destination_warp < 1 or destination_warp > destination.warps.size():
+			errors.append("%s: warp '%s'/pokeredpc:dest_warp — %s has %d warps, not warp %d" % [
+				str(pending["rel"]), str(warp.get("id", "")), destination_id,
+				destination.warps.size(), destination_warp])
 
 	var counts := {}
 	for prefix in ids:

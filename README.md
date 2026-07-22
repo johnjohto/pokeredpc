@@ -20,7 +20,7 @@ RPGs without opening the Godot editor.
 | Native Pokémon Red | **v1.2.0 shipped** — all 223 maps, complete critical path, battles, saves, audio, and Cable Club multiplayer |
 | v2 Core | **Phases 1–3 complete** — versioned projects, stable IDs, ruleset modules, formulas, and authored Event VM |
 | Studio | **Phase 4 complete** — project browser, schema-driven content editors, validation, canonical Save/Revert, and isolated live play-test |
-| Maps and events | **Phase 5 active** — all 223 Kanto maps use native Tiled TMX/TSX; Studio map creation, painting, collision, undo/redo, and direct play-test are live |
+| Maps and events | **Phase 5 active** — native TMX map painting plus typed warp/NPC/sign/trigger placement, reciprocal world connections, undo/redo, and direct play-test are live |
 
 The detailed, evidence-backed tracker is [docs/roadmap.md](docs/roadmap.md). The v2 product
 direction lives in [docs/v2/plan.md](docs/v2/plan.md), and the supplied Studio reference
@@ -61,8 +61,9 @@ pwsh tools/run.ps1 --studio
 Studio opens as a native, resizable 1280×800 desktop application with a persistent 80–200%
 UI-scale slider (125% by default). It currently edits
 species, moves, items, and trainers, validates through the same Core schemas the Engine
-uses, creates and paints native maps, and launches a separate play-test process with an
-isolated save. Do not edit the extractor-owned `game/project` in place; copy it to a creator
+uses, creates and paints native maps, places typed gameplay objects, edits seamless world
+connections, and launches a separate play-test process with an isolated save. Do not edit
+the extractor-owned `game/project` in place; copy it to a creator
 workspace and open that copy.
 
 Developers can open the focused Phase-5 native-map tracer directly:
@@ -72,9 +73,10 @@ pwsh tools/run.ps1 --studio-map-fixture
 ```
 
 The map workspace supports a tileset palette, tile/erase/fill and optional Gen-1 block
-brushes, per-cell collision, pan/zoom, exact undo/redo, source-preserving Save/Revert, and
-play-testing directly on the active map. Objects, world connections, event authoring, and
-softlock lints are the remaining Phase-5 slices. MIDI and pluggable chiptune import are
+brushes, per-cell collision, pan/zoom, typed warp/NPC/sign/trigger tools and inspectors,
+reciprocal cardinal world links, exact unified undo/redo, source-preserving Save/Revert,
+and play-testing directly on the active map. Event authoring and softlock lints are the
+remaining Phase-5 slices. MIDI and pluggable chiptune import are
 tracked for the later asset-pipeline phase in
 [gh #60](https://github.com/johnjohto/pokeredpc/issues/60).
 

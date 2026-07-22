@@ -64,7 +64,11 @@ without guessing.
 
 Phase 5.1's read-only tracer should already establish this composition even when some rails
 contain placeholders. Phase 5.3 fills those surfaces with painting, collision, block-brush,
-and undo controls rather than replacing the composition.
+and undo controls rather than replacing the composition. Phase 5.4 turns the object/trigger
+placeholders into tools and a scrolling typed inspector, then adds the current map's world
+connections below them. Kind-specific fields replace generic labels; imported compatibility
+objects clearly present as read-only. Both local objects and reciprocal links use the same
+action bar, dirty state, and undo/redo language as painting.
 
 ## Scale and accessibility
 

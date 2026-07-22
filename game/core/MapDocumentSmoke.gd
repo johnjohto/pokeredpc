@@ -79,6 +79,61 @@ func run() -> bool:
 			and edited_source.contains("third-party:weather")
 			and edited_source.contains("third-party:intensity")
 			and tsx_before == tsx_after, targeted_error) and ok
+		if bool(reopened.get("ok", false)):
+			var authored: MapDocument = reopened["document"]
+			var object_before := authored.edit_state()
+			var object_error := authored.add_typed_object("warp", "studio_door",
+				Vector2i(0, 1), {"dest_map": "TestTown", "dest_const": "", "dest_warp": 1})
+			if object_error == "":
+				object_error = authored.add_typed_object("npc", "studio_guide",
+					Vector2i(1, 1), {"sprite": "SPRITE_TESTER", "args": ["STAY", "DOWN"],
+						"event": "event:test_event"})
+			if object_error == "":
+				object_error = authored.add_typed_object("sign", "studio_sign",
+					Vector2i(2, 2), {"text": "Hello", "event": ""})
+			if object_error == "":
+				object_error = authored.add_typed_object("trigger", "studio_trigger",
+					Vector2i(0, 2), {"width": 2, "height": 1, "event": "event:test_event"})
+			if object_error == "":
+				object_error = authored.update_typed_object("sign", "studio_sign",
+					{"id": "studio_notice", "x": 3, "text": "Welcome"})
+			var object_after := authored.edit_state()
+			authored.restore_edit_state(object_before)
+			var object_undo := authored.edit_state() == object_before
+			authored.restore_edit_state(object_after)
+			var object_save := authored.save()
+			var object_reopened := MapDocument.open(edit_scratch, "TestTown")
+			var object_source := FileAccess.get_file_as_string(authored.path)
+			var persisted: MapDocument = object_reopened.get("document")
+			ok = _check("typed objects add/edit as one exact undoable document state",
+				object_error == "" and object_undo and object_save == ""
+				and bool(object_reopened.get("ok", false)) and persisted.warps.size() == 2
+				and persisted.objects.size() == 2 and persisted.signs.size() == 1
+				and persisted.triggers.size() == 1
+				and str(persisted.signs[0].get("id", "")) == "studio_notice"
+				and int(persisted.signs[0].get("x", -1)) == 3,
+				object_error + object_save + str(object_reopened.get("error", ""))) and ok
+			var runtime_objects: Array = persisted.runtime_map().get("object_events", []) \
+				if bool(object_reopened.get("ok", false)) else []
+			ok = _check("targeted object writer preserves unrelated TMX and hides editor metadata",
+				object_source.contains("third-party:weather")
+				and object_source.contains("third-party:intensity")
+				and object_source.contains("name=\"studio_trigger\"")
+				and not runtime_objects.is_empty()
+				and not (runtime_objects[-1] as Dictionary).has("_tiled_id")) and ok
+			if bool(object_reopened.get("ok", false)):
+				var remove_error := persisted.remove_typed_object("npc", "studio_guide")
+				if remove_error == "":
+					remove_error = persisted.update_typed_object("warp", "studio_door",
+						{"dest_warp": 2})
+				var remove_save := persisted.save()
+				var final_open := MapDocument.open(edit_scratch, "TestTown")
+				var final_doc: MapDocument = final_open.get("document")
+				ok = _check("existing typed objects update/remove and reopen without drift",
+					remove_error == "" and remove_save == "" and bool(final_open.get("ok", false))
+					and final_doc.objects.size() == 1 and final_doc.warps.size() == 2
+					and int(final_doc.warps[-1].get("dest_warp", 0)) == 2,
+					remove_error + remove_save + str(final_open.get("error", ""))) and ok
 
 	var scratch := OS.get_user_data_dir().path_join("mapdoc_malformed")
 	if DirAccess.dir_exists_absolute(scratch):
