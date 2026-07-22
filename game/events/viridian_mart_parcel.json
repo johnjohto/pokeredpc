@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/ViridianMart.asm — the parcel errand: the clerk calls you over on the first visit after getting a starter.",
+ "$comment": "scripts/ViridianMart.asm — the parcel errand, FULLY AUTHORED (wave C): on the first visit after getting a starter the clerk calls you over, walks you to the counter front (the cell two east of him, never ON the counter), hands over OAK's PARCEL with the key-item fanfare, and the flag arms Oak's delivery branch.",
  "id": "event:viridian_mart_parcel",
  "trigger": {
   "kind": "enter",
@@ -7,9 +7,14 @@
   "when": "GOT_STARTER and not GOT_OAKS_PARCEL and not OAK_GOT_PARCEL"
  },
  "commands": [
-  {
-   "cmd": "beat",
-   "name": "viridian_mart_parcel"
-  }
+  {"cmd": "say", "text": "Hey! You came from\nPALLET TOWN?"},
+  {"cmd": "walk_player_to", "to": [2, 5]},
+  {"cmd": "face_player", "dir": "left"},
+  {"cmd": "face_object", "object": "SPRITE_CLERK@0,5", "dir": "right"},
+  {"cmd": "say", "text": "You know PROF.\nOAK, right?\fHis order came in.\nWill you take it\nto him?"},
+  {"cmd": "sfx", "key": "get_key_item"},
+  {"cmd": "say", "text": "{player} got\nOAK's PARCEL!"},
+  {"cmd": "give_item", "item": "item:oaks_parcel"},
+  {"cmd": "set_flag", "flag": "GOT_OAKS_PARCEL"}
  ]
 }

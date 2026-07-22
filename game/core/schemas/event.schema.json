@@ -544,6 +544,26 @@
       "required": [
        "cmd",
        "object",
+       "at"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "place_object"
+       },
+       "object": {
+        "type": "string"
+       },
+       "at": {
+        "$ref": "#/$defs/cell"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "object",
        "dir"
       ],
       "properties": {

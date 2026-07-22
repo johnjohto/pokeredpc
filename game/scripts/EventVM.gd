@@ -38,7 +38,8 @@ const CMDS := ["say", "notice", "if", "give_item", "take_item", "set_flag", "cle
 	"club_enter", "club_leave", "trash_reset", "trash_can", "face_object",
 	"face_player", "play_song", "wait", "walk_object_to", "class_battle", "heal_party",
 	"ask", "show_dex_entry", "pic", "clear_pic", "set_starter", "set_rival_starter", "give_mon",
-	"show_text", "close_text", "emote", "walk_object", "walk_player_to", "walk_together_to", "warp_to"]
+	"show_text", "close_text", "emote", "walk_object", "walk_player_to", "walk_together_to", "warp_to",
+	"place_object"]
 
 ## Player facing indices (Player.facing) by direction word.
 const DIRS := {"down": 0, "up": 1, "left": 2, "right": 3}
@@ -443,6 +444,15 @@ func _run_block(cmds: Array, ctx: Dictionary) -> bool:
 			"warp_to":
 				# A scripted map change mid-event (the intercept walking you into the lab).
 				main.load_world(_bare(str(c["map"])), int(c.get("warp", -1)))
+			"place_object":
+				# Teleport a map object somewhere and show it (the rival re-entering at the
+				# lab door for the Pokédex handout).
+				var po = main._npc_by_key(str(c["object"]))
+				if po != null:
+					var pa: Array = c["at"]
+					po.cell = Vector2i(int(pa[0]), int(pa[1]))
+					po.position = Vector2(po.cell * 16)
+					po.set_shown(true)
 			"vending":
 				main._vending_enter()
 			"fall_hole":

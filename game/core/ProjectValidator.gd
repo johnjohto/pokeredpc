@@ -108,7 +108,7 @@ static func validate_project(dir: String) -> Dictionary:
 
 ## Commands that name a map object.
 const _OBJECT_CMDS := ["trainer_battle", "set_npc_text", "hide_object", "show_object",
-	"face_object", "walk_object", "walk_object_to", "walk_together_to"]
+	"face_object", "walk_object", "walk_object_to", "walk_together_to", "place_object"]
 
 
 ## Every object an event names must exist on its map; every cell must lie inside it.
