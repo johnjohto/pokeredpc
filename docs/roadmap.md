@@ -300,7 +300,22 @@ capping the Lapras record, pokered-faithful). Gate: `--eventtest` 30 checks,
 0 errors, double extraction byte-identical, md5s unchanged, and a sixth fresh seed-1 NEW GAME →
 HALL OF FAME **GATE GREEN** (Champion at L74; a first attempt wedged in Victory Road under a
 zombie test engine's load — the known gh #30/#38 class — and the clean rerun went straight
-through). Convergence: 20 → 1 → 2 → 2 → 3 → 4. Next questline: endgame.
+through). Convergence: 20 → 1 → 2 → 2 → 3 → 4.
+**Questline 7 (endgame) COMPLETE (same session):** champion_entrance / champion_battle /
+champions_room_oak dissolved into the champions_room_battle/_entrance records — the reversed
+RLE march, OPP_RIVAL3 by the rival's starter, BEAT_CHAMPION before the two gh #179 laments,
+Oak's full arrival choreography (the congrats naming the player's starter authored as three
+static branches), and the walk onto the door — ending in `beat: hall_of_fame` (the credits +
+League-reset ceremony stays native, ADR-019 §1). **Zero new commands** — the library needed
+nothing. Gate: `--eventtest` 30 checks, `--champwalktest`/`--e4test`/`--elitetest`/`--hoftest`
+green (elitetest's output byte-identical to HEAD), md5s unchanged, double extraction
+byte-identical, and a seventh fresh seed-1 NEW GAME → HALL OF FAME **GATE GREEN** through the
+authored champion chain (Champion at L71). Convergence: 20 → 1 → 2 → 2 → 3 → 4 → 0.
+Remaining before the wave-C close: one mop-up questline (the Tower arc, the three rival
+ambushes, the escort drags, the gift-item NPCs — ~18 beats, mostly existing vocabulary) with
+~13 beats staying native as ADR-019 §1 ceremonies (hall_of_fame, oak_dex_rating,
+revive_fossil, award_diploma, oldman_demo, daycare_man, prize/coin counters, safari_gate,
+board_ss_anne/ss_anne_departs, the two link tables).
 **Landed: gh #34** (2026-07-20): Catch + Progression are behind the seam and the
 **config-first knobs are real** — `Gen1Catch` (`attempt` over the byte-exact kernel + the
 safari `bait_rate`/`rock_rate` transitions, which moved out of the host's input handler),
