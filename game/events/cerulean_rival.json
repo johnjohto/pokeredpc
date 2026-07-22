@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/CeruleanCity.asm CeruleanCityCoords2 — the rival ambushes the player by the north bridge ((20,6)/(21,6)).",
+ "$comment": "scripts/CeruleanCity.asm CeruleanCityCoords2 — the rival ambushes you by the north bridge ((20,6)/(21,6)): he appears at (20,2), walks down to one above you, the OPP_RIVAL1 fight (party by HIS starter: 7/8/9), the take-it-easy line, the flag, the BILL speech, then the bridge-lane sidestep (x==20 right, x==21 left) and six steps south with Music_RivalAlternateStart, gone.",
  "id": "event:cerulean_rival",
  "trigger": {
   "kind": "step",
@@ -18,8 +18,123 @@
  },
  "commands": [
   {
-   "cmd": "beat",
-   "name": "cerulean_rival"
+   "cmd": "face_player",
+   "dir": "up"
+  },
+  {
+   "cmd": "play_song",
+   "key": "meetrival"
+  },
+  {
+   "cmd": "show_object",
+   "object": "SPRITE_BLUE@20,2"
+  },
+  {
+   "cmd": "walk_object_to",
+   "object": "SPRITE_BLUE@20,2",
+   "to": "player",
+   "offset": [
+    0,
+    -1
+   ]
+  },
+  {
+   "cmd": "face_object",
+   "object": "SPRITE_BLUE@20,2",
+   "dir": "player"
+  },
+  {
+   "cmd": "say",
+   "text": "{rival}: Yo!\n{player}!\fYou're still\nstruggling along\nback here?\fI'm doing great!\nI caught a bunch\nof strong and\nsmart POKéMON!\fHere, let me see\nwhat you caught,\n{player}!"
+  },
+  {
+   "cmd": "if",
+   "cond": "rival_starter_squirtle",
+   "then": [
+    {
+     "cmd": "class_battle",
+     "class": "OPP_RIVAL1",
+     "party": 7,
+     "npc": "CeruleanCity:20,2"
+    }
+   ],
+   "else": [
+    {
+     "cmd": "if",
+     "cond": "rival_starter_bulbasaur",
+     "then": [
+      {
+       "cmd": "class_battle",
+       "class": "OPP_RIVAL1",
+       "party": 8,
+       "npc": "CeruleanCity:20,2"
+      }
+     ],
+     "else": [
+      {
+       "cmd": "class_battle",
+       "class": "OPP_RIVAL1",
+       "party": 9,
+       "npc": "CeruleanCity:20,2"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "cmd": "if",
+   "cond": "battle_won",
+   "then": [
+    {
+     "cmd": "say",
+     "text": "Hey!\nTake it easy!\nYou won already!"
+    },
+    {
+     "cmd": "set_flag",
+     "flag": "BEAT_CERULEAN_RIVAL"
+    },
+    {
+     "cmd": "say",
+     "text": "{rival}: Hey,\nguess what?\fI went to BILL's\nand got him to\nshow me his rare\nPOKéMON!\fThat added a lot\nof pages to my\nPOKéDEX!\fAfter all, BILL's\nworld famous as a\nPOKéMANIAC!\fHe invented the\nPOKéMON Storage\nSystem on PC!\fSince you're using\nhis system, go\nthank him!\fWell, I better\nget rolling!\nSmell ya later!"
+    },
+    {
+     "cmd": "play_song",
+     "key": "meetrival_alt"
+    },
+    {
+     "cmd": "if",
+     "cond": "player_x == 20",
+     "then": [
+      {
+       "cmd": "walk_object",
+       "object": "SPRITE_BLUE@20,2",
+       "dir": "right",
+       "count": 1
+      }
+     ],
+     "else": [
+      {
+       "cmd": "walk_object",
+       "object": "SPRITE_BLUE@20,2",
+       "dir": "left",
+       "count": 1
+      }
+     ]
+    },
+    {
+     "cmd": "walk_object",
+     "object": "SPRITE_BLUE@20,2",
+     "dir": "down",
+     "count": 6
+    },
+    {
+     "cmd": "hide_object",
+     "object": "SPRITE_BLUE@20,2"
+    },
+    {
+     "cmd": "play_map_music"
+    }
+   ]
   }
  ]
 }

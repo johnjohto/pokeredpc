@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/CeladonDiner.asm — the gambler hands over the COIN CASE (he lost it at the slots).",
+ "$comment": "scripts/CeladonDiner.asm — the busted gambler's COIN CASE.",
  "id": "event:celadon_diner_coin_case",
  "trigger": {
   "kind": "interact",
@@ -8,8 +8,36 @@
  },
  "commands": [
   {
-   "cmd": "beat",
-   "name": "coin_case_giver"
+   "cmd": "if",
+   "cond": "GOT_COIN_CASE",
+   "then": [
+    {
+     "cmd": "say",
+     "text": "I always thought\nI was going to\nwin it back..."
+    }
+   ],
+   "else": [
+    {
+     "cmd": "say",
+     "text": "Go ahead! Laugh!\fI'm flat out\nbusted!\fNo more slots for\nme! I'm going\nstraight!\fHere! I won't be\nneeding this any-\nmore!"
+    },
+    {
+     "cmd": "give_item",
+     "item": "item:coin_case"
+    },
+    {
+     "cmd": "sfx",
+     "key": "get_key_item"
+    },
+    {
+     "cmd": "say",
+     "text": "{player} received\na COIN CASE!"
+    },
+    {
+     "cmd": "set_flag",
+     "flag": "GOT_COIN_CASE"
+    }
+   ]
   }
  ]
 }

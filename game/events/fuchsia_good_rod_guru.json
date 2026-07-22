@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/FuchsiaGoodRodHouse.asm — the Fishing Guru's older brother gives the GOOD ROD.",
+ "$comment": "scripts/FuchsiaGoodRodHouse.asm — the GURU's older brother's GOOD ROD (the ask-gift flow; give_item's abort = the retired _gift, re-offer).",
  "id": "event:fuchsia_good_rod_guru",
  "trigger": {
   "kind": "interact",
@@ -8,8 +8,48 @@
  },
  "commands": [
   {
-   "cmd": "beat",
-   "name": "good_rod_guru"
+   "cmd": "if",
+   "cond": "GOT_GOOD_ROD",
+   "then": [
+    {
+     "cmd": "say",
+     "text": "Hello there,\n{player}!\fHow are the fish\nbiting?"
+    }
+   ],
+   "else": [
+    {
+     "cmd": "ask",
+     "text": "I'm the FISHING\nGURU's older\nbrother!\fI simply Looove\nfishing!\fDo you like to\nfish?",
+     "then": [
+      {
+       "cmd": "say",
+       "text": "Grand! I like\nyour style!\fTake this and\nfish, young one!"
+      },
+      {
+       "cmd": "give_item",
+       "item": "item:good_rod"
+      },
+      {
+       "cmd": "sfx",
+       "key": "get_item1"
+      },
+      {
+       "cmd": "say",
+       "text": "{player} received\na GOOD ROD!"
+      },
+      {
+       "cmd": "set_flag",
+       "flag": "GOT_GOOD_ROD"
+      }
+     ],
+     "else": [
+      {
+       "cmd": "say",
+       "text": "Oh... That's so\ndisappointing..."
+      }
+     ]
+    }
+   ]
   }
  ]
 }

@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/Route12SuperRodHouse.asm — the Route 12 brother gives the SUPER ROD.",
+ "$comment": "scripts/Route12SuperRodHouse.asm — the GURU's brother's SUPER ROD (the ask-gift flow; give_item's abort = the retired _gift, re-offer).",
  "id": "event:route12_super_rod_guru",
  "trigger": {
   "kind": "interact",
@@ -8,8 +8,48 @@
  },
  "commands": [
   {
-   "cmd": "beat",
-   "name": "super_rod_guru"
+   "cmd": "if",
+   "cond": "GOT_SUPER_ROD",
+   "then": [
+    {
+     "cmd": "say",
+     "text": "Hello there,\n{player}!\fUse the SUPER ROD\nin any water!\nYou can catch\nbetter POKéMON."
+    }
+   ],
+   "else": [
+    {
+     "cmd": "ask",
+     "text": "I'm the FISHING\nGURU's brother!\fI simply Looove\nfishing!\fDo you like to\nfish?",
+     "then": [
+      {
+       "cmd": "say",
+       "text": "Grand! I like\nyour style!\fTake this and\nfish, young one!"
+      },
+      {
+       "cmd": "give_item",
+       "item": "item:super_rod"
+      },
+      {
+       "cmd": "sfx",
+       "key": "get_item1"
+      },
+      {
+       "cmd": "say",
+       "text": "{player} received\na SUPER ROD!"
+      },
+      {
+       "cmd": "set_flag",
+       "flag": "GOT_SUPER_ROD"
+      }
+     ],
+     "else": [
+      {
+       "cmd": "say",
+       "text": "Oh... That's so\ndisappointing..."
+      }
+     ]
+    }
+   ]
   }
  ]
 }

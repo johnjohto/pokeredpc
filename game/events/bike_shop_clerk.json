@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/BikeShop.asm — the clerk trades the BIKE VOUCHER for the BICYCLE.",
+ "$comment": "scripts/BikeShop.asm — the VOUCHER-for-BICYCLE trade (taking the voucher first frees the slot the BICYCLE lands in, the retired beat's bag ops), or the ¥1,000,000 pitch.",
  "id": "event:bike_shop_clerk",
  "trigger": {
   "kind": "interact",
@@ -8,8 +8,52 @@
  },
  "commands": [
   {
-   "cmd": "beat",
-   "name": "bike_shop_clerk"
+   "cmd": "if",
+   "cond": "GOT_BICYCLE",
+   "then": [
+    {
+     "cmd": "say",
+     "text": "How do you like\nyour BICYCLE?\fIsn't it great?"
+    }
+   ],
+   "else": [
+    {
+     "cmd": "if",
+     "cond": "item_bike_voucher",
+     "then": [
+      {
+       "cmd": "say",
+       "text": "Oh, that's...\fA BIKE VOUCHER!\fOK! Here you go!"
+      },
+      {
+       "cmd": "take_item",
+       "item": "item:bike_voucher"
+      },
+      {
+       "cmd": "give_item",
+       "item": "item:bicycle"
+      },
+      {
+       "cmd": "sfx",
+       "key": "get_item1"
+      },
+      {
+       "cmd": "say",
+       "text": "{player} exchanged\nthe BIKE VOUCHER\nfor a BICYCLE."
+      },
+      {
+       "cmd": "set_flag",
+       "flag": "GOT_BICYCLE"
+      }
+     ],
+     "else": [
+      {
+       "cmd": "say",
+       "text": "Hi! Welcome to\nthe BICYCLE SHOP!\fOur bargain price\nfor that model is\n¥1,000,000!\fHaha! No one can\nafford that!"
+      }
+     ]
+    }
+   ]
   }
  ]
 }

@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/VermilionOldRodHouse.asm — the Fishing Guru gives the OLD ROD.",
+ "$comment": "scripts/VermilionOldRodHouse.asm — the FISHING GURU's OLD ROD (the ask-gift flow; give_item's abort = the retired _gift, re-offer).",
  "id": "event:vermilion_old_rod_guru",
  "trigger": {
   "kind": "interact",
@@ -8,8 +8,48 @@
  },
  "commands": [
   {
-   "cmd": "beat",
-   "name": "old_rod_guru"
+   "cmd": "if",
+   "cond": "GOT_OLD_ROD",
+   "then": [
+    {
+     "cmd": "say",
+     "text": "Hello there,\n{player}!\fHow are the fish\nbiting?"
+    }
+   ],
+   "else": [
+    {
+     "cmd": "ask",
+     "text": "I'm the FISHING\nGURU!\fI simply Looove\nfishing!\fDo you like to\nfish?",
+     "then": [
+      {
+       "cmd": "say",
+       "text": "Grand! I like\nyour style!\fTake this and\nfish, young one!"
+      },
+      {
+       "cmd": "give_item",
+       "item": "item:old_rod"
+      },
+      {
+       "cmd": "sfx",
+       "key": "get_item1"
+      },
+      {
+       "cmd": "say",
+       "text": "{player} received\nan OLD ROD!"
+      },
+      {
+       "cmd": "set_flag",
+       "flag": "GOT_OLD_ROD"
+      }
+     ],
+     "else": [
+      {
+       "cmd": "say",
+       "text": "Oh... That's so\ndisappointing..."
+      }
+     ]
+    }
+   ]
   }
  ]
 }

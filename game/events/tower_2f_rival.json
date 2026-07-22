@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/PokemonTower2F.asm — the rival battle on the second floor (coords (15,5)/(14,6)).",
+ "$comment": "scripts/PokemonTower2F.asm — the rival waits on 2F; stepping beside him ((15,5) or (14,6)) starts the OPP_RIVAL2 fight (party by HIS starter: squirtle 4 / bulbasaur 5 / charmander 6). On the win his stinker line, the flag, and the L-path exit to the 2F stairs chosen by which side you stood on (RivalDownThenRight from (15,5), RivalRightThenDown from (14,6)).",
  "id": "event:tower_2f_rival",
  "trigger": {
   "kind": "step",
@@ -18,8 +18,141 @@
  },
  "commands": [
   {
-   "cmd": "beat",
-   "name": "tower_rival"
+   "cmd": "play_song",
+   "key": "meetrival"
+  },
+  {
+   "cmd": "if",
+   "cond": "player_x == 15",
+   "then": [
+    {
+     "cmd": "face_player",
+     "dir": "left"
+    }
+   ],
+   "else": [
+    {
+     "cmd": "face_player",
+     "dir": "up"
+    }
+   ]
+  },
+  {
+   "cmd": "face_object",
+   "object": "SPRITE_BLUE@14,5",
+   "dir": "player"
+  },
+  {
+   "cmd": "say",
+   "text": "{rival}: Hey,\n{player}! What\nbrings you here?\nYour POKéMON\ndon't look dead!\fI can at least\nmake them faint!\nLet's go, pal!"
+  },
+  {
+   "cmd": "if",
+   "cond": "rival_starter_squirtle",
+   "then": [
+    {
+     "cmd": "class_battle",
+     "class": "OPP_RIVAL2",
+     "party": 4,
+     "npc": "PokemonTower2F:14,5"
+    }
+   ],
+   "else": [
+    {
+     "cmd": "if",
+     "cond": "rival_starter_bulbasaur",
+     "then": [
+      {
+       "cmd": "class_battle",
+       "class": "OPP_RIVAL2",
+       "party": 5,
+       "npc": "PokemonTower2F:14,5"
+      }
+     ],
+     "else": [
+      {
+       "cmd": "class_battle",
+       "class": "OPP_RIVAL2",
+       "party": 6,
+       "npc": "PokemonTower2F:14,5"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "cmd": "if",
+   "cond": "battle_won",
+   "then": [
+    {
+     "cmd": "say",
+     "text": "What?\nYou stinker!\fI took it easy on\nyou too!"
+    },
+    {
+     "cmd": "set_flag",
+     "flag": "BEAT_POKEMON_TOWER_RIVAL"
+    },
+    {
+     "cmd": "if",
+     "cond": "player_x == 15",
+     "then": [
+      {
+       "cmd": "walk_object",
+       "object": "SPRITE_BLUE@14,5",
+       "dir": "down",
+       "count": 2
+      },
+      {
+       "cmd": "walk_object",
+       "object": "SPRITE_BLUE@14,5",
+       "dir": "right",
+       "count": 4
+      },
+      {
+       "cmd": "walk_object",
+       "object": "SPRITE_BLUE@14,5",
+       "dir": "down",
+       "count": 2
+      }
+     ],
+     "else": [
+      {
+       "cmd": "walk_object",
+       "object": "SPRITE_BLUE@14,5",
+       "dir": "right",
+       "count": 1
+      },
+      {
+       "cmd": "walk_object",
+       "object": "SPRITE_BLUE@14,5",
+       "dir": "down",
+       "count": 2
+      },
+      {
+       "cmd": "walk_object",
+       "object": "SPRITE_BLUE@14,5",
+       "dir": "right",
+       "count": 1
+      },
+      {
+       "cmd": "walk_object",
+       "object": "SPRITE_BLUE@14,5",
+       "dir": "down",
+       "count": 2
+      },
+      {
+       "cmd": "walk_object",
+       "object": "SPRITE_BLUE@14,5",
+       "dir": "right",
+       "count": 2
+      }
+     ]
+    },
+    {
+     "cmd": "hide_object",
+     "object": "SPRITE_BLUE@14,5"
+    }
+   ]
   }
  ]
 }

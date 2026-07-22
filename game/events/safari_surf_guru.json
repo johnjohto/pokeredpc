@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/SafariZoneSecretHouse.asm — the secret-house guru gives HM03 (SURF).",
+ "$comment": "scripts/SafariZoneSecretHouse.asm — the secret-house guru's HM03 (SURF).",
  "id": "event:safari_surf_guru",
  "trigger": {
   "kind": "interact",
@@ -8,8 +8,40 @@
  },
  "commands": [
   {
-   "cmd": "beat",
-   "name": "safari_surf_guru"
+   "cmd": "if",
+   "cond": "GOT_HM03",
+   "then": [
+    {
+     "cmd": "say",
+     "text": "HM03 is SURF!\fPOKéMON will be\nable to ferry you\nacross water!"
+    }
+   ],
+   "else": [
+    {
+     "cmd": "say",
+     "text": "Ah! Finally!\fYou're the first\nperson to reach\nthe SECRET HOUSE!\fHere is your\nprize!"
+    },
+    {
+     "cmd": "give_item",
+     "item": "item:hm_surf"
+    },
+    {
+     "cmd": "sfx",
+     "key": "get_key_item"
+    },
+    {
+     "cmd": "say",
+     "text": "{player} received\nHM03!"
+    },
+    {
+     "cmd": "set_flag",
+     "flag": "GOT_HM03"
+    },
+    {
+     "cmd": "say",
+     "text": "HM03 is SURF!\fPOKéMON will be\nable to ferry you\nacross water!"
+    }
+   ]
   }
  ]
 }

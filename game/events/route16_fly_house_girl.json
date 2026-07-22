@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/Route16FlyHouse.asm — the girl gives HM02 (FLY).",
+ "$comment": "scripts/Route16FlyHouse.asm — the secret-path girl's HM02 (FLY). give_item's abort = the retired _gift (no flag, re-offer).",
  "id": "event:route16_fly_house_girl",
  "trigger": {
   "kind": "interact",
@@ -8,8 +8,40 @@
  },
  "commands": [
   {
-   "cmd": "beat",
-   "name": "fly_house_girl"
+   "cmd": "if",
+   "cond": "GOT_HM02",
+   "then": [
+    {
+     "cmd": "say",
+     "text": "Isn't FLY the\nbest? You can go\nback to any town\nin a flash!"
+    }
+   ],
+   "else": [
+    {
+     "cmd": "say",
+     "text": "My bird POKéMON\nuses FLY to whisk\nme to any town!\fI want you to\nhave this!"
+    },
+    {
+     "cmd": "give_item",
+     "item": "item:hm_fly"
+    },
+    {
+     "cmd": "sfx",
+     "key": "get_item1"
+    },
+    {
+     "cmd": "say",
+     "text": "{player} received\nHM02!"
+    },
+    {
+     "cmd": "set_flag",
+     "flag": "GOT_HM02"
+    },
+    {
+     "cmd": "say",
+     "text": "HM02 is FLY!\fTeach it to a bird\nPOKéMON to soar\nto any town\nyou've visited!"
+    }
+   ]
   }
  ]
 }

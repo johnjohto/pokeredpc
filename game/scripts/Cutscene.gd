@@ -530,45 +530,6 @@ func _rival_st() -> String:
 
 ## The rival challenges the player to the first battle once they head for the exit
 ## (OaksLabRivalChallengesPlayerScript fires at Y==6). Triggered from Main._on_player_moved.
-## Route 22 rival battle (scripts/Route22.asm). which = 1 (early, before Brock) or 2 (after the 8th
-## badge). The rival walks in from the west, battles (party by the rival's starter), then leaves.
-const _ROUTE22_PARTY := {
-	1: {"squirtle": 4, "bulbasaur": 5, "charmander": 6},
-	2: {"squirtle": 10, "bulbasaur": 11, "charmander": 12},
-}
-func route22_rival(which: int) -> void:
-	main.cutscene_active = true
-	main.modal = null
-	var pn: String = main.player_name
-	var rn: String = main.rival_name
-	var rival = main._npc_by_key("SPRITE_BLUE@25,5")
-	if main.audio:
-		main.audio.play_song("meetrival")
-	if rival:
-		rival.set_shown(true)
-		await walk_forward(rival, 3, 4)            # walk east toward the player, stopping alongside
-		rival.face_to(main.player.cell)
-	if which == 1:
-		await say("%s: Hey!\n%s!\fYou're going to\nPOKéMON LEAGUE?\fForget it! You\nprobably don't\nhave any BADGEs!\fThe guard won't\nlet you through!\fBy the way, did\nyour POKéMON\nget any stronger?" % [rn, pn])
-	else:
-		await say("%s: What?\n%s! What a\nsurprise to see\nyou here!\fSo you're going to\nPOKéMON LEAGUE?\fYou collected all\nthe BADGEs too?\fThen I'll whip you\nas a warm up for\nPOKéMON LEAGUE!\fCome on!" % [rn, pn])
-	var num: int = int(_ROUTE22_PARTY[which].get(_rival_st(), _ROUTE22_PARTY[which]["charmander"]))
-	main.start_trainer_battle("OPP_RIVAL1" if which == 1 else "OPP_RIVAL2", num, "Route22:25,5")
-	await main.battle.finished
-	if not main.battle.won:
-		main.cutscene_active = false
-		return
-	if which == 1:
-		await say("I heard POKéMON\nLEAGUE has many\ntough trainers!\fI have to figure\nout how to get\npast them!\fYou should quit\ndawdling and get\na move on!")
-	else:
-		await say("That loosened me\nup! I'm ready for\nPOKéMON LEAGUE!\f%s, you need\nmore practice!\fBut hey, you know\nthat! I'm out of\nhere. Smell ya!" % pn)
-	main.set_event("BEAT_ROUTE22_RIVAL_%d" % which)
-	if rival:
-		await walk_forward(rival, 2, 5)            # slink off to the west
-		rival.set_shown(false)
-	main.cutscene_active = false
-
-
 # ---- Bill's house: the cell-separator event (scripts/BillsHouse.asm) --------
 
 # (bill_intro + bill_separator dissolved into the Bill's-house records - wave C, gh #41.)
@@ -730,96 +691,6 @@ func daycare_man() -> void:
 	await say("Here's your\nPOKéMON!\fTake good care\nof it!")
 	main.moneybox.hide_box()
 	main.cutscene_active = false
-
-
-# ---- Bike: voucher + shop (scripts/PokemonFanClub.asm, scripts/BikeShop.asm) ----
-
-## The Route 16 house girl gives HM02 (FLY).
-func fly_house_girl() -> void:
-	main.cutscene_active = true
-	main.modal = null
-	if main.has_event("GOT_HM02"):
-		await say("Isn't FLY the\nbest? You can go\nback to any town\nin a flash!")
-		main.cutscene_active = false
-		return
-	await say("My bird POKéMON\nuses FLY to whisk\nme to any town!\fI want you to\nhave this!")
-	if not await _gift("HM02"):
-		return
-	if main.audio:
-		main.audio.play_sfx("get_item1")
-	await say("%s received\nHM02!" % main.player_name)
-	main.set_event("GOT_HM02")
-	await say("HM02 is FLY!\fTeach it to a bird\nPOKéMON to soar\nto any town\nyou've visited!")
-	main.cutscene_active = false
-
-
-## The Fuchsia Warden gives HM04 (STRENGTH) once you return his GOLD TEETH.
-func warden_strength() -> void:
-	main.cutscene_active = true
-	main.modal = null
-	if main.has_event("GOT_HM04"):
-		await say("WARDEN: Thanks to\nyou I can wear my\ndentures again!")
-		main.cutscene_active = false
-		return
-	if not main.player_bag.has("GOLD TEETH"):
-		await say("WARDEN: OFAOFA!\nKEKEKE!\f(He has no teeth\nand can't speak\nclearly...)")
-		main.cutscene_active = false
-		return
-	await say("WARDEN: OH! My\nGOLD TEETH!\fYou found them!\fHere, take this\nin gratitude!")
-	main.player_bag.erase("GOLD TEETH")
-	main.player_bag["HM04"] = 1
-	if main.audio:
-		main.audio.play_sfx("get_item1")
-	await say("%s received\nHM04!" % main.player_name)
-	main.set_event("GOT_HM04")
-	await say("HM04 is STRENGTH!\fA POKéMON can use\nit to move giant\nboulders!")
-	main.cutscene_active = false
-
-
-## Game Corner coin clerk (scripts/GameCorner.asm GameCornerClerk1Text): 50 coins for ¥1000.
-func coin_clerk() -> void:
-	main.cutscene_active = true
-	main.modal = null
-	if not await ask("Welcome to ROCKET\nGAME CORNER!\fDo you need some\ngame coins?"):
-		await say("No? Please come\nplay sometime!")
-		main.cutscene_active = false
-		return
-	if not main.player_bag.has("COIN CASE"):
-		await say("You don't have a\nCOIN CASE!")
-	elif main.player_coins >= 9990:
-		await say("Oops! Your COIN\nCASE is full.")
-	elif main.player_money < 1000:
-		await say("You can't afford\nthe coins!")
-	else:
-		main.player_money -= 1000
-		main.player_coins = mini(9999, main.player_coins + 50)
-		if main.audio:
-			main.audio.play_sfx("get_item1")
-		await say("Thanks! Here are\nyour 50 coins!")
-	main.cutscene_active = false
-
-
-## Game Corner fishing guru (GameCornerFishingGuruText): 10 free coins, once.
-func coin_gift() -> void:
-	main.cutscene_active = true
-	main.modal = null
-	if main.has_event("GOT_10_COINS"):
-		await say("Wins seem to come\nand go.")
-		main.cutscene_active = false
-		return
-	await say("Kid, do you want\nto play?")
-	if not main.player_bag.has("COIN CASE"):
-		await say("Oops! Forgot the\nCOIN CASE!")
-	elif main.player_coins >= 9990:
-		await say("You don't need my\ncoins!")
-	else:
-		main.player_coins = mini(9999, main.player_coins + 10)
-		main.set_event("GOT_10_COINS")
-		if main.audio:
-			main.audio.play_sfx("get_item1")
-		await say("%s received\n10 coins!" % main.player_name)
-	main.cutscene_active = false
-
 
 ## Game Corner prize room prizes (data/events/prizes.asm + prize_mon_levels.asm, RED). Three
 ## vendors: two Pokémon counters and one TM counter. TM ids per game/assets/tm_moves.json.
@@ -1684,24 +1555,6 @@ func daisy_town_map() -> void:
 	main.cutscene_active = false
 
 
-## Celadon Diner gambler (scripts/CeladonDiner.asm): the busted slot player gives the COIN CASE.
-func coin_case_giver() -> void:
-	main.cutscene_active = true
-	main.modal = null
-	if main.has_event("GOT_COIN_CASE"):
-		await say("I always thought\nI was going to\nwin it back...")
-		main.cutscene_active = false
-		return
-	await say("Go ahead! Laugh!\fI'm flat out\nbusted!\fNo more slots for\nme! I'm going\nstraight!\fHere! I won't be\nneeding this any-\nmore!")
-	if not await _gift("COIN CASE"):
-		return
-	if main.audio:
-		main.audio.play_sfx("get_key_item")
-	await say("%s received\na COIN CASE!" % main.player_name)
-	main.set_event("GOT_COIN_CASE")
-	main.cutscene_active = false
-
-
 ## The Safari Zone gate: pay ¥500 for 30 SAFARI BALLs + a 500-step game, then enter the park.
 func safari_gate(dest_label: String, dest_warp: int) -> void:
 	main.cutscene_active = true
@@ -1758,134 +1611,6 @@ func safari_game_over() -> void:
 	await say("Did you get a\ngood haul?\nCome again!")
 	main.safari_balls = 0                            # wNumSafariBalls = 0, after the worker's line
 	await walk_forward(main.player, DOWN, 3)         # SafariZoneEntranceAutoWalk PAD_DOWN, c = 3
-	main.cutscene_active = false
-
-
-## The Safari Zone secret-house guru rewards reaching him with HM03 (SURF).
-func safari_surf_guru() -> void:
-	main.cutscene_active = true
-	main.modal = null
-	if main.has_event("GOT_HM03"):
-		await say("HM03 is SURF!\fPOKéMON will be\nable to ferry you\nacross water!")
-		main.cutscene_active = false
-		return
-	await say("Ah! Finally!\fYou're the first\nperson to reach\nthe SECRET HOUSE!\fHere is your\nprize!")
-	if not await _gift("HM03"):
-		return
-	if main.audio:
-		main.audio.play_sfx("get_key_item")
-	await say("%s received\nHM03!" % main.player_name)
-	main.set_event("GOT_HM03")
-	await say("HM03 is SURF!\fPOKéMON will be\nable to ferry you\nacross water!")
-	main.cutscene_active = false
-
-
-## The Pokémon Fan Club chairman rambles about his RAPIDASH, then gives the BIKE VOUCHER.
-func fan_club_chairman() -> void:
-	main.cutscene_active = true
-	main.modal = null
-	if main.has_event("GOT_BIKE_VOUCHER") or main.player_bag.has("BICYCLE"):
-		await say("Exchange that\nVOUCHER for a\nBICYCLE!\fMy FEAROW will\nFLY me anywhere,\nso I don't need\none. Enjoy!")
-		main.cutscene_active = false
-		return
-	if not await ask("I chair the\nPOKéMON Fan Club!\fI have collected\nover 100 POKéMON!\fSo... Did you come\nto hear about my\nPOKéMON?"):
-		await say("Oh. Come back\nany time.")
-		main.cutscene_active = false
-		return
-	await say("Good! Then listen\nup!\fMy favorite\nRAPIDASH... cute...\nlovely... smart...\namazing...\f...Oops! I kept\nyou too long!\fThanks for hearing\nme out! I want you\nto have this!")
-	if not await _gift("BIKE VOUCHER"):
-		return
-	if main.audio:
-		main.audio.play_sfx("get_key_item")
-	await say("%s received\na BIKE VOUCHER!" % main.player_name)
-	main.set_event("GOT_BIKE_VOUCHER")
-	main.cutscene_active = false
-
-
-## The Cerulean Bike Shop trades the BIKE VOUCHER for a BICYCLE.
-func bike_shop_clerk() -> void:
-	main.cutscene_active = true
-	main.modal = null
-	if main.has_event("GOT_BICYCLE"):
-		await say("How do you like\nyour BICYCLE?\fIsn't it great?")
-	elif main.player_bag.has("BIKE VOUCHER"):
-		await say("Oh, that's...\fA BIKE VOUCHER!\fOK! Here you go!")
-		main.player_bag.erase("BIKE VOUCHER")
-		main.player_bag["BICYCLE"] = 1
-		if main.audio:
-			main.audio.play_sfx("get_item1")
-		await say("%s exchanged\nthe BIKE VOUCHER\nfor a BICYCLE." % main.player_name)
-		main.set_event("GOT_BICYCLE")
-	else:
-		await say("Hi! Welcome to\nthe BICYCLE SHOP!\fOur bargain price\nfor that model is\n¥1,000,000!\fHaha! No one can\nafford that!")
-	main.cutscene_active = false
-
-
-# ---- Fishing (scripts/VermilionOldRodHouse.asm, engine/items/item_effects.asm) ----
-
-## The Vermilion Fishing Guru gives the OLD ROD.
-func old_rod_guru() -> void:
-	main.cutscene_active = true
-	main.modal = null
-	if main.has_event("GOT_OLD_ROD"):
-		await say("Hello there,\n%s!\fHow are the fish\nbiting?" % main.player_name)
-		main.cutscene_active = false
-		return
-	if not await ask("I'm the FISHING\nGURU!\fI simply Looove\nfishing!\fDo you like to\nfish?"):
-		await say("Oh... That's so\ndisappointing...")
-		main.cutscene_active = false
-		return
-	await say("Grand! I like\nyour style!\fTake this and\nfish, young one!")
-	if not await _gift("OLD ROD"):
-		return
-	if main.audio:
-		main.audio.play_sfx("get_item1")
-	await say("%s received\nan OLD ROD!" % main.player_name)
-	main.set_event("GOT_OLD_ROD")
-	main.cutscene_active = false
-
-
-## The Fuchsia Good Rod house guru (scripts/FuchsiaGoodRodHouse.asm).
-func good_rod_guru() -> void:
-	main.cutscene_active = true
-	main.modal = null
-	if main.has_event("GOT_GOOD_ROD"):
-		await say("Hello there,\n%s!\fHow are the fish\nbiting?" % main.player_name)
-		main.cutscene_active = false
-		return
-	if not await ask("I'm the FISHING\nGURU's older\nbrother!\fI simply Looove\nfishing!\fDo you like to\nfish?"):
-		await say("Oh... That's so\ndisappointing...")
-		main.cutscene_active = false
-		return
-	await say("Grand! I like\nyour style!\fTake this and\nfish, young one!")
-	if not await _gift("GOOD ROD"):
-		return
-	if main.audio:
-		main.audio.play_sfx("get_item1")
-	await say("%s received\na GOOD ROD!" % main.player_name)
-	main.set_event("GOT_GOOD_ROD")
-	main.cutscene_active = false
-
-
-## The Route 12 Super Rod house guru (scripts/Route12SuperRodHouse.asm).
-func super_rod_guru() -> void:
-	main.cutscene_active = true
-	main.modal = null
-	if main.has_event("GOT_SUPER_ROD"):
-		await say("Hello there,\n%s!\fUse the SUPER ROD\nin any water!\nYou can catch\nbetter POKéMON." % main.player_name)
-		main.cutscene_active = false
-		return
-	if not await ask("I'm the FISHING\nGURU's brother!\fI simply Looove\nfishing!\fDo you like to\nfish?"):
-		await say("Oh... That's so\ndisappointing...")
-		main.cutscene_active = false
-		return
-	await say("Grand! I like\nyour style!\fTake this and\nfish, young one!")
-	if not await _gift("SUPER ROD"):
-		return
-	if main.audio:
-		main.audio.play_sfx("get_item1")
-	await say("%s received\na SUPER ROD!" % main.player_name)
-	main.set_event("GOT_SUPER_ROD")
 	main.cutscene_active = false
 
 
@@ -1957,19 +1682,6 @@ func fish(species: String, level: int) -> void:
 	main.start_battle(species, level)
 
 
-# ---- Cerulean rival battle (scripts/CeruleanCity.asm) ----------------------
-
-# Player starter -> OPP_RIVAL1 party number for the Cerulean bridge battle.
-const _CERULEAN_RIVAL_PARTY := {"squirtle": 7, "bulbasaur": 8, "charmander": 9}
-
-
-# Player starter -> OPP_RIVAL2 party for the Pokémon Tower battle (scripts/PokemonTower2F.asm).
-const _TOWER_RIVAL_PARTY := {"squirtle": 4, "bulbasaur": 5, "charmander": 6}
-
-
-# ---- Pokémon Tower: Marowak ghost -> Mr. Fuji -> Poké Flute -----------------
-
-## Add a mon to the party, or the box if the party is full. Returns false if both are full.
 var _last_received: Dictionary = {}   # the mon added by the most recent _receive_mon (for nicknaming)
 
 
@@ -2069,62 +1781,6 @@ func wake_snorlax(npc) -> void:
 		npc.set_shown(false)
 
 
-## The restless MAROWAK ghost on Tower 6F (needs the SILPH SCOPE to fight).
-func marowak_ghost() -> void:
-	main.cutscene_active = true
-	main.modal = null
-	if not main.player_bag.has("SILPH SCOPE"):
-		await say("GHOST: Get out...\nGet out...")
-		main.cutscene_active = false
-		return
-	await say("Be gone...\nIntruders...")
-	main.cutscene_active = false
-	main.battle.unveil = true          # appears as GHOST; the SILPH SCOPE reveal mid-intro
-	main.start_battle("marowak", 30)
-	await main.battle.finished
-	main.battle.unveil = false
-	# The script keys on wBattleResult == 0 — a win, but ALSO a POKé DOLL escape (which
-	# never writes it): the documented doll trick lays the ghost to rest. RUN and a loss
-	# both set it nonzero and leave the ghost blocking.
-	if not (main.battle.won or main.battle.doll_escape):
-		return
-	main.cutscene_active = true
-	main.set_event("BEAT_GHOST_MAROWAK")
-	await say("The mother's soul\nwas calmed.\fIt departed to\nthe afterlife!")
-	main.cutscene_active = false
-
-
-## Mr. Fuji on Tower 7F: rescued, he asks you to his house (and warps you there).
-func mr_fuji_tower() -> void:
-	main.cutscene_active = true
-	main.modal = null
-	var fuji = main._npc_by_key("SPRITE_MR_FUJI@10,3")
-	if fuji:
-		fuji.face_to(main.player.cell)
-	await say("MR.FUJI: Heh? You\ncame to save me?\fThank you. But, I\ncame here of my\nown free will.\f...Come to my\nhouse. I'll be\nwaiting.")
-	main.set_event("RESCUED_MR_FUJI")
-	main.cutscene_active = false
-	main.load_world("MrFujisHouse")
-
-
-## Mr. Fuji at his house hands over the POKé FLUTE.
-func mr_fuji_flute() -> void:
-	main.cutscene_active = true
-	main.modal = null
-	if main.has_event("GOT_POKE_FLUTE"):
-		await say("MR.FUJI: Has my\nflute helped you?")
-		main.cutscene_active = false
-		return
-	await say("MR.FUJI: %s.\fYour POKéDEX quest\nmay fail without\nlove for your\nPOKéMON.\fI think this may\nhelp your quest." % main.player_name)
-	if not await _gift("POKé FLUTE"):
-		return
-	if main.audio:
-		main.audio.play_sfx("get_key_item")
-	await say("%s received\na POKé FLUTE!" % main.player_name)
-	main.set_event("GOT_POKE_FLUTE")
-	main.cutscene_active = false
-
-
 ## scripts/HallOfFame.asm + engine/movie/credits.asm HallOfFamePC (gh #179). OAK leads you in:
 ## the entry walk (HallOfFameEntryMovement, UP ×5) stops beside him at the machine, he faces you
 ## for the Er-hem speech, the Cerulean cave guard goes off duty (HideObject
@@ -2197,101 +1853,6 @@ func league_pc() -> void:
 	visible = false
 	main.cutscene_active = false
 	main._open_pc()
-
-
-## Pokémon Tower 5F's purified zone silently heals the party, then flashes white before its message
-## (scripts/PokemonTower5F.asm PokemonTower5FDefaultScript: HealParty, fades, Delay3 twice, text).
-func tower_purified_zone() -> void:
-	main.cutscene_active = true
-	main.modal = null
-	main.heal_party()
-	await fade_out()
-	await wait(6.0 / 60.0)
-	await fade_in()
-	await say("Entered purified,\nprotected zone!")
-	main.cutscene_active = false
-
-
-## The rival is already on Pokémon Tower 2F; stepping beside him starts the battle, then he leaves.
-func tower_rival() -> void:
-	main.cutscene_active = true
-	main.modal = null
-	var pn: String = main.player_name
-	var rn: String = main.rival_name
-	if main.audio:
-		main.audio.play_song("meetrival")
-	var rival = main._npc_by_key("SPRITE_BLUE@14,5")
-	if rival:
-		rival.face_to(main.player.cell)
-		main.player.face_to(rival.cell)
-	await say("%s: Hey,\n%s! What\nbrings you here?\nYour POKéMON\ndon't look dead!\fI can at least\nmake them faint!\nLet's go, pal!" % [rn, pn])
-	var num: int = _TOWER_RIVAL_PARTY.get(_rival_st(), 6)
-	main.start_trainer_battle("OPP_RIVAL2", num, "PokemonTower2F:14,5")
-	await main.battle.finished
-	if not main.battle.won:
-		main.cutscene_active = false
-		return
-	await say("What?\nYou stinker!\fI took it easy on\nyou too!")
-	main.set_event("BEAT_POKEMON_TOWER_RIVAL")
-	if rival:
-		# PokemonTower2F.asm: the rival leaves by an L-path to the stairs, chosen by which side he was
-		# on (EVENT_POKEMON_TOWER_RIVAL_ON_LEFT) — the player at (15,5) means the rival is on the left
-		# (RivalDownThenRight); at (14,6) the player is below him (RivalRightThenDown). Both end at the
-		# 2F stairs (18,9), where he vanishes down.
-		var seq: Array = [DOWN, DOWN, RIGHT, RIGHT, RIGHT, RIGHT, DOWN, DOWN] \
-			if main.player.cell == Vector2i(15, 5) \
-			else [RIGHT, DOWN, DOWN, RIGHT, DOWN, DOWN, RIGHT, RIGHT]
-		await walk(rival, seq)
-		rival.set_shown(false)
-	main.cutscene_active = false
-
-
-## The rival ambushes the player at the north bridge: he walks down, battles (OPP_RIVAL1, a tougher
-## party by starter), then leaves with the hint to thank BILL. Fired from Main._on_player_moved.
-func cerulean_rival() -> void:
-	main.cutscene_active = true
-	main.modal = null
-	var pn: String = main.player_name
-	var rn: String = main.rival_name
-	main.player.face(UP)
-	if main.audio:
-		main.audio.play_song("meetrival")
-	var rival = main._npc_by_key("SPRITE_BLUE@20,2")
-	if rival:
-		rival.set_shown(true)
-		await walk(rival, main.find_path(rival.cell, main.player.cell + Vector2i(0, -1)))
-		rival.face_to(main.player.cell)
-	await say(("%s: Yo!\n%s!" % [rn, pn])
-		+ "\fYou're still\nstruggling along\nback here?"
-		+ "\fI'm doing great!\nI caught a bunch\nof strong and\nsmart POKéMON!"
-		+ "\fHere, let me see\nwhat you caught,\n%s!" % pn)
-	var num: int = _CERULEAN_RIVAL_PARTY.get(_rival_st(), 9)
-	main.start_trainer_battle("OPP_RIVAL1", num, "CeruleanCity:20,2")
-	await main.battle.finished
-	if not main.battle.won:                          # lost / blacked out — control already restored
-		main.cutscene_active = false
-		return
-	await say("Hey!\nTake it easy!\nYou won already!")
-	main.set_event("BEAT_CERULEAN_RIVAL")
-	await say(("%s: Hey,\nguess what?" % rn)
-		+ "\fI went to BILL's\nand got him to\nshow me his rare\nPOKéMON!"
-		+ "\fThat added a lot\nof pages to my\nPOKéDEX!"
-		+ "\fAfter all, BILL's\nworld famous as a\nPOKéMANIAC!"
-		+ "\fHe invented the\nPOKéMON Storage\nSystem on PC!"
-		+ "\fSince you're using\nhis system, go\nthank him!"
-		+ "\fWell, I better\nget rolling!\nSmell ya later!")
-	if rival:
-		# He sidesteps around you by bridge lane (CeruleanCityMovement3/4: x==20 steps right,
-		# x==21 left), then heads off south into town with the rival jingle re-struck.
-		if main.audio:
-			main.audio.play_song("meetrival_alt")
-		await rival.step(RIGHT if main.player.cell.x == 20 else LEFT)
-		for i in 6:
-			await rival.step(DOWN)
-		rival.set_shown(false)
-		if main.audio:
-			main.audio.play_map_music(main.center_label)
-	main.cutscene_active = false
 
 
 ## The Viridian old man's catching demo (scripts/ViridianCity.asm ViridianCityOldManText +
@@ -2525,7 +2086,7 @@ func nurse_heal(npc = null) -> void:
 
 ## Escort helper: both actors walk their own paths simultaneously (the Pewter guys' paired
 ## RLE movement lists), gating on whichever finishes last.
-func _walk_both(npc, npc_to: Vector2i, player_to: Vector2i) -> void:
+func walk_both(npc, npc_to: Vector2i, player_to: Vector2i) -> void:
 	var done := [false]
 	var w := func() -> void:
 		await walk(npc, main.find_path(npc.cell, npc_to))
@@ -2534,39 +2095,6 @@ func _walk_both(npc, npc_to: Vector2i, player_to: Vector2i) -> void:
 	await walk(main.player, main.find_path(main.player.cell, player_to))
 	while not done[0]:
 		await main.get_tree().process_frame
-
-
-## Pewter's museum guy (scripts/PewterCity.asm SuperNerd1 + PewterMovementScript_WalkToMuseum):
-## say you haven't seen the museum and he marches you there to MUSIC_MUSEUM_GUY — the player to
-## the museum steps, him alongside the door — then sees you off and wanders away south.
-func pewter_museum_guy(npc) -> void:
-	main.cutscene_active = true
-	main.modal = null
-	npc.face_to(main.player.cell)
-	if await ask("Did you check out\nthe MUSEUM?"):
-		await say("Weren't those\nfossils from MT.\nMOON amazing?")
-		main.cutscene_active = false
-		return
-	await say("Really?\nYou absolutely\nhave to go!")
-	if main.audio:
-		main.audio.play_song("museumguy")
-	await _walk_both(npc, Vector2i(13, 8), Vector2i(14, 9))   # the RLE lists' end cells
-	npc.face(UP)
-	if main.audio:
-		main.audio.play_map_music(main.center_label)   # PlayDefaultMusic before the send-off
-	await say("It's right here!\nYou have to pay\nto get in, but\nit's worth it!\fSee you around!")
-	# MovementData_PewterMuseumGuyExit (gh #70): he's dropped at (13,8) and walks straight
-	# down 4 steps — no pathfinding — then hides and is reset to his post, shown again
-	# (PewterCityHideSuperNerd1Script + ResetSuperNerd1Script).
-	npc.cell = Vector2i(13, 8)
-	npc.position = Vector2(npc.cell * 16)
-	for i in 4:
-		await npc.step(DOWN)
-	npc.set_shown(false)
-	npc.cell = npc.home
-	npc.position = Vector2(npc.cell * 16)
-	npc.set_shown(true)
-	main.cutscene_active = false
 
 
 ## The evolution movie (engine/movie/evolution.asm EvolveMon + evos_moves.asm, gh #67):
@@ -2639,34 +2167,6 @@ func museum_fossil(pic_key: String, disp: String) -> void:
 	pic(load("res://assets/%s.png" % pic_key))
 	await say("%s Fossil\nA primitive and\nrare POKéMON." % disp)
 	clear_pic()
-	main.cutscene_active = false
-
-
-## Pewter's gym guide kid (PewterCityYoungsterText + PewterMovementScript_WalkToGym): talk to
-## him and he marches you straight to BROCK's gym door, then takes his leave.
-func pewter_gym_guy(npc) -> void:
-	main.cutscene_active = true
-	main.modal = null
-	npc.face_to(main.player.cell)
-	await say("You're a trainer\nright? BROCK's\nlooking for new\nchallengers!\fFollow me!")
-	if main.audio:
-		main.audio.play_song("museumguy")
-	await _walk_both(npc, Vector2i(17, 18), Vector2i(16, 18))   # just below the gym door
-	npc.face_to(main.player.cell)
-	if main.audio:
-		main.audio.play_map_music(main.center_label)
-	await say("If you have the\nright stuff, go\ntake on BROCK!")
-	# MovementData_PewterGymGuyExit (gh #70): he's dropped at (12,18) and dashes right 5
-	# steps — no pathfinding around the gym — then hides and is reset to his post, shown
-	# again for the next challenger (PewterCityHideYoungsterScript + ResetYoungsterScript).
-	npc.cell = Vector2i(12, 18)
-	npc.position = Vector2(npc.cell * 16)
-	for i in 5:
-		await npc.step(RIGHT)
-	npc.set_shown(false)
-	npc.cell = npc.home
-	npc.position = Vector2(npc.cell * 16)
-	npc.set_shown(true)
 	main.cutscene_active = false
 
 
@@ -2833,13 +2333,3 @@ func is_gym_leader(opp_class: String) -> bool:
 ## Is this trainer battle one of the eight gym-leader fights (wGymLeaderNo)?
 func is_gym_leader_battle(opp_class: String, num: int) -> bool:
 	return _GYM_LEADERS.has(opp_class) and int(_GYM_LEADERS[opp_class]) == num
-
-
-## Viridian City's sleepy old man blocks the road north until the player has the Pokédex
-## (scripts/ViridianCity.asm ViridianCityCheckGotPokedexScript fires at X==19, Y==9).
-func viridian_oldman_block() -> void:
-	main.cutscene_active = true
-	main.modal = null
-	await say("You can't go\nthrough here!\fThis is private\nproperty!")
-	await main.player.step(DOWN)                   # ViridianCityMovePlayerDownScript pushes you back
-	main.cutscene_active = false

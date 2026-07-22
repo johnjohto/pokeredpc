@@ -8158,7 +8158,8 @@ func _pewtertest() -> void:
 	await get_tree().process_frame
 	var nerd = _npc_by_key("SPRITE_SUPER_NERD@27,17")
 	player.place(Vector2i(27, 18))
-	cutscene.pewter_museum_guy(nerd)
+	player.facing = 1                               # face UP -> the record's interact trigger
+	interact(player)
 	var g := 0
 	var picked_no := false
 	while g < 4000 and (cutscene_active or modal != null):
@@ -8176,7 +8177,8 @@ func _pewtertest() -> void:
 		player.cell, nerd.shown and nerd.cell == nerd.home])
 	var kid = _npc_by_key("SPRITE_YOUNGSTER@35,16")
 	player.place(Vector2i(35, 17))
-	cutscene.pewter_gym_guy(kid)
+	player.facing = 1                               # face UP -> the record's interact trigger
+	interact(player)
 	g = 0
 	while g < 4000 and (cutscene_active or modal != null):
 		if modal == textbox:
@@ -15211,6 +15213,25 @@ func _eventtest() -> void:
 	await _drive_until(func() -> bool: return not cutscene_active and modal == null, 400)
 	ok = _ev_check("wave C give_mon both-full: refused, event aborted, box still 20",
 		pc_box.size() == 20 and not has_event("EVT_GAVE")) and ok
+
+	# 15 — wave C mop-up (gh #41): give_coins caps at the COIN CASE's 9999, and the
+	# coins condition reads the case (the Game Corner clerk/gift branches).
+	e = vm2.load_all({"g_coins": {"trigger": {"kind": "step", "map": "map:V", "cells": [[4, 4]]},
+		"commands": [
+			{"cmd": "if", "cond": "coins >= 9990",
+				"then": [{"cmd": "set_flag", "flag": "EVT_CASE_FULL"}],
+				"else": [{"cmd": "give_coins", "count": 50}]}]}})
+	ok = _ev_check("wave C coin commands load clean", e == "", e) and ok
+	story_events = {}
+	player_coins = 9960
+	vm2.step_fire("V", Vector2i(4, 4))
+	await _drive_until(func() -> bool: return not cutscene_active, 200)
+	ok = _ev_check("wave C give_coins: 9960 + 50 capped at 9999",
+		player_coins == 9999 and not has_event("EVT_CASE_FULL")) and ok
+	vm2.step_fire("V", Vector2i(4, 4))
+	await _drive_until(func() -> bool: return has_event("EVT_CASE_FULL"), 200)
+	ok = _ev_check("wave C coins condition: the full case took the guard branch",
+		has_event("EVT_CASE_FULL") and player_coins == 9999) and ok
 
 	print("[eventtest] %s" % ("ALL GREEN" if ok else "FAIL"))
 	get_tree().quit(0 if ok else 1)

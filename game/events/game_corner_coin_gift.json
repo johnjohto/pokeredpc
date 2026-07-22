@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/GameCorner.asm — the fishing guru's 10 free coins (once).",
+ "$comment": "scripts/GameCorner.asm GameCornerFishingGuruText — 10 free coins, once, needing the COIN CASE with room (the 9990 cap check).",
  "id": "event:game_corner_coin_gift",
  "trigger": {
   "kind": "interact",
@@ -8,8 +8,60 @@
  },
  "commands": [
   {
-   "cmd": "beat",
-   "name": "coin_gift"
+   "cmd": "if",
+   "cond": "GOT_10_COINS",
+   "then": [
+    {
+     "cmd": "say",
+     "text": "Wins seem to come\nand go."
+    }
+   ],
+   "else": [
+    {
+     "cmd": "say",
+     "text": "Kid, do you want\nto play?"
+    },
+    {
+     "cmd": "if",
+     "cond": "not item_coin_case",
+     "then": [
+      {
+       "cmd": "say",
+       "text": "Oops! Forgot the\nCOIN CASE!"
+      }
+     ],
+     "else": [
+      {
+       "cmd": "if",
+       "cond": "coins >= 9990",
+       "then": [
+        {
+         "cmd": "say",
+         "text": "You don't need my\ncoins!"
+        }
+       ],
+       "else": [
+        {
+         "cmd": "give_coins",
+         "count": 10
+        },
+        {
+         "cmd": "set_flag",
+         "flag": "GOT_10_COINS"
+        },
+        {
+         "cmd": "sfx",
+         "key": "get_item1"
+        },
+        {
+         "cmd": "say",
+         "text": "{player} received\n10 coins!"
+        }
+       ]
+      }
+     ]
+    }
+   ]
   }
  ]
 }

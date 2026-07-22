@@ -1,16 +1,25 @@
 {
- "$comment": "scripts/ViridianCity.asm ViridianCityCheckGotPokedexScript — the sleepy old man blocks the road north (X==19, Y==9) until the player has the POKéDEX.",
+ "$comment": "scripts/ViridianCity.asm ViridianCityCheckGotPokedexScript — the sleepy old man blocks the road north until the Pokédex (fires at (19,9)); the line, then a step back down (ViridianCityMovePlayerDownScript).",
  "id": "event:viridian_oldman_block",
  "trigger": {
   "kind": "step",
   "map": "map:ViridianCity",
-  "cells": [[19, 9]],
+  "cells": [
+   [
+    19,
+    9
+   ]
+  ],
   "when": "not GOT_POKEDEX"
  },
  "commands": [
   {
-   "cmd": "beat",
-   "name": "viridian_oldman_block"
+   "cmd": "say",
+   "text": "You can't go\nthrough here!\fThis is private\nproperty!"
+  },
+  {
+   "cmd": "walk_player",
+   "dir": "down"
   }
  ]
 }

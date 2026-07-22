@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/PokemonFanClub.asm — the chairman's rapture ends with the BIKE VOUCHER.",
+ "$comment": "scripts/PokemonFanClub.asm — the chairman's RAPIDASH ramble and the BIKE VOUCHER; a BICYCLE in the bag also ends the offer.",
  "id": "event:fan_club_chairman",
  "trigger": {
   "kind": "interact",
@@ -8,8 +8,48 @@
  },
  "commands": [
   {
-   "cmd": "beat",
-   "name": "fan_club_chairman"
+   "cmd": "if",
+   "cond": "GOT_BIKE_VOUCHER or item_bicycle",
+   "then": [
+    {
+     "cmd": "say",
+     "text": "Exchange that\nVOUCHER for a\nBICYCLE!\fMy FEAROW will\nFLY me anywhere,\nso I don't need\none. Enjoy!"
+    }
+   ],
+   "else": [
+    {
+     "cmd": "ask",
+     "text": "I chair the\nPOKéMON Fan Club!\fI have collected\nover 100 POKéMON!\fSo... Did you come\nto hear about my\nPOKéMON?",
+     "then": [
+      {
+       "cmd": "say",
+       "text": "Good! Then listen\nup!\fMy favorite\nRAPIDASH... cute...\nlovely... smart...\namazing...\f...Oops! I kept\nyou too long!\fThanks for hearing\nme out! I want you\nto have this!"
+      },
+      {
+       "cmd": "give_item",
+       "item": "item:bike_voucher"
+      },
+      {
+       "cmd": "sfx",
+       "key": "get_key_item"
+      },
+      {
+       "cmd": "say",
+       "text": "{player} received\na BIKE VOUCHER!"
+      },
+      {
+       "cmd": "set_flag",
+       "flag": "GOT_BIKE_VOUCHER"
+      }
+     ],
+     "else": [
+      {
+       "cmd": "say",
+       "text": "Oh. Come back\nany time."
+      }
+     ]
+    }
+   ]
   }
  ]
 }

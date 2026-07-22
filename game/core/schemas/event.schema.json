@@ -1282,6 +1282,72 @@
       "type": "object",
       "required": [
        "cmd",
+       "species",
+       "level"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "wild_battle"
+       },
+       "species": {
+        "type": "string",
+        "x-ref": "species"
+       },
+       "level": {
+        "type": "integer",
+        "minimum": 1
+       },
+       "unveil": {
+        "type": "boolean"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "count"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "give_coins"
+       },
+       "count": {
+        "type": "integer",
+        "minimum": 1
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "object",
+       "to",
+       "player_to"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "walk_both_to"
+       },
+       "object": {
+        "type": "string"
+       },
+       "to": {
+        "$ref": "#/$defs/cell"
+       },
+       "player_to": {
+        "$ref": "#/$defs/cell"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
        "floors"
       ],
       "properties": {

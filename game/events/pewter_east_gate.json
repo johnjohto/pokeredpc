@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/PewterCity.asm PewterCityCheckPlayerLeavingEastScript — leaving east before beating BROCK, the gym guide kid intercepts and marches you to the gym.",
+ "$comment": "scripts/PewterCity.asm PewterCityCoords — heading east without the BOULDERBADGE fires the gym-guide drag (the same body as pewter_gym_guy).",
  "id": "event:pewter_east_gate",
  "trigger": {
   "kind": "step",
@@ -26,10 +26,66 @@
  },
  "commands": [
   {
-   "cmd": "beat",
-   "name": "pewter_gym_guy",
-   "args": [
-    "@object:SPRITE_YOUNGSTER@35,16"
+   "cmd": "face_object",
+   "object": "SPRITE_YOUNGSTER@35,16",
+   "dir": "player"
+  },
+  {
+   "cmd": "say",
+   "text": "You're a trainer\nright? BROCK's\nlooking for new\nchallengers!\fFollow me!"
+  },
+  {
+   "cmd": "play_song",
+   "key": "museumguy"
+  },
+  {
+   "cmd": "walk_both_to",
+   "object": "SPRITE_YOUNGSTER@35,16",
+   "to": [
+    17,
+    18
+   ],
+   "player_to": [
+    16,
+    18
+   ]
+  },
+  {
+   "cmd": "face_object",
+   "object": "SPRITE_YOUNGSTER@35,16",
+   "dir": "player"
+  },
+  {
+   "cmd": "play_map_music"
+  },
+  {
+   "cmd": "say",
+   "text": "If you have the\nright stuff, go\ntake on BROCK!"
+  },
+  {
+   "cmd": "place_object",
+   "object": "SPRITE_YOUNGSTER@35,16",
+   "at": [
+    12,
+    18
+   ]
+  },
+  {
+   "cmd": "walk_object",
+   "object": "SPRITE_YOUNGSTER@35,16",
+   "dir": "right",
+   "count": 5
+  },
+  {
+   "cmd": "hide_object",
+   "object": "SPRITE_YOUNGSTER@35,16"
+  },
+  {
+   "cmd": "place_object",
+   "object": "SPRITE_YOUNGSTER@35,16",
+   "at": [
+    35,
+    16
    ]
   }
  ]

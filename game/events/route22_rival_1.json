@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/Route22.asm — the rival walks in for battle 1 at the gate approach: after the Pokédex, until Brock is beaten.",
+ "$comment": "scripts/Route22.asm — rival battle 1 at the League gate ((29,4)/(29,5)): he appears at (25,5), walks east stopping alongside you, the OPP_RIVAL1 fight (party by HIS starter), his line, the flag, and the slink west, gone. (gh #177: he stops beside, never on top.)",
  "id": "event:route22_rival_1",
  "trigger": {
   "kind": "step",
@@ -18,10 +18,84 @@
  },
  "commands": [
   {
-   "cmd": "beat",
-   "name": "route22_rival",
-   "args": [
-    1
+   "cmd": "play_song",
+   "key": "meetrival"
+  },
+  {
+   "cmd": "show_object",
+   "object": "SPRITE_BLUE@25,5"
+  },
+  {
+   "cmd": "walk_object",
+   "object": "SPRITE_BLUE@25,5",
+   "dir": "right",
+   "count": 4
+  },
+  {
+   "cmd": "face_object",
+   "object": "SPRITE_BLUE@25,5",
+   "dir": "player"
+  },
+  {
+   "cmd": "say",
+   "text": "{rival}: Hey!\n{player}!\fYou're going to\nPOKéMON LEAGUE?\fForget it! You\nprobably don't\nhave any BADGEs!\fThe guard won't\nlet you through!\fBy the way, did\nyour POKéMON\nget any stronger?"
+  },
+  {
+   "cmd": "if",
+   "cond": "rival_starter_squirtle",
+   "then": [
+    {
+     "cmd": "class_battle",
+     "class": "OPP_RIVAL1",
+     "party": 4,
+     "npc": "Route22:25,5"
+    }
+   ],
+   "else": [
+    {
+     "cmd": "if",
+     "cond": "rival_starter_bulbasaur",
+     "then": [
+      {
+       "cmd": "class_battle",
+       "class": "OPP_RIVAL1",
+       "party": 5,
+       "npc": "Route22:25,5"
+      }
+     ],
+     "else": [
+      {
+       "cmd": "class_battle",
+       "class": "OPP_RIVAL1",
+       "party": 6,
+       "npc": "Route22:25,5"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "cmd": "if",
+   "cond": "battle_won",
+   "then": [
+    {
+     "cmd": "say",
+     "text": "I heard POKéMON\nLEAGUE has many\ntough trainers!\fI have to figure\nout how to get\npast them!\fYou should quit\ndawdling and get\na move on!"
+    },
+    {
+     "cmd": "set_flag",
+     "flag": "BEAT_ROUTE22_RIVAL_1"
+    },
+    {
+     "cmd": "walk_object",
+     "object": "SPRITE_BLUE@25,5",
+     "dir": "left",
+     "count": 5
+    },
+    {
+     "cmd": "hide_object",
+     "object": "SPRITE_BLUE@25,5"
+    }
    ]
   }
  ]

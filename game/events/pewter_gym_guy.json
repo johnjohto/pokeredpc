@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/PewterCity.asm — talking to the gym guide kid marches you to the gym.",
+ "$comment": "scripts/PewterCity.asm PewterCityYoungsterText + PewterMovementScript_WalkToGym — the gym-guide kid marches you to BROCK's door (the simultaneous walk_both_to drag), takes his leave via the (12,18) drop + the 5-step dash (MovementData_PewterGymGuyExit, gh #70), and resets to his post shown for the next challenger. pewter_east_gate carries the same body for the pre-badge east-exit gate.",
  "id": "event:pewter_gym_guy",
  "trigger": {
   "kind": "interact",
@@ -8,10 +8,66 @@
  },
  "commands": [
   {
-   "cmd": "beat",
-   "name": "pewter_gym_guy",
-   "args": [
-    "@npc"
+   "cmd": "face_object",
+   "object": "SPRITE_YOUNGSTER@35,16",
+   "dir": "player"
+  },
+  {
+   "cmd": "say",
+   "text": "You're a trainer\nright? BROCK's\nlooking for new\nchallengers!\fFollow me!"
+  },
+  {
+   "cmd": "play_song",
+   "key": "museumguy"
+  },
+  {
+   "cmd": "walk_both_to",
+   "object": "SPRITE_YOUNGSTER@35,16",
+   "to": [
+    17,
+    18
+   ],
+   "player_to": [
+    16,
+    18
+   ]
+  },
+  {
+   "cmd": "face_object",
+   "object": "SPRITE_YOUNGSTER@35,16",
+   "dir": "player"
+  },
+  {
+   "cmd": "play_map_music"
+  },
+  {
+   "cmd": "say",
+   "text": "If you have the\nright stuff, go\ntake on BROCK!"
+  },
+  {
+   "cmd": "place_object",
+   "object": "SPRITE_YOUNGSTER@35,16",
+   "at": [
+    12,
+    18
+   ]
+  },
+  {
+   "cmd": "walk_object",
+   "object": "SPRITE_YOUNGSTER@35,16",
+   "dir": "right",
+   "count": 5
+  },
+  {
+   "cmd": "hide_object",
+   "object": "SPRITE_YOUNGSTER@35,16"
+  },
+  {
+   "cmd": "place_object",
+   "object": "SPRITE_YOUNGSTER@35,16",
+   "at": [
+    35,
+    16
    ]
   }
  ]

@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/WardensHouse.asm — the Warden trades the GOLD TEETH for HM04 (STRENGTH).",
+ "$comment": "scripts/WardensHouse.asm — the toothless WARDEN: OFAOFA without the GOLD TEETH; with them the trade (taking the teeth first frees the bag slot HM04 lands in, so the direct give cannot overflow — the retired beat's bag ops verbatim).",
  "id": "event:warden_strength",
  "trigger": {
   "kind": "interact",
@@ -8,8 +8,56 @@
  },
  "commands": [
   {
-   "cmd": "beat",
-   "name": "warden_strength"
+   "cmd": "if",
+   "cond": "GOT_HM04",
+   "then": [
+    {
+     "cmd": "say",
+     "text": "WARDEN: Thanks to\nyou I can wear my\ndentures again!"
+    }
+   ],
+   "else": [
+    {
+     "cmd": "if",
+     "cond": "item_gold_teeth",
+     "then": [
+      {
+       "cmd": "say",
+       "text": "WARDEN: OH! My\nGOLD TEETH!\fYou found them!\fHere, take this\nin gratitude!"
+      },
+      {
+       "cmd": "take_item",
+       "item": "item:gold_teeth"
+      },
+      {
+       "cmd": "give_item",
+       "item": "item:hm_strength"
+      },
+      {
+       "cmd": "sfx",
+       "key": "get_item1"
+      },
+      {
+       "cmd": "say",
+       "text": "{player} received\nHM04!"
+      },
+      {
+       "cmd": "set_flag",
+       "flag": "GOT_HM04"
+      },
+      {
+       "cmd": "say",
+       "text": "HM04 is STRENGTH!\fA POKéMON can use\nit to move giant\nboulders!"
+      }
+     ],
+     "else": [
+      {
+       "cmd": "say",
+       "text": "WARDEN: OFAOFA!\nKEKEKE!\f(He has no teeth\nand can't speak\nclearly...)"
+      }
+     ]
+    }
+   ]
   }
  ]
 }

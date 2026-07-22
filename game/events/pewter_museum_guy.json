@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/PewterCity.asm — the museum guy marches the player across town to the museum.",
+ "$comment": "scripts/PewterCity.asm PewterCitySuperNerd1Text — the museum guy: the yes/no; NO drags you to the museum door (walk_both_to, the RLE lists' end cells), his pitch, then the (13,8) drop + 4 steps down (MovementData_PewterMuseumGuyExit, gh #70) and the reset to his post.",
  "id": "event:pewter_museum_guy",
  "trigger": {
   "kind": "interact",
@@ -8,10 +8,78 @@
  },
  "commands": [
   {
-   "cmd": "beat",
-   "name": "pewter_museum_guy",
-   "args": [
-    "@npc"
+   "cmd": "face_object",
+   "object": "SPRITE_SUPER_NERD@27,17",
+   "dir": "player"
+  },
+  {
+   "cmd": "ask",
+   "text": "Did you check out\nthe MUSEUM?",
+   "then": [
+    {
+     "cmd": "say",
+     "text": "Weren't those\nfossils from MT.\nMOON amazing?"
+    }
+   ],
+   "else": [
+    {
+     "cmd": "say",
+     "text": "Really?\nYou absolutely\nhave to go!"
+    },
+    {
+     "cmd": "play_song",
+     "key": "museumguy"
+    },
+    {
+     "cmd": "walk_both_to",
+     "object": "SPRITE_SUPER_NERD@27,17",
+     "to": [
+      13,
+      8
+     ],
+     "player_to": [
+      14,
+      9
+     ]
+    },
+    {
+     "cmd": "face_object",
+     "object": "SPRITE_SUPER_NERD@27,17",
+     "dir": "up"
+    },
+    {
+     "cmd": "play_map_music"
+    },
+    {
+     "cmd": "say",
+     "text": "It's right here!\nYou have to pay\nto get in, but\nit's worth it!\fSee you around!"
+    },
+    {
+     "cmd": "place_object",
+     "object": "SPRITE_SUPER_NERD@27,17",
+     "at": [
+      13,
+      8
+     ]
+    },
+    {
+     "cmd": "walk_object",
+     "object": "SPRITE_SUPER_NERD@27,17",
+     "dir": "down",
+     "count": 4
+    },
+    {
+     "cmd": "hide_object",
+     "object": "SPRITE_SUPER_NERD@27,17"
+    },
+    {
+     "cmd": "place_object",
+     "object": "SPRITE_SUPER_NERD@27,17",
+     "at": [
+      27,
+      17
+     ]
+    }
    ]
   }
  ]

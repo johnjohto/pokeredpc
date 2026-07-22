@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/PokemonTower7F.asm — rescuing Mr. Fuji warps you to his house. Once rescued the gate falls through to his generic map text.",
+ "$comment": "scripts/PokemonTower7F.asm — rescued, MR.FUJI asks you to his house and warps you there (RESCUED_MR_FUJI opens Silph's front door via the Saffron gates).",
  "id": "event:tower_mr_fuji_rescue",
  "trigger": {
   "kind": "interact",
@@ -9,8 +9,16 @@
  },
  "commands": [
   {
-   "cmd": "beat",
-   "name": "mr_fuji_tower"
+   "cmd": "say",
+   "text": "MR.FUJI: Heh? You\ncame to save me?\fThank you. But, I\ncame here of my\nown free will.\f...Come to my\nhouse. I'll be\nwaiting."
+  },
+  {
+   "cmd": "set_flag",
+   "flag": "RESCUED_MR_FUJI"
+  },
+  {
+   "cmd": "warp_to",
+   "map": "map:MrFujisHouse"
   }
  ]
 }

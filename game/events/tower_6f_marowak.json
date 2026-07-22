@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/PokemonTower6F.asm — the restless MAROWAK ghost blocks the stairs at (10,16).",
+ "$comment": "scripts/PokemonTower6F.asm — the restless MAROWAK ghost at (10,16): without the SILPH SCOPE only the 'Get out' warning; with it the fight (wild_battle unveil — appears as GHOST until the mid-intro reveal). The script keys on wBattleResult == 0: a WIN or a POKé DOLL escape (which never writes it) both lay the ghost — RUN and a loss leave it blocking.",
  "id": "event:tower_6f_marowak",
  "trigger": {
   "kind": "step",
@@ -14,8 +14,40 @@
  },
  "commands": [
   {
-   "cmd": "beat",
-   "name": "marowak_ghost"
+   "cmd": "if",
+   "cond": "item_silph_scope",
+   "then": [
+    {
+     "cmd": "say",
+     "text": "Be gone...\nIntruders..."
+    },
+    {
+     "cmd": "wild_battle",
+     "species": "species:marowak",
+     "level": 30,
+     "unveil": true
+    },
+    {
+     "cmd": "if",
+     "cond": "battle_won or battle_doll_escape",
+     "then": [
+      {
+       "cmd": "set_flag",
+       "flag": "BEAT_GHOST_MAROWAK"
+      },
+      {
+       "cmd": "say",
+       "text": "The mother's soul\nwas calmed.\fIt departed to\nthe afterlife!"
+      }
+     ]
+    }
+   ],
+   "else": [
+    {
+     "cmd": "say",
+     "text": "GHOST: Get out...\nGet out..."
+    }
+   ]
   }
  ]
 }

@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/MrFujisHouse.asm — Mr. Fuji hands over the POKé FLUTE.",
+ "$comment": "scripts/MrFujisHouse.asm — the POKé FLUTE. give_item's full-bag abort leaves GOT_POKE_FLUTE unset (re-offer, the retired _gift early return).",
  "id": "event:mr_fuji_flute",
  "trigger": {
   "kind": "interact",
@@ -8,8 +8,36 @@
  },
  "commands": [
   {
-   "cmd": "beat",
-   "name": "mr_fuji_flute"
+   "cmd": "if",
+   "cond": "GOT_POKE_FLUTE",
+   "then": [
+    {
+     "cmd": "say",
+     "text": "MR.FUJI: Has my\nflute helped you?"
+    }
+   ],
+   "else": [
+    {
+     "cmd": "say",
+     "text": "MR.FUJI: {player}.\fYour POKéDEX quest\nmay fail without\nlove for your\nPOKéMON.\fI think this may\nhelp your quest."
+    },
+    {
+     "cmd": "give_item",
+     "item": "item:poke_flute"
+    },
+    {
+     "cmd": "sfx",
+     "key": "get_key_item"
+    },
+    {
+     "cmd": "say",
+     "text": "{player} received\na POKé FLUTE!"
+    },
+    {
+     "cmd": "set_flag",
+     "flag": "GOT_POKE_FLUTE"
+    }
+   ]
   }
  ]
 }

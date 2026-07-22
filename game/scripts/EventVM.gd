@@ -42,7 +42,8 @@ const CMDS := ["say", "notice", "if", "give_item", "take_item", "set_flag", "cle
 	"show_text", "close_text", "emote", "walk_object", "walk_player_to", "walk_together_to", "warp_to",
 	"place_object", "play_map_music", "give_badge", "defeat_gym_trainers",
 	"fade_out", "fade_in", "refresh_objects",
-	"offer_nickname", "show_money", "hide_money", "take_money"]
+	"offer_nickname", "show_money", "hide_money", "take_money",
+	"wild_battle", "give_coins", "walk_both_to"]
 
 ## Player facing indices (Player.facing) by direction word.
 const DIRS := {"down": 0, "up": 1, "left": 2, "right": 3}
@@ -602,6 +603,31 @@ func _run_block(cmds: Array, ctx: Dictionary) -> bool:
 			"take_money":
 				main.player_money -= int(c["amount"])
 				main.moneybox.refresh()          # redrawn right after SubBCDPredef
+			"wild_battle":
+				# A scripted wild encounter (the MAROWAK ghost): the retired beat's
+				# start_battle + await. `unveil: true` = the ghost intro — appears as GHOST
+				# until the SILPH SCOPE reveal mid-intro. Awaited, and re-armed after, as
+				# class_battle does.
+				if bool(c.get("unveil", false)):
+					main.battle.unveil = true
+				main.start_battle(_bare(str(c["species"])), int(c["level"]))
+				await main.battle.finished
+				main.battle.unveil = false
+				main.cutscene_active = true
+			"give_coins":
+				# Game Corner coins, capped at the COIN CASE's 9999 (MaxCoinsText's cap).
+				main.player_coins = mini(9999, main.player_coins + int(c["count"]))
+			"walk_both_to":
+				# The Pewter escort drag (gh #70): the NPC and the player walk their own
+				# pathfound routes SIMULTANEOUSLY (PewterMovementScript_WalkToGym / the
+				# museum guy's RLE pair) — Cutscene.walk_both is the primitive.
+				var escort = main._npc_by_key(str(c["object"]))
+				if escort != null:
+					var escort_to: Array = c["to"]
+					var player_to: Array = c["player_to"]
+					await main.cutscene.walk_both(escort,
+						Vector2i(int(escort_to[0]), int(escort_to[1])),
+						Vector2i(int(player_to[0]), int(player_to[1])))
 			"give_badge":
 				# The badge case (the gym dissolution, gh #41): append once, idempotent — the
 				# pokered quirk of the badge playing sound_level_up stays an explicit `sfx`
@@ -783,6 +809,12 @@ func _ident_value(ident: String, label: String):
 		return main.pc_box.size()
 	if ident == "money":
 		return main.player_money
+	if ident == "coins":
+		return main.player_coins
+	if ident == "battle_doll_escape":
+		# wBattleResult stays 0 on a POKé DOLL escape — the documented ghost-laying
+		# trick (the MAROWAK script keys on it alongside the win).
+		return 1 if main.battle.doll_escape else 0
 	if ident == "dex_owned":
 		main._sync_owned()
 		return main.pokedex_owned.size()

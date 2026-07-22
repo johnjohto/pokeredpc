@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/PokemonTower5F.asm PokemonTower5FDefaultScript — stepping into the four-tile purified zone fires the heal beat once; the IN_PURIFIED_ZONE var re-arms when you step off (the four leave records).",
+ "$comment": "scripts/PokemonTower5F.asm PokemonTower5FDefaultScript — entering the purified zone: HealParty under the white flash (fades + Delay3 twice = 6 frames), then the message. The saved var re-arms on leaving (the complement-region records).",
  "id": "event:tower_5f_a_zone_enter",
  "trigger": {
   "kind": "step",
@@ -31,8 +31,23 @@
    "value": 1
   },
   {
-   "cmd": "beat",
-   "name": "tower_purified_zone"
+   "cmd": "heal_party"
+  },
+  {
+   "cmd": "fade_out",
+   "color": "white"
+  },
+  {
+   "cmd": "wait",
+   "frames": 6
+  },
+  {
+   "cmd": "fade_in",
+   "color": "white"
+  },
+  {
+   "cmd": "say",
+   "text": "Entered purified,\nprotected zone!"
   }
  ]
 }

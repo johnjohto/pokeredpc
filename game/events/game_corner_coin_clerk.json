@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/GameCorner.asm — the coin clerk: 50 coins for ¥1000.",
+ "$comment": "scripts/GameCorner.asm GameCornerClerk1Text — 50 coins for ¥1000: the welcome ask, then the three refusals (no COIN CASE / the 9990 cap / short of money) or the sale.",
  "id": "event:game_corner_coin_clerk",
  "trigger": {
   "kind": "interact",
@@ -8,8 +8,68 @@
  },
  "commands": [
   {
-   "cmd": "beat",
-   "name": "coin_clerk"
+   "cmd": "ask",
+   "text": "Welcome to ROCKET\nGAME CORNER!\fDo you need some\ngame coins?",
+   "then": [
+    {
+     "cmd": "if",
+     "cond": "not item_coin_case",
+     "then": [
+      {
+       "cmd": "say",
+       "text": "You don't have a\nCOIN CASE!"
+      }
+     ],
+     "else": [
+      {
+       "cmd": "if",
+       "cond": "coins >= 9990",
+       "then": [
+        {
+         "cmd": "say",
+         "text": "Oops! Your COIN\nCASE is full."
+        }
+       ],
+       "else": [
+        {
+         "cmd": "if",
+         "cond": "money < 1000",
+         "then": [
+          {
+           "cmd": "say",
+           "text": "You can't afford\nthe coins!"
+          }
+         ],
+         "else": [
+          {
+           "cmd": "take_money",
+           "amount": 1000
+          },
+          {
+           "cmd": "give_coins",
+           "count": 50
+          },
+          {
+           "cmd": "sfx",
+           "key": "get_item1"
+          },
+          {
+           "cmd": "say",
+           "text": "Thanks! Here are\nyour 50 coins!"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "else": [
+    {
+     "cmd": "say",
+     "text": "No? Please come\nplay sometime!"
+    }
+   ]
   }
  ]
 }
