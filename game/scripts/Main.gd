@@ -15155,6 +15155,35 @@ func _eventtest() -> void:
 		defeated_trainers.has("CeruleanGym:2,3") and defeated_trainers.has("CeruleanGym:8,7")
 		and defeated_trainers.has("CeruleanGym:4,2")) and ok
 
+	# 13 — wave C questline 5 (gh #41, Silph/Rocket): the fades + refresh_objects run to
+	# completion headless, and party_count branches a gift's text BEFORE the give (the
+	# Lapras full-party rule, gh #157).
+	e = vm2.load_all({"e_silph": {"trigger": {"kind": "step", "map": "map:Z", "cells": [[2, 2]]},
+		"commands": [
+			{"cmd": "if", "cond": "party_count >= 6",
+				"then": [{"cmd": "set_flag", "flag": "EVT_FULL"}],
+				"else": [{"cmd": "set_flag", "flag": "EVT_ROOM"}]},
+			{"cmd": "fade_out"}, {"cmd": "refresh_objects"}, {"cmd": "wait", "frames": 1},
+			{"cmd": "fade_in"},
+			{"cmd": "fade_out", "color": "white"}, {"cmd": "fade_in", "color": "white"},
+			{"cmd": "set_flag", "flag": "EVT_FADED"}]}})
+	ok = _ev_check("wave C silph commands load clean", e == "", e) and ok
+	story_events = {}
+	player_party = [make_mon("squirtle", 5, [])]
+	vm2.step_fire("Z", Vector2i(2, 2))
+	await _drive_until(func() -> bool: return has_event("EVT_FADED"), 600)
+	ok = _ev_check("wave C party_count: a part-full party took the room branch",
+		has_event("EVT_ROOM") and not has_event("EVT_FULL")) and ok
+	ok = _ev_check("wave C fades: both fade pairs completed and restored",
+		has_event("EVT_FADED") and not cutscene_active) and ok
+	story_events = {}
+	for i in 5:
+		player_party.append(make_mon("pidgey", 5, []))
+	vm2.step_fire("Z", Vector2i(2, 2))
+	await _drive_until(func() -> bool: return has_event("EVT_FADED"), 600)
+	ok = _ev_check("wave C party_count: a six-mon party took the full branch",
+		has_event("EVT_FULL") and not has_event("EVT_ROOM")) and ok
+
 	print("[eventtest] %s" % ("ALL GREEN" if ok else "FAIL"))
 	get_tree().quit(0 if ok else 1)
 

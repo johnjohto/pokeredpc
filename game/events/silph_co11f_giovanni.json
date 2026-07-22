@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/SilphCo11F.asm — Giovanni #2 guards the president's office.",
+ "$comment": "scripts/SilphCo11F.asm — Giovanni #2 guards the president's office (OPP_GIOVANNI party 2). On the win the flag is set BEFORE his parting line, then GBFadeOutToBlack, TEAM ROCKET leaves under the dark (the refresh_objects sweep — this floor's rockets and Giovanni; other floors + Saffron's streets flip at load from the same flag), Delay3, GBFadeInFromBlack (gh #158).",
  "id": "event:silph_co11f_giovanni",
  "trigger": {
   "kind": "interact",
@@ -9,8 +9,41 @@
  },
  "commands": [
   {
-   "cmd": "beat",
-   "name": "giovanni_silph"
+   "cmd": "say",
+   "text": "Ah {player}!\nSo we meet again!\fThe PRESIDENT and\nI are discussing a\nvital business\nproposition.\fKeep your nose out\nof grown-up\nmatters...\fOr, experience a\nworld of pain!"
+  },
+  {
+   "cmd": "class_battle",
+   "class": "OPP_GIOVANNI",
+   "party": 2,
+   "npc": "SilphCo11F:6,9"
+  },
+  {
+   "cmd": "if",
+   "cond": "battle_won",
+   "then": [
+    {
+     "cmd": "set_flag",
+     "flag": "BEAT_SILPH_CO_GIOVANNI"
+    },
+    {
+     "cmd": "say",
+     "text": "Arrgh!\fYou are stronger\nthan I expected!\fAgain, you ruined\nour plans for\nSILPH!\fBut TEAM ROCKET\nwon't give up!"
+    },
+    {
+     "cmd": "fade_out"
+    },
+    {
+     "cmd": "refresh_objects"
+    },
+    {
+     "cmd": "wait",
+     "frames": 3
+    },
+    {
+     "cmd": "fade_in"
+    }
+   ]
   }
  ]
 }

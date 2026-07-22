@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/SilphCo7F.asm — the grateful worker's Lapras.",
+ "$comment": "scripts/SilphCo7F.asm — the grateful worker's LAPRAS (GivePokemon): the party takes it, or a full party sends it to BILL's PC with SentToBoxText instead of the received line (gh #157) — party_count branches BEFORE the give. Once GOT_LAPRAS, the worker only worries after the PRESIDENT.",
  "id": "event:silph_co7f_lapras",
  "trigger": {
   "kind": "interact",
@@ -8,8 +8,58 @@
  },
  "commands": [
   {
-   "cmd": "beat",
-   "name": "silph_lapras"
+   "cmd": "if",
+   "cond": "GOT_LAPRAS",
+   "then": [
+    {
+     "cmd": "say",
+     "text": "Is our PRESIDENT\nOK?"
+    }
+   ],
+   "else": [
+    {
+     "cmd": "say",
+     "text": "Oh! Hi! You're\nnot a ROCKET! You\ncame to save us?\fI want you to\nhave this POKéMON\nfor saving us."
+    },
+    {
+     "cmd": "if",
+     "cond": "party_count >= 6",
+     "then": [
+      {
+       "cmd": "give_mon",
+       "species": "species:lapras",
+       "level": 15
+      },
+      {
+       "cmd": "sfx",
+       "key": "get_item1"
+      },
+      {
+       "cmd": "say",
+       "text": "There's no more\nroom for POKéMON!\fLAPRAS was sent\nto BILL's PC!"
+      }
+     ],
+     "else": [
+      {
+       "cmd": "give_mon",
+       "species": "species:lapras",
+       "level": 15
+      },
+      {
+       "cmd": "sfx",
+       "key": "get_item1"
+      },
+      {
+       "cmd": "say",
+       "text": "{player} received\na LAPRAS!"
+      }
+     ]
+    },
+    {
+     "cmd": "set_flag",
+     "flag": "GOT_LAPRAS"
+    }
+   ]
   }
  ]
 }

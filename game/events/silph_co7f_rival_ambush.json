@@ -1,16 +1,149 @@
 {
- "$comment": "scripts/SilphCo7F.asm SilphCo7FDefaultScript — the rival ambushes you in the corridor (coords (3,2)/(3,3)).",
+ "$comment": "scripts/SilphCo7F.asm SilphCo7FDefaultScript — the rival ambushes you in the corridor (coords (3,2)/(3,3)). Fully authored (wave C): MEET_RIVAL strikes, he calls out, walks up column 3 to stop below you (RivalMovementUp), the OPP_RIVAL2 fight keyed by HIS starter (squirtle 7 / bulbasaur 8 / charmander 9), and on a win the luck line, Music_RivalAlternateStart, and the exit — RivalExitRightMovement from the lower cell (y==3), RivalWalkAroundPlayerMovement from the upper. A loss just returns (blackout handles itself). silph_co7f_rival_talk carries the same body minus the approach walk.",
  "id": "event:silph_co7f_rival_ambush",
  "trigger": {
   "kind": "step",
   "map": "map:SilphCo7F",
-  "cells": [[3, 2], [3, 3]],
+  "cells": [
+   [
+    3,
+    2
+   ],
+   [
+    3,
+    3
+   ]
+  ],
   "when": "not BEAT_SILPH_CO_RIVAL"
  },
  "commands": [
   {
-   "cmd": "beat",
-   "name": "silph_rival"
+   "cmd": "face_player",
+   "dir": "down"
+  },
+  {
+   "cmd": "play_song",
+   "key": "meetrival"
+  },
+  {
+   "cmd": "say",
+   "text": "{rival}: Hahaha!\nI thought you'd\nturn up if I\nwaited here!\fI saw you in\nSAFFRON, so I\ndecided to see if\nyou got better!"
+  },
+  {
+   "cmd": "walk_object_to",
+   "object": "SPRITE_BLUE@3,7",
+   "to": "player",
+   "offset": [
+    0,
+    1
+   ]
+  },
+  {
+   "cmd": "face_object",
+   "object": "SPRITE_BLUE@3,7",
+   "dir": "up"
+  },
+  {
+   "cmd": "if",
+   "cond": "rival_starter_squirtle",
+   "then": [
+    {
+     "cmd": "class_battle",
+     "class": "OPP_RIVAL2",
+     "party": 7,
+     "npc": "SilphCo7F:3,7"
+    }
+   ],
+   "else": [
+    {
+     "cmd": "if",
+     "cond": "rival_starter_bulbasaur",
+     "then": [
+      {
+       "cmd": "class_battle",
+       "class": "OPP_RIVAL2",
+       "party": 8,
+       "npc": "SilphCo7F:3,7"
+      }
+     ],
+     "else": [
+      {
+       "cmd": "class_battle",
+       "class": "OPP_RIVAL2",
+       "party": 9,
+       "npc": "SilphCo7F:3,7"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "cmd": "if",
+   "cond": "battle_won",
+   "then": [
+    {
+     "cmd": "set_flag",
+     "flag": "BEAT_SILPH_CO_RIVAL"
+    },
+    {
+     "cmd": "face_object",
+     "object": "SPRITE_BLUE@3,7",
+     "dir": "up"
+    },
+    {
+     "cmd": "say",
+     "text": "Oh ho!\nSo, you are ready\nfor BOSS ROCKET!\f{rival}: Good luck to\nyou!"
+    },
+    {
+     "cmd": "play_song",
+     "key": "meetrival_alt"
+    },
+    {
+     "cmd": "if",
+     "cond": "player_y == 3",
+     "then": [
+      {
+       "cmd": "walk_object",
+       "object": "SPRITE_BLUE@3,7",
+       "dir": "right",
+       "count": 2
+      }
+     ],
+     "else": [
+      {
+       "cmd": "walk_object",
+       "object": "SPRITE_BLUE@3,7",
+       "dir": "left",
+       "count": 1
+      },
+      {
+       "cmd": "walk_object",
+       "object": "SPRITE_BLUE@3,7",
+       "dir": "up",
+       "count": 2
+      },
+      {
+       "cmd": "walk_object",
+       "object": "SPRITE_BLUE@3,7",
+       "dir": "right",
+       "count": 3
+      },
+      {
+       "cmd": "walk_object",
+       "object": "SPRITE_BLUE@3,7",
+       "dir": "down",
+       "count": 1
+      }
+     ]
+    },
+    {
+     "cmd": "hide_object",
+     "object": "SPRITE_BLUE@3,7"
+    },
+    {
+     "cmd": "play_map_music"
+    }
+   ]
   }
  ]
 }

@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/RocketHideoutB4F.asm RocketHideoutB4FRocket3AfterBattleText — beaten, Rocket 3 lets slip that he dropped the LIFT KEY, which is what puts the ball on the floor beside him (CheckAndSetEvent EVENT_ROCKET_DROPPED_LIFT_KEY -> ShowObject ITEM_5). The reveal waits on the text, so it's a beat.",
+ "$comment": "scripts/RocketHideoutB4F.asm RocketHideoutB4FRocket3AfterBattleText — beaten, Rocket 3 lets slip that he dropped the LIFT KEY; only once the text is dismissed does the ball turn up beside him (CheckAndSetEvent EVENT_ROCKET_DROPPED_LIFT_KEY -> ShowObject ITEM_5 at (10,2); the _shown record persists it).",
  "id": "event:rocket_hideout_b4f_lift_key",
  "trigger": {
   "kind": "interact",
@@ -9,11 +9,16 @@
  },
  "commands": [
   {
-   "cmd": "beat",
-   "name": "rocket_drops_lift_key",
-   "args": [
-    "@npc"
-   ]
+   "cmd": "say",
+   "text": "Oh no! I dropped\nthe LIFT KEY!"
+  },
+  {
+   "cmd": "set_flag",
+   "flag": "ROCKET_DROPPED_LIFT_KEY"
+  },
+  {
+   "cmd": "show_object",
+   "object": "SPRITE_POKE_BALL@10,2"
   }
  ]
 }

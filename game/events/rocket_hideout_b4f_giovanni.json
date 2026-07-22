@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/RocketHideoutB4F.asm — Giovanni guards the SILPH SCOPE, then steps aside once beaten.",
+ "$comment": "scripts/RocketHideoutB4F.asm — Giovanni guards the SILPH SCOPE (OPP_GIOVANNI party 1). Beat him: the WHAT! line, the flag, his concession, then HideObject Giovanni + ShowObject ITEM_4 (the SILPH SCOPE ball at (25,2)); the _shown records persist both across loads.",
  "id": "event:rocket_hideout_b4f_giovanni",
  "trigger": {
   "kind": "interact",
@@ -9,8 +9,40 @@
  },
  "commands": [
   {
-   "cmd": "beat",
-   "name": "giovanni_hideout"
+   "cmd": "say",
+   "text": "So! I must say, I\nam impressed you\ngot here!"
+  },
+  {
+   "cmd": "class_battle",
+   "class": "OPP_GIOVANNI",
+   "party": 1,
+   "npc": "RocketHideoutB4F:25,3"
+  },
+  {
+   "cmd": "if",
+   "cond": "battle_won",
+   "then": [
+    {
+     "cmd": "say",
+     "text": "WHAT!\nThis cannot be!"
+    },
+    {
+     "cmd": "set_flag",
+     "flag": "BEAT_ROCKET_HIDEOUT_GIOVANNI"
+    },
+    {
+     "cmd": "say",
+     "text": "I see that you\nraise POKéMON\nwith utmost care.\fA child like you\nwould never\nunderstand what I\nhope to achieve.\fI shall step\naside this time!\fI hope we meet\nagain..."
+    },
+    {
+     "cmd": "hide_object",
+     "object": "SPRITE_GIOVANNI@25,3"
+    },
+    {
+     "cmd": "show_object",
+     "object": "SPRITE_POKE_BALL@25,2"
+    }
+   ]
   }
  ]
 }

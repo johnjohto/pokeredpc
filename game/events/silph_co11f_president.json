@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/SilphCo11F.asm — the freed president's MASTER BALL.",
+ "$comment": "scripts/SilphCo11F.asm — the freed president's MASTER BALL. give_item's full-bag abort leaves GOT_MASTER_BALL unset, so he re-offers next talk (faithful to the retired _gift early-return).",
  "id": "event:silph_co11f_president",
  "trigger": {
   "kind": "interact",
@@ -9,8 +9,36 @@
  },
  "commands": [
   {
-   "cmd": "beat",
-   "name": "silph_president"
+   "cmd": "if",
+   "cond": "GOT_MASTER_BALL",
+   "then": [
+    {
+     "cmd": "say",
+     "text": "PRESIDENT: SILPH's\nfuture depends on\nyoung people\nlike you!"
+    }
+   ],
+   "else": [
+    {
+     "cmd": "say",
+     "text": "PRESIDENT: Thank\nyou for saving\nSILPH!\fI will never\nforget you saved\nus in our moment\nof peril!\fLet me give you\nthis as thanks!"
+    },
+    {
+     "cmd": "give_item",
+     "item": "item:master_ball"
+    },
+    {
+     "cmd": "sfx",
+     "key": "get_key_item"
+    },
+    {
+     "cmd": "say",
+     "text": "{player} got a\nMASTER BALL!\fThat's the best\nBALL! It catches\nanything, no fail!"
+    },
+    {
+     "cmd": "set_flag",
+     "flag": "GOT_MASTER_BALL"
+    }
+   ]
   }
  ]
 }

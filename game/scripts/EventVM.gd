@@ -39,7 +39,8 @@ const CMDS := ["say", "notice", "if", "give_item", "take_item", "set_flag", "cle
 	"face_player", "play_song", "wait", "walk_object_to", "class_battle", "heal_party",
 	"ask", "show_dex_entry", "pic", "clear_pic", "set_starter", "set_rival_starter", "give_mon",
 	"show_text", "close_text", "emote", "walk_object", "walk_player_to", "walk_together_to", "warp_to",
-	"place_object", "play_map_music", "give_badge", "defeat_gym_trainers"]
+	"place_object", "play_map_music", "give_badge", "defeat_gym_trainers",
+	"fade_out", "fade_in", "refresh_objects"]
 
 ## Player facing indices (Player.facing) by direction word.
 const DIRS := {"down": 0, "up": 1, "left": 2, "right": 3}
@@ -558,6 +559,24 @@ func _run_block(cmds: Array, ctx: Dictionary) -> bool:
 				main.cutscene_active = true    # re-arm for the rest of the event (as beat does)
 			"heal_party":
 				main.heal_party()
+			"fade_out":
+				# color "black" (default) = home/fade.asm GBFadeOutToBlack (Team Rocket leaving
+				# Silph under the dark, gh #158); "white" = GBFadeOutToWhite (Silph 9F's nurse
+				# heal flash, scripts/SilphCo9F.asm). The screen holds until the matching fade_in.
+				if str(c.get("color", "black")) == "white":
+					await main.cutscene.fade_out()
+				else:
+					await main.transition.fade_black()
+			"fade_in":
+				if str(c.get("color", "black")) == "white":
+					await main.cutscene.fade_in()
+				else:
+					await main.transition.fade_in_black()
+			"refresh_objects":
+				# Re-evaluate every map object's visibility gate right now — pokered's
+				# ShowObject/HideObject sweep mid-scene (this floor's rockets vanish while
+				# the screen is dark; other floors flip at load from the same flags).
+				main.refresh_objects()
 			"give_badge":
 				# The badge case (the gym dissolution, gh #41): append once, idempotent — the
 				# pokered quirk of the badge playing sound_level_up stays an explicit `sfx`
@@ -730,6 +749,9 @@ func _ident_value(ident: String, label: String):
 		return main.player.cell.x
 	if ident == "player_y":
 		return main.player.cell.y
+	if ident == "party_count":
+		# GivePokemon's full-party test (a gift branches its text BEFORE the give).
+		return main.player_party.size()
 	if ident == "dex_owned":
 		main._sync_owned()
 		return main.pokedex_owned.size()

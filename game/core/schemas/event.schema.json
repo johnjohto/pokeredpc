@@ -1186,6 +1186,48 @@
      {
       "type": "object",
       "required": [
+       "cmd"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "fade_out"
+       },
+       "color": {
+        "$ref": "#/$defs/fade_color"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "fade_in"
+       },
+       "color": {
+        "$ref": "#/$defs/fade_color"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "refresh_objects"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
        "cmd",
        "floors"
       ],
@@ -1218,6 +1260,12 @@
      }
     ]
    }
+  },
+  "fade_color": {
+   "enum": [
+    "black",
+    "white"
+   ]
   }
  }
 }

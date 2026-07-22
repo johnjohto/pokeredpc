@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/SilphCo9F.asm — the sheltering nurse heals the party.",
+ "$comment": "scripts/SilphCo9F.asm SilphCo9FNurseText — the sheltering nurse: HealParty under a white flash (fades + Delay3), or the thank-you line once Giovanni is beaten.",
  "id": "event:silph_co9f_nurse",
  "trigger": {
   "kind": "interact",
@@ -8,8 +8,39 @@
  },
  "commands": [
   {
-   "cmd": "beat",
-   "name": "silph_co9f_nurse"
+   "cmd": "if",
+   "cond": "BEAT_SILPH_CO_GIOVANNI",
+   "then": [
+    {
+     "cmd": "say",
+     "text": "Thank you so\nmuch!"
+    }
+   ],
+   "else": [
+    {
+     "cmd": "say",
+     "text": "You look tired!\nYou should take a\nquick nap!"
+    },
+    {
+     "cmd": "heal_party"
+    },
+    {
+     "cmd": "fade_out",
+     "color": "white"
+    },
+    {
+     "cmd": "wait",
+     "frames": 3
+    },
+    {
+     "cmd": "fade_in",
+     "color": "white"
+    },
+    {
+     "cmd": "say",
+     "text": "Don't give up!"
+    }
+   ]
   }
  ]
 }

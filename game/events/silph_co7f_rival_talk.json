@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/SilphCo7F.asm — talking to the waiting rival starts the same fight.",
+ "$comment": "scripts/SilphCo7F.asm — talking to the waiting rival starts the same fight as the ambush, minus his approach walk: the retired beat's RivalMovementUp count is max(0, rival.y - (player.y+1)), which clamps to ZERO from every cell you can talk from — he just faces UP and the fight starts. The exit choreography is the ambush's walk-around branch (the player is never at y==3 here).",
  "id": "event:silph_co7f_rival_talk",
  "trigger": {
   "kind": "interact",
@@ -9,8 +9,123 @@
  },
  "commands": [
   {
-   "cmd": "beat",
-   "name": "silph_rival"
+   "cmd": "face_player",
+   "dir": "down"
+  },
+  {
+   "cmd": "play_song",
+   "key": "meetrival"
+  },
+  {
+   "cmd": "say",
+   "text": "{rival}: Hahaha!\nI thought you'd\nturn up if I\nwaited here!\fI saw you in\nSAFFRON, so I\ndecided to see if\nyou got better!"
+  },
+  {
+   "cmd": "face_object",
+   "object": "SPRITE_BLUE@3,7",
+   "dir": "up"
+  },
+  {
+   "cmd": "if",
+   "cond": "rival_starter_squirtle",
+   "then": [
+    {
+     "cmd": "class_battle",
+     "class": "OPP_RIVAL2",
+     "party": 7,
+     "npc": "SilphCo7F:3,7"
+    }
+   ],
+   "else": [
+    {
+     "cmd": "if",
+     "cond": "rival_starter_bulbasaur",
+     "then": [
+      {
+       "cmd": "class_battle",
+       "class": "OPP_RIVAL2",
+       "party": 8,
+       "npc": "SilphCo7F:3,7"
+      }
+     ],
+     "else": [
+      {
+       "cmd": "class_battle",
+       "class": "OPP_RIVAL2",
+       "party": 9,
+       "npc": "SilphCo7F:3,7"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "cmd": "if",
+   "cond": "battle_won",
+   "then": [
+    {
+     "cmd": "set_flag",
+     "flag": "BEAT_SILPH_CO_RIVAL"
+    },
+    {
+     "cmd": "face_object",
+     "object": "SPRITE_BLUE@3,7",
+     "dir": "up"
+    },
+    {
+     "cmd": "say",
+     "text": "Oh ho!\nSo, you are ready\nfor BOSS ROCKET!\f{rival}: Good luck to\nyou!"
+    },
+    {
+     "cmd": "play_song",
+     "key": "meetrival_alt"
+    },
+    {
+     "cmd": "if",
+     "cond": "player_y == 3",
+     "then": [
+      {
+       "cmd": "walk_object",
+       "object": "SPRITE_BLUE@3,7",
+       "dir": "right",
+       "count": 2
+      }
+     ],
+     "else": [
+      {
+       "cmd": "walk_object",
+       "object": "SPRITE_BLUE@3,7",
+       "dir": "left",
+       "count": 1
+      },
+      {
+       "cmd": "walk_object",
+       "object": "SPRITE_BLUE@3,7",
+       "dir": "up",
+       "count": 2
+      },
+      {
+       "cmd": "walk_object",
+       "object": "SPRITE_BLUE@3,7",
+       "dir": "right",
+       "count": 3
+      },
+      {
+       "cmd": "walk_object",
+       "object": "SPRITE_BLUE@3,7",
+       "dir": "down",
+       "count": 1
+      }
+     ]
+    },
+    {
+     "cmd": "hide_object",
+     "object": "SPRITE_BLUE@3,7"
+    },
+    {
+     "cmd": "play_map_music"
+    }
+   ]
   }
  ]
 }
