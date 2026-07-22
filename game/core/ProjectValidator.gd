@@ -31,7 +31,7 @@ static func validate_project(dir: String) -> Dictionary:
 	var errors: Array = []
 	var format: Dictionary = _load_json_file(SCHEMA_DIR + "format.json", errors)
 	if not errors.is_empty():
-		return {"ok": false, "errors": errors, "files": 0, "ids": {}}
+		return {"ok": false, "errors": errors, "files": 0, "ids": {}, "id_registry": {}}
 	var layout: Array = format.get("layout", [])
 	var schemas := {}
 	for entry in layout:
@@ -39,7 +39,7 @@ static func validate_project(dir: String) -> Dictionary:
 		if sname != "" and not schemas.has(sname):
 			schemas[sname] = _load_json_file(SCHEMA_DIR + sname + ".schema.json", errors)
 	if not errors.is_empty():
-		return {"ok": false, "errors": errors, "files": 0, "ids": {}}
+		return {"ok": false, "errors": errors, "files": 0, "ids": {}, "id_registry": {}}
 
 	var files := _walk(dir, "")
 	var ids := {}                       # prefix -> {full_id: true}
@@ -55,7 +55,8 @@ static func validate_project(dir: String) -> Dictionary:
 			if (fmt is float or fmt is int) and int(fmt) > SUPPORTED_FORMAT:
 				errors.append("manifest.json — project format %d; this build supports format %d — update the engine"
 					% [int(fmt), SUPPORTED_FORMAT])
-				return {"ok": false, "errors": errors, "files": files.size(), "ids": {}}
+				return {"ok": false, "errors": errors, "files": files.size(), "ids": {},
+					"id_registry": {}}
 	else:
 		errors.append("manifest.json — missing (a project requires a manifest)")
 
@@ -101,7 +102,61 @@ static func validate_project(dir: String) -> Dictionary:
 	var counts := {}
 	for prefix in ids:
 		counts[prefix] = (ids[prefix] as Dictionary).size()
-	return {"ok": errors.is_empty(), "errors": errors, "files": files.size(), "ids": counts}
+	return {"ok": errors.is_empty(), "errors": errors, "files": files.size(), "ids": counts,
+		"id_registry": ids}
+
+
+## Studio's form context comes from the same format walk and schema files as project
+## validation: no parallel type list or reference index can drift from the boot gate.
+## `ids` is prefix -> {full_id: true}; pickers sort those keys for display.
+static func editor_context(dir: String, content_type: String) -> Dictionary:
+	var report := validate_project(dir)
+	var errors: Array = (report.get("errors", []) as Array).duplicate()
+	var format = _load_json_file(SCHEMA_DIR + "format.json", errors)
+	var entry: Dictionary = {}
+	if format is Dictionary:
+		var wanted := "data/%s/*.json" % content_type
+		for candidate in format.get("layout", []):
+			if str(candidate.get("path", "")) == wanted:
+				entry = candidate
+				break
+	if entry.is_empty():
+		errors.append("no record schema for content type '%s'" % content_type)
+		return {"ok": false, "errors": errors, "schema": {}, "ids": {}, "entry": {}}
+	var schema = _load_json_file(
+		SCHEMA_DIR + str(entry.get("schema", "")) + ".schema.json", errors)
+	return {"ok": errors.is_empty(), "errors": errors, "schema": schema,
+		"ids": report.get("id_registry", {}), "entry": entry}
+
+
+## Validate one in-memory editor draft without touching disk. This is the save
+## preflight: the record gets the full CoreSchema pass, filename identity rule, and
+## resolution against the exact id registry built by validate_project().
+static func validate_editor_record(basename: String, record: Dictionary,
+		context: Dictionary) -> Array:
+	var errors: Array = []
+	if not bool(context.get("ok", false)):
+		errors.append_array(context.get("errors", []))
+		return errors
+	var schema: Dictionary = context.get("schema", {})
+	var refs: Array = []
+	CoreSchema.validate(record, schema, schema, "", errors, refs)
+	var entry: Dictionary = context.get("entry", {})
+	var prefix := str(entry.get("id_prefix", ""))
+	var id_field := str(entry.get("id_field", "id"))
+	var expected := basename if bool(entry.get("bare_id", false)) else prefix + ":" + basename
+	var got := str(record.get(id_field, ""))
+	if got != expected:
+		errors.append("/%s — record id '%s' does not match filename (expected '%s')"
+			% [id_field, got, expected])
+	var registry: Dictionary = context.get("ids", {})
+	for ref in refs:
+		var ref_prefix := str(ref["prefix"])
+		var have: Dictionary = registry.get(ref_prefix, {})
+		if not have.has(str(ref["value"])):
+			errors.append("%s — dangling reference '%s' — no %s with that id"
+				% [ref["path"], ref["value"], ref_prefix])
+	return errors
 
 
 # ---- event semantics (gh #42, ADR-019 consequences) ---------------------------------

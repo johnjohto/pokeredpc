@@ -354,7 +354,18 @@ asserts the counts 151/165/152/47, proves the loud non-fatal refusal). **Landed:
 (same day): `CanonJSON` — the GDScript twin of the extractor's `_pj_write` (code-point key
 sort, Python's escape set, whole-float→int re-emission) — proven by `--studiotest`'s sweep:
 all 515 records of the four kinds re-serialize **byte-identical** against the extractor's
-raw tree. Next: gh #49 (the schema-driven form engine).
+raw tree. **Landed: gh #49** (same day): the validator now exposes the exact schema + ID
+registry context Studio consumes; `SchemaForm` recursively generates scalar, enum,
+boolean, nested-object, array, and `x-ref` picker controls from those schemas (including
+optional-field and array add/remove), reports CoreSchema/reference errors inline, tracks
+dirty state, and validates before canonical Save so an invalid draft never touches the
+last good bytes; explicit Revert restores the last save. `FormWidgetRegistry` is the tiny
+`(content-type, JSON-pointer path)` override seam for #50's sprite/learnset/type/party
+widgets, including whole object/array overrides, and the shell's record pane now mounts
+the real generated form with Save/Revert. `--studiotest` drives the real controls through
+valid canonical save, invalid local + dangling-ref refusal, add/remove/revert, and custom
+scalar + collection overrides; the saved scratch project returns to `--validate` clean.
+Next: gh #50 (the four focused content editors + custom widgets).
 **Landed: gh #34** (2026-07-20): Catch + Progression are behind the seam and the
 **config-first knobs are real** — `Gen1Catch` (`attempt` over the byte-exact kernel + the
 safari `bait_rate`/`rock_rate` transitions, which moved out of the host's input handler),

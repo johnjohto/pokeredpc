@@ -1,0 +1,396 @@
+extends VBoxContainer
+class_name SchemaForm
+## Schema-driven record form (ADR-020 d3/d4, gh #49). Public callers bind a record
+## and address generated controls by JSON-pointer path; the schema remains the single
+## source of field shape and constraints.
+
+var _draft: Dictionary = {}
+var _saved: Dictionary = {}
+var _schema: Dictionary = {}
+var _id_registry: Dictionary = {}
+var _basename := ""
+var _content_type := ""
+var _context: Dictionary = {}
+var _widget_registry: RefCounted = null
+var _field_controls := {}
+var _array_add_controls := {}
+var _array_remove_controls := {}
+var _optional_add_controls := {}
+var _optional_remove_controls := {}
+var _error_labels := {}
+var _current_errors: Array = []
+var _dirty := false
+
+signal dirty_changed(dirty: bool)
+
+
+func bind_record(content_type: String, basename: String, record: Dictionary,
+		context: Dictionary, widget_registry: RefCounted = null) -> void:
+	_draft = record.duplicate(true)
+	_saved = record.duplicate(true)
+	_schema = context.get("schema", {})
+	_id_registry = context.get("ids", {})
+	_content_type = content_type
+	_basename = basename
+	_context = context
+	_widget_registry = widget_registry
+	_set_dirty(false)
+	_rebuild()
+
+
+## The public test/editor seam: return the input control generated for a JSON pointer.
+func field_control(path: String) -> Control:
+	return _field_controls.get(path, null)
+
+
+func field_error(path: String) -> String:
+	var label: Label = _error_labels.get(path, null)
+	return label.text if label != null else ""
+
+
+func array_add_control(path: String) -> Button:
+	return _array_add_controls.get(path, null)
+
+
+func array_remove_control(item_path: String) -> Button:
+	return _array_remove_controls.get(item_path, null)
+
+
+func optional_add_control(path: String) -> Button:
+	return _optional_add_controls.get(path, null)
+
+
+func optional_remove_control(path: String) -> Button:
+	return _optional_remove_controls.get(path, null)
+
+
+func is_dirty() -> bool:
+	return _dirty
+
+
+## Validate before opening the file. Invalid drafts never reach CanonJSON, so refusal
+## cannot truncate or otherwise disturb the last good bytes.
+func save_record(path: String) -> Array:
+	var errors := _validate_draft()
+	if not errors.is_empty():
+		return errors
+	var write_error := CanonJSON.write_file(path, _draft)
+	if write_error != "":
+		return [write_error]
+	_saved = _draft.duplicate(true)
+	_set_dirty(false)
+	return []
+
+
+func revert_record() -> void:
+	_draft = _saved.duplicate(true)
+	_set_dirty(false)
+	_rebuild()
+
+
+func _rebuild() -> void:
+	_field_controls.clear()
+	_array_add_controls.clear()
+	_array_remove_controls.clear()
+	_optional_add_controls.clear()
+	_optional_remove_controls.clear()
+	_error_labels.clear()
+	for child in get_children():
+		child.queue_free()
+	_build_object(self, _schema, _draft, "")
+	_validate_draft()
+
+
+func _build_object(parent: Control, schema: Dictionary, value: Dictionary, path: String) -> void:
+	var properties: Dictionary = schema.get("properties", {})
+	for field in properties:
+		var field_schema: Dictionary = properties[field]
+		var field_path := path + "/" + str(field)
+		if not value.has(field):
+			if not (schema.get("required", []) as Array).has(field):
+				_build_missing_optional(parent, str(field), field_schema, field_path)
+			continue
+		_build_field(parent, str(field), field_schema, value[field], field_path)
+		if not (schema.get("required", []) as Array).has(field):
+			var remove := Button.new()
+			remove.text = "Remove %s" % field
+			remove.pressed.connect(func() -> void: _remove_optional(field_path))
+			parent.add_child(remove)
+			_optional_remove_controls[field_path] = remove
+
+
+func _build_missing_optional(parent: Control, field: String, schema: Dictionary,
+		path: String) -> void:
+	var row := HBoxContainer.new()
+	parent.add_child(row)
+	var label := Label.new()
+	label.text = field + " (optional)"
+	label.custom_minimum_size.x = 120
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(label)
+	var add := Button.new()
+	add.text = "Add"
+	add.pressed.connect(func() -> void: _add_optional(path, schema))
+	row.add_child(add)
+	_optional_add_controls[path] = add
+
+
+func _build_field(parent: Control, field: String, schema: Dictionary, value, path: String) -> void:
+	if _widget_registry != null:
+		var custom: Control = _widget_registry.build(_content_type, path, schema, value,
+			func(next) -> void: _set_draft_value(path, next))
+		if custom != null:
+			_mount_input(parent, field, custom, path)
+			return
+	var kind := str(schema.get("type", ""))
+	if kind == "object":
+		var section := VBoxContainer.new()
+		parent.add_child(section)
+		var heading := Label.new()
+		heading.text = field
+		section.add_child(heading)
+		_add_error_label(section, path)
+		if value is Dictionary:
+			_build_object(section, schema, value, path)
+		return
+	if kind == "array":
+		_build_array(parent, field, schema, value if value is Array else [], path)
+		return
+	var input := _make_input(schema, value, path)
+	if input == null:
+		return
+	_mount_input(parent, field, input, path)
+
+
+func _mount_input(parent: Control, field: String, input: Control, path: String) -> void:
+	var block := VBoxContainer.new()
+	parent.add_child(block)
+	var row := HBoxContainer.new()
+	block.add_child(row)
+	var label := Label.new()
+	label.text = str(field)
+	label.custom_minimum_size.x = 120
+	row.add_child(label)
+	input.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(input)
+	_field_controls[path] = input
+	_add_error_label(block, path)
+
+
+func _build_array(parent: Control, field: String, schema: Dictionary, value: Array,
+		path: String) -> void:
+	var section := VBoxContainer.new()
+	parent.add_child(section)
+	var header := HBoxContainer.new()
+	section.add_child(header)
+	var label := Label.new()
+	label.text = field
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(label)
+	var add := Button.new()
+	add.text = "Add"
+	add.disabled = schema.has("maxItems") and value.size() >= int(schema["maxItems"])
+	add.pressed.connect(func() -> void: _append_array(path, schema.get("items", {})))
+	header.add_child(add)
+	_array_add_controls[path] = add
+	_add_error_label(section, path)
+	var item_schema: Dictionary = schema.get("items", {})
+	for i in value.size():
+		var item_path := "%s/%d" % [path, i]
+		var item_row := HBoxContainer.new()
+		section.add_child(item_row)
+		var item_content := VBoxContainer.new()
+		item_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		item_row.add_child(item_content)
+		_build_field(item_content, "[%d]" % i, item_schema, value[i], item_path)
+		var remove := Button.new()
+		remove.text = "Remove"
+		var item_index := i
+		remove.pressed.connect(func() -> void: _remove_array_item(path, item_index))
+		item_row.add_child(remove)
+		_array_remove_controls[item_path] = remove
+
+
+func _make_input(schema: Dictionary, value, path: String) -> Control:
+	if schema.has("x-ref"):
+		var picker := OptionButton.new()
+		var prefix := str(schema["x-ref"])
+		var ids := (_id_registry.get(prefix, {}) as Dictionary).keys()
+		ids.sort()
+		var found := false
+		for id in ids:
+			picker.add_item(str(id))
+			picker.set_item_metadata(picker.item_count - 1, str(id))
+			if str(id) == str(value):
+				found = true
+				picker.select(picker.item_count - 1)
+		if not found:
+			picker.add_item("[missing] " + str(value))
+			picker.set_item_metadata(picker.item_count - 1, str(value))
+			picker.select(picker.item_count - 1)
+		picker.item_selected.connect(func(index: int) -> void:
+			_set_draft_value(path, picker.get_item_metadata(index)))
+		return picker
+	if schema.has("enum"):
+		var picker := OptionButton.new()
+		var allowed: Array = schema["enum"]
+		for option in allowed:
+			picker.add_item(str(option))
+			if option == value:
+				picker.select(picker.item_count - 1)
+		picker.item_selected.connect(func(index: int) -> void:
+			_set_draft_value(path, allowed[index]))
+		return picker
+	match str(schema.get("type", "")):
+		"string":
+			var input := LineEdit.new()
+			input.text = str(value)
+			input.text_changed.connect(func(text: String) -> void: _set_draft_value(path, text))
+			return input
+		"integer", "number":
+			var number := SpinBox.new()
+			number.min_value = float(schema.get("minimum", -1.0e12))
+			number.max_value = float(schema.get("maximum", 1.0e12))
+			number.allow_lesser = true
+			number.allow_greater = true
+			number.step = 1.0 if str(schema.get("type", "")) == "integer" else 0.01
+			number.value = float(value)
+			number.value_changed.connect(func(next: float) -> void:
+				_set_draft_value(path, int(next) if str(schema.get("type", "")) == "integer" else next))
+			return number
+		"boolean":
+			var check := CheckBox.new()
+			check.button_pressed = bool(value)
+			check.toggled.connect(func(pressed: bool) -> void: _set_draft_value(path, pressed))
+			return check
+	return null
+
+
+func _append_array(path: String, item_schema: Dictionary) -> void:
+	var value = _draft_value(path)
+	if not (value is Array):
+		return
+	(value as Array).append(_default_value(item_schema))
+	_set_dirty(CanonJSON.serialize(_draft) != CanonJSON.serialize(_saved))
+	_rebuild()
+
+
+func _remove_array_item(path: String, index: int) -> void:
+	var value = _draft_value(path)
+	if not (value is Array) or index < 0 or index >= (value as Array).size():
+		return
+	(value as Array).remove_at(index)
+	_set_dirty(CanonJSON.serialize(_draft) != CanonJSON.serialize(_saved))
+	_rebuild()
+
+
+func _add_optional(path: String, schema: Dictionary) -> void:
+	_set_draft_value(path, _default_value(schema))
+	_rebuild()
+
+
+func _remove_optional(path: String) -> void:
+	var segments := path.split("/", false)
+	if segments.is_empty():
+		return
+	var node = _draft
+	for i in segments.size() - 1:
+		var segment := str(segments[i])
+		node = node[int(segment)] if node is Array else node[segment]
+	if node is Dictionary:
+		(node as Dictionary).erase(str(segments[-1]))
+	_set_dirty(CanonJSON.serialize(_draft) != CanonJSON.serialize(_saved))
+	_rebuild()
+
+
+func _draft_value(path: String):
+	var node = _draft
+	for segment in path.split("/", false):
+		node = node[int(segment)] if node is Array else node[str(segment)]
+	return node
+
+
+func _default_value(schema: Dictionary):
+	if schema.has("default"):
+		var default_value = schema["default"]
+		return default_value.duplicate(true) if default_value is Array or default_value is Dictionary else default_value
+	if schema.has("x-ref"):
+		var ids := (_id_registry.get(str(schema["x-ref"]), {}) as Dictionary).keys()
+		ids.sort()
+		return str(ids[0]) if not ids.is_empty() else str(schema["x-ref"]) + ":"
+	if schema.has("enum") and not (schema["enum"] as Array).is_empty():
+		return schema["enum"][0]
+	match str(schema.get("type", "")):
+		"object":
+			var object := {}
+			var properties: Dictionary = schema.get("properties", {})
+			for field in schema.get("required", []):
+				if properties.has(field):
+					object[field] = _default_value(properties[field])
+			return object
+		"array":
+			var array := []
+			for _i in int(schema.get("minItems", 0)):
+				array.append(_default_value(schema.get("items", {})))
+			return array
+		"string":
+			return ""
+		"integer":
+			return int(schema.get("minimum", 0))
+		"number":
+			return float(schema.get("minimum", 0.0))
+		"boolean":
+			return false
+	return null
+
+
+func _add_error_label(parent: Control, path: String) -> void:
+	var error := Label.new()
+	error.modulate = Color(1.0, 0.35, 0.35)
+	error.visible = false
+	parent.add_child(error)
+	_error_labels[path] = error
+
+
+func _set_draft_value(path: String, value) -> void:
+	var segments := path.split("/", false)
+	if segments.is_empty():
+		return
+	var node = _draft
+	for i in segments.size() - 1:
+		var segment := str(segments[i])
+		node = node[int(segment)] if node is Array else node[segment]
+	var leaf := str(segments[-1])
+	if node is Array:
+		node[int(leaf)] = value
+	else:
+		node[leaf] = value
+	_set_dirty(CanonJSON.serialize(_draft) != CanonJSON.serialize(_saved))
+	_validate_draft()
+
+
+func _set_dirty(value: bool) -> void:
+	if _dirty == value:
+		return
+	_dirty = value
+	dirty_changed.emit(_dirty)
+
+
+func _validate_draft() -> Array:
+	_current_errors = ProjectValidator.validate_editor_record(_basename, _draft, _context)
+	for label in _error_labels.values():
+		(label as Label).text = ""
+		(label as Label).visible = false
+	for error in _current_errors:
+		var message := str(error)
+		var split_at := message.find(" — ")
+		var path := message.substr(0, split_at) if split_at >= 0 else ""
+		var target := path
+		while target != "" and not _error_labels.has(target):
+			target = target.substr(0, target.rfind("/"))
+		if _error_labels.has(target):
+			var label: Label = _error_labels[target]
+			label.text += ("\n" if label.text != "" else "") + (
+				message.substr(split_at + 3) if split_at >= 0 else message)
+			label.visible = true
+	return _current_errors.duplicate()
