@@ -97,6 +97,11 @@ reconstruction sorts by it. Binary assets (textures/audio synth inputs) still lo
 Godot's import pipeline from `game/assets/` this phase; the project carries byte-identical
 copies, and the raw-load switch belongs to the Studio phases.
 
+Studio's Play-test action launches a separate Engine process with `--project=<dir>` and a
+normalized-path-derived `--saveslot`. The child writes a tokened ready handshake only after
+the project has loaded and reports the resolved save path; separate creator projects therefore
+cannot share play-test progress (ADR-020 d5, gh #51).
+
 ## Schemas + validator (gh #22)
 
 - `game/core/schemas/*.schema.json` — standard JSON Schema documents (external tools can

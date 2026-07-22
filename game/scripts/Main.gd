@@ -572,21 +572,23 @@ func _ready() -> void:
 		make_mon("charmander", 8, ["SCRATCH", "GROWL", "EMBER"]),
 		make_mon("pidgey", 5, []),
 	]
+	var user_args := OS.get_cmdline_user_args()
+	var automated_run := _is_automated_run(user_args)
 	audio = preload("res://scripts/Audio.gd").new()
 	add_child(audio)
 	audio.setup(ProjectData.legacy("audio.json"), ProjectData.legacy("map_music.json"),
 		ProjectData.legacy("sfx.json"), ProjectData.legacy("cries.json"))
-	audio.enabled = OS.get_cmdline_user_args().is_empty()   # no music synthesis during tests
-	if not OS.get_cmdline_user_args().is_empty():
+	audio.enabled = not automated_run                       # live custom-project runs keep audio
+	if automated_run:
 		SAVE_PATH = "user://pokeredpc_save_test.json"       # never clobber the real save (gh #40)
-		for ua in OS.get_cmdline_user_args():
-			if str(ua).begins_with("--saveslot="):          # two-instance tests keep separate slots
-				SAVE_PATH = "user://pokeredpc_save_%s.json" % str(ua).substr(11)
+	for ua in user_args:
+		if str(ua).begins_with("--saveslot="):              # link tests + Studio play-tests
+			SAVE_PATH = "user://pokeredpc_save_%s.json" % str(ua).substr(11)
 	# gh #9: a leftover trade journal marks a trade interrupted inside the commit window.
 	# Recovery runs in load_game (it needs the party); here it is only surfaced.
 	if FileAccess.file_exists(_tc_journal_path()):
 		print("[trade] interrupted trade journal present — will recover on load")
-	battle.fast_hp = not OS.get_cmdline_user_args().is_empty()   # skip HP-drain animation in tests
+	battle.fast_hp = automated_run                               # skip HP-drain animation in tests
 	apply_options()                   # text speed etc. (defaults; a loaded save re-applies)
 	player = preload("res://scripts/Player.gd").new()
 	add_child(player)
@@ -602,9 +604,32 @@ func _ready() -> void:
 	add_child(grass_overlay)
 	grass_overlay.draw.connect(_draw_grass_overlay)
 	load_world("PalletTown")
-	audio.presynth_all()        # background-build every track so later changes are instant
+	# The handshake probe exits immediately; do not queue every synth only to block on
+	# Audio._exit_tree waiting for throwaway workers. A real Studio child warms normally.
+	if "--playtest-probe" not in user_args:
+		audio.presynth_all()        # background-build every track so later changes are instant
 
 	var args := OS.get_cmdline_args() + OS.get_cmdline_user_args()
+	var playtest_handshake := _arg_value(args, "--playtest-handshake=")
+	if playtest_handshake != "":
+		var handshake_error := CanonJSON.write_file(playtest_handshake, {
+			"automated": automated_run,
+			"ok": true,
+			"pid": OS.get_process_id(),
+			"project_dir": _normalized_platform_path(ProjectData.dir),
+			"project_id": str(ProjectData.manifest.get("id", "")),
+			"save_path": ProjectSettings.globalize_path(SAVE_PATH),
+			"save_slot": _arg_value(args, "--saveslot="),
+			"token": _arg_value(args, "--playtest-token="),
+		})
+		if handshake_error != "":
+			print("[playtest] HANDSHAKE FAIL — " + handshake_error)
+			get_tree().quit(1)
+			return
+		print("[playtest] READY project=%s save=%s" % [ProjectData.dir, SAVE_PATH])
+		if "--playtest-probe" in args:
+			get_tree().quit(0)
+			return
 	if "--selftest" in args:
 		_selftest()
 	elif "--playthrough" in args:
@@ -5510,6 +5535,31 @@ func _validate_dir_arg(args) -> String:
 		if str(a).begins_with("--validate="):
 			return str(a).substr(11)
 	return ""
+
+
+func _arg_value(args, prefix: String) -> String:
+	for arg in args:
+		if str(arg).begins_with(prefix):
+			return str(arg).substr(prefix.length())
+	return ""
+
+
+func _is_automated_run(user_args) -> bool:
+	# Runtime modifiers are also used by live Studio children; they must not silently
+	# disable audio or accelerate battle presentation. Any actual command/test flag does.
+	for arg in user_args:
+		var value := str(arg)
+		if value.begins_with("--project=") or value.begins_with("--saveslot=") \
+				or value.begins_with("--playtest-handshake=") \
+				or value.begins_with("--playtest-token=") or value == "--playtest-probe":
+			continue
+		return true
+	return false
+
+
+func _normalized_platform_path(path: String) -> String:
+	var normalized := ProjectSettings.globalize_path(path).simplify_path().replace("\\", "/")
+	return normalized.to_lower() if OS.get_name() == "Windows" else normalized
 
 
 ## gh #25: the project directory the runtime loads — res://project (the extractor's

@@ -15,6 +15,7 @@ const RECENTS_CFG := "user://studio.cfg"
 var project_dir := ""
 var _path_label: Label
 var _status: Label
+var _playtest_button: Button
 var _sidebar: ItemList
 var _records: ItemList
 var _editor_host: ScrollContainer
@@ -61,6 +62,7 @@ func open_project(dir_path: String) -> String:
 	_refresh_sidebar()
 	_clear_editor()
 	_save_recent(dir_path)
+	_playtest_button.disabled = false
 	_status.text = "project open — %s (%s)" % [
 		str(ProjectData.manifest.get("name", "?")), str(ProjectData.manifest.get("ruleset", "?"))]
 	return ""
@@ -76,6 +78,11 @@ func _build_ui() -> void:
 	open_btn.text = "Open project…"
 	open_btn.pressed.connect(func() -> void: _dialog.popup_centered_ratio(0.7))
 	top.add_child(open_btn)
+	_playtest_button = Button.new()
+	_playtest_button.text = "Play-test"
+	_playtest_button.disabled = true
+	_playtest_button.pressed.connect(_on_playtest_pressed)
+	top.add_child(_playtest_button)
 	_path_label = Label.new()
 	_path_label.text = "(no project)"
 	_path_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -191,6 +198,42 @@ func _clear_editor() -> void:
 		child.queue_free()
 
 
+func playtest_control() -> Button:
+	return _playtest_button
+
+
+## Public launch seam used by the button and --studiotest. The Engine is always a child
+## process; `probe` asks it to quit after proving readiness, and is test-only.
+func launch_playtest(probe := false, headless := false):
+	if project_dir == "":
+		_status.text = "REFUSED: open a project before play-testing"
+		return null
+	if _active_form != null and _active_form.is_dirty():
+		_status.text = "REFUSED: save or revert the current record before play-testing"
+		return null
+	var report := ProjectValidator.validate_project(project_dir)
+	if not bool(report.get("ok", false)):
+		_status.text = "REFUSED: " + "; ".join(PackedStringArray(report.get("errors", [])))
+		return null
+	var child := preload("res://scripts/studio/StudioPlaytest.gd").new()
+	var error: String = child.launch(project_dir, probe, headless)
+	if error != "":
+		_status.text = "REFUSED: " + error
+		return null
+	_status.text = "launching play-test…"
+	return child
+
+
+func _on_playtest_pressed() -> void:
+	var child = launch_playtest()
+	if child == null:
+		return
+	var ack: Dictionary = await child.wait_for_handshake(get_tree())
+	_status.text = ("play-test ready — isolated save %s" % str(ack.get("save_slot", ""))) \
+		if bool(ack.get("ok", false)) else "REFUSED: " + str(ack.get("error", "handshake failed"))
+	child.cleanup_handshake()
+
+
 # ---- the recents list (user://studio.cfg) -------------------------------------------
 
 func _load_recents() -> Array:
@@ -243,8 +286,8 @@ func _studiotest() -> void:
 	var rerr := open_project(scratch.path_join("no_such_dir"))
 	ok = _st_check("a bad folder refuses loudly and the shell survives",
 		rerr != "" and project_dir == scratch) and ok
-	# gh #48 (ADR-020 d2) — canonical write-through: parse + re-serialize every record of
-	# the four kinds through CanonJSON and compare against the extractor's raw bytes.
+	# gh #48/#51 (ADR-020 d2/d7) — canonical write-through: parse + ACTUALLY re-save every
+	# record in the scratch copy, then compare against the extractor's raw bytes.
 	# BYTE-identical or the writer is wrong; the first mismatch names file + offset.
 	var swept := 0
 	var bad := ""
@@ -253,8 +296,13 @@ func _studiotest() -> void:
 		for f in DirAccess.get_files_at(kdir):
 			if not f.ends_with(".json"):
 				continue
-			var raw := FileAccess.get_file_as_string(kdir.path_join(f))
-			var reser: String = CanonJSON.serialize(JSON.parse_string(raw)) + "\n"
+			var path := kdir.path_join(f)
+			var raw := FileAccess.get_file_as_string(path)
+			var write_error := CanonJSON.write_file(path, JSON.parse_string(raw))
+			if write_error != "":
+				bad = write_error
+				break
+			var reser := FileAccess.get_file_as_string(path)
 			if reser != raw:
 				var at := 0
 				while at < mini(raw.length(), reser.length()) and raw[at] == reser[at]:
@@ -266,10 +314,11 @@ func _studiotest() -> void:
 			swept += 1
 		if bad != "":
 			break
-	ok = _st_check("canonical write-through: %d records re-serialize byte-identical" % swept,
+	ok = _st_check("canonical write-through: %d records load/re-save byte-identical" % swept,
 		bad == "", bad) and ok
 	ok = preload("res://scripts/studio/StudioFormSmoke.gd").new().run(self, scratch) and ok
 	ok = preload("res://scripts/studio/StudioEditorSmoke.gd").new().run(self, scratch) and ok
+	ok = await preload("res://scripts/studio/StudioPlaytestSmoke.gd").new().run(self, scratch) and ok
 	print("[studiotest] %s" % ("ALL GREEN" if ok else "FAIL"))
 	get_tree().quit(0 if ok else 1)
 

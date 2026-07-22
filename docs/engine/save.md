@@ -2,8 +2,12 @@
 
 ## Save file
 
-A single JSON slot at `user://pokeredpc_save.json` (Godot's per-user dir). `Main.save_game()`
-writes the full game state; `Main.load_game()` restores it. The serialized fields:
+A normal game uses `user://pokeredpc_save.json` (Godot's per-user dir). `Main.save_game()`
+writes the full game state; `Main.load_game()` restores it. Studio play-tests pass a stable
+`--saveslot=studio_<path-hash>` derived from the opened project's normalized absolute path,
+so each project instead uses its own `pokeredpc_save_studio_<hash>.json`; testing one creator
+project can never overwrite the normal game or another project's progress (ADR-020 d5, gh #51).
+The serialized fields:
 
 | Field | Source |
 |---|---|

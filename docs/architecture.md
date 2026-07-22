@@ -52,7 +52,7 @@ still require reimplementing the GB's PPU/APU/timing and yields an unmaintainabl
 | Link layer | `game/scripts/Link.gd` | THE one networking seam (v1.1): ENet transport, link identity handshake, session messages ([engine/link.md](engine/link.md)) |
 | Mon record | `game/scripts/MonRecord.gd` | the `mon/1` wire codec, mapped only at the link boundary ([data-formats/mon-record.md](data-formats/mon-record.md)) |
 | Project format core | `game/core/Schema.gd`, `ProjectValidator.gd`, `CanonJSON.gd` | schema validation, cross-record identity/reference checks, editor context, and canonical persistence for v2 project data |
-| Studio | `game/scripts/studio/StudioShell.gd`, `SchemaForm.gd`, `StudioWidgetCatalog.gd`, `widgets/` | project browser plus schema-generated record forms; the catalog plugs sprite, type, learnset, and party controls into exact content-type/JSON-pointer paths |
+| Studio | `game/scripts/studio/StudioShell.gd`, `SchemaForm.gd`, `StudioWidgetCatalog.gd`, `StudioPlaytest.gd`, `widgets/` | project browser plus schema-generated forms and focused content widgets; Play-test launches a separately handshaken Engine child with a project-isolated save slot |
 | Engine binary | `tools/godot/` | portable Godot 4.7 (not installed system-wide) |
 
 As systems grow, `Main.gd` will split into focused nodes/scripts (MapManager, Battle,

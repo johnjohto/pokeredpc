@@ -223,6 +223,10 @@ func run(shell, scratch: String) -> bool:
 		and move_form.field_control("/power") is SpinBox
 		and trainer_form.field_control("/parties/0/0/species") is OptionButton
 		and trainer_form.field_control("/parties/0/0/level") is SpinBox) and ok
+	var restore_error := CanonJSON.write_file(species_file, bulbasaur)
+	ok = _check("form smoke restores its round-trip fixture",
+		restore_error == "" and FileAccess.get_file_as_string(species_file) == species_raw,
+		restore_error) and ok
 	return ok
 
 

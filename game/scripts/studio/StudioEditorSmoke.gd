@@ -6,6 +6,8 @@ class_name StudioEditorSmoke
 
 func run(shell, scratch: String) -> bool:
 	var ok := true
+	var species_path := scratch.path_join("data/species/bulbasaur.json")
+	var original_species_raw := FileAccess.get_file_as_string(species_path)
 	var species_form = shell.edit_record("species", "bulbasaur")
 	var sprites: Control = species_form.field_control("/sprites") if species_form != null else null
 	var types: Control = species_form.field_control("/types") if species_form != null else null
@@ -52,7 +54,6 @@ func run(shell, scratch: String) -> bool:
 		and (types.call("current_value") as Array).size() == 2
 		and added_learnset_row and learnset.call("row_count") == original_learnset_size
 		and species_form.is_dirty()) and ok
-	var species_path := scratch.path_join("data/species/bulbasaur.json")
 	var species_save_errors: Array = species_form.save_record(species_path)
 	var saved_species: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(species_path))
 	ok = _check("species custom-widget edits save canonically and validate",
@@ -82,6 +83,8 @@ func run(shell, scratch: String) -> bool:
 	ok = _check("item editor remains schema-driven",
 		item_form != null and item_form.field_control("/price") is SpinBox) and ok
 
+	var trainer_path := scratch.path_join("data/trainers/opp_brock.json")
+	var original_trainer_raw := FileAccess.get_file_as_string(trainer_path)
 	var trainer_form = shell.edit_record("trainers", "opp_brock")
 	var parties: Control = trainer_form.field_control("/parties") if trainer_form != null else null
 	ok = _check("trainer editor mounts the party builder",
@@ -119,7 +122,6 @@ func run(shell, scratch: String) -> bool:
 		added_party and parties.call("party_count") == initial_parties
 		and added_member and parties.call("member_count", 0) == initial_members
 		and abra >= 0 and trainer_form.is_dirty()) and ok
-	var trainer_path := scratch.path_join("data/trainers/opp_brock.json")
 	var trainer_save_errors: Array = trainer_form.save_record(trainer_path)
 	var saved_trainer: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(trainer_path))
 	var final_report := ProjectValidator.validate_project(scratch)
@@ -129,6 +131,14 @@ func run(shell, scratch: String) -> bool:
 		and int(saved_trainer["parties"][0][0]["level"]) == 15
 		and bool(final_report["ok"]), "; ".join(PackedStringArray(
 			trainer_save_errors if not trainer_save_errors.is_empty() else final_report["errors"]))) and ok
+	var species_restore := CanonJSON.write_file(species_path, JSON.parse_string(original_species_raw))
+	var trainer_restore := CanonJSON.write_file(trainer_path, JSON.parse_string(original_trainer_raw))
+	var restored_report := ProjectValidator.validate_project(scratch)
+	ok = _check("content-editor smoke restores the round-trip project for the phase gate",
+		species_restore == "" and trainer_restore == ""
+		and FileAccess.get_file_as_string(species_path) == original_species_raw
+		and FileAccess.get_file_as_string(trainer_path) == original_trainer_raw
+		and bool(restored_report["ok"]), species_restore + trainer_restore) and ok
 	return ok
 
 
