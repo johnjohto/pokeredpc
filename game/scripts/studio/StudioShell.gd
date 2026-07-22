@@ -166,6 +166,31 @@ func _studiotest() -> void:
 	var rerr := open_project(scratch.path_join("no_such_dir"))
 	ok = _st_check("a bad folder refuses loudly and the shell survives",
 		rerr != "" and project_dir == scratch) and ok
+	# gh #48 (ADR-020 d2) — canonical write-through: parse + re-serialize every record of
+	# the four kinds through CanonJSON and compare against the extractor's raw bytes.
+	# BYTE-identical or the writer is wrong; the first mismatch names file + offset.
+	var swept := 0
+	var bad := ""
+	for kind in CONTENT_TYPES:
+		var kdir := scratch.path_join("data").path_join(kind)
+		for f in DirAccess.get_files_at(kdir):
+			if not f.ends_with(".json"):
+				continue
+			var raw := FileAccess.get_file_as_string(kdir.path_join(f))
+			var reser: String = CanonJSON.serialize(JSON.parse_string(raw)) + "\n"
+			if reser != raw:
+				var at := 0
+				while at < mini(raw.length(), reser.length()) and raw[at] == reser[at]:
+					at += 1
+				bad = "%s/%s differs at offset %d (raw %s vs re %s)" % [kind, f, at,
+					raw.substr(maxi(0, at - 12), 24).json_escape(),
+					reser.substr(maxi(0, at - 12), 24).json_escape()]
+				break
+			swept += 1
+		if bad != "":
+			break
+	ok = _st_check("canonical write-through: %d records re-serialize byte-identical" % swept,
+		bad == "", bad) and ok
 	print("[studiotest] %s" % ("ALL GREEN" if ok else "FAIL"))
 	get_tree().quit(0 if ok else 1)
 
