@@ -249,8 +249,16 @@ teleport re-entry via the one new command `place_object`, the handout, the taunt
 walk-out) inline in Oak's interact record; Cutscene's errand section is empty. Gate:
 `--parceltest` fully green through the authored errand, the suites green, md5s unchanged,
 and another fresh seed-1 **GATE GREEN** through both authored questlines (an E4 loss +
-lobby reset + retry exercised en route). Next questlines: Bill/S.S. Anne → gyms →
-Silph/Rocket → legendaries/fossils/gifts → endgame.
+lobby reset + retry exercised en route).
+**Questline 3 (Bill / S.S. Anne) COMPLETE (same session):** bill_intro / bill_separator /
+bill_ticket / ss_anne_captain / ss_anne_rival dissolved — `give_item`'s full-bag abort IS
+pokered's GiveItem .BagFull re-offer (the gh #174 billtest legs ride it unchanged), and the
+gh #117 rival-exit choreography authored on the existing `player_x` condition; two trivial
+vocabulary additions (`face_object` dir "player", `play_map_music`); board_ss_anne +
+ss_anne_departs stay native (ADR-019 §1). `--billtest`/`--ssannetest` fully green, md5s
+unchanged, and a third fresh seed-1 **GATE GREEN**. The command library is converging hard:
+questlines needed 20 → 1 → 2 new commands. Next questlines: gyms → Silph/Rocket →
+legendaries/fossils/gifts → endgame.
 **Landed: gh #34** (2026-07-20): Catch + Progression are behind the seam and the
 **config-first knobs are real** — `Gen1Catch` (`attempt` over the byte-exact kernel + the
 safari `bait_rate`/`rock_rate` transitions, which moved out of the host's input handler),
