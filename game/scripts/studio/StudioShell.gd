@@ -4,8 +4,8 @@ class_name StudioShell
 ## on `--studio`. This increment is the project browser + the content-type sidebar: open a
 ## project folder (never the extractor-owned game/project in place — the dev/test flows
 ## copy Kanto to a scratch dir first, by convention), list the four Phase-4 content types,
-## and edit their records through the schema-driven form engine. The four focused custom
-## widgets land in gh #50; their registry seam is live here already.
+## and edit their records through the schema-driven form engine. The four focused gh #50
+## widgets register over that engine without creating parallel editor models.
 
 ## The Phase-4 content types (ADR-020 d3): species/moves/items/trainers; maps stay
 ## Tiled-external (Phase 5) and events get their own GUI (Phase 5).
@@ -23,7 +23,6 @@ var _dialog: FileDialog
 var _record_names := {}          # kind -> sorted basenames (the sidebar's data)
 var _active_kind := ""
 var _active_form: Control = null
-var _widget_registry := preload("res://scripts/studio/FormWidgetRegistry.gd").new()
 
 
 func _ready() -> void:
@@ -166,7 +165,10 @@ func edit_record(content_type: String, basename: String):
 	var form := preload("res://scripts/studio/SchemaForm.gd").new()
 	form.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_editor_panel.add_child(form)
-	form.bind_record(content_type, basename, record, context, _widget_registry)
+	var widget_registry := preload("res://scripts/studio/FormWidgetRegistry.gd").new()
+	preload("res://scripts/studio/StudioWidgetCatalog.gd").register_defaults(
+		widget_registry, project_dir, context.get("ids", {}))
+	form.bind_record(content_type, basename, record, context, widget_registry)
 	form.dirty_changed.connect(func(dirty: bool) -> void:
 		title.text = "%s / %s%s" % [content_type, basename, " *" if dirty else ""])
 	save.pressed.connect(func() -> void:
@@ -267,6 +269,7 @@ func _studiotest() -> void:
 	ok = _st_check("canonical write-through: %d records re-serialize byte-identical" % swept,
 		bad == "", bad) and ok
 	ok = preload("res://scripts/studio/StudioFormSmoke.gd").new().run(self, scratch) and ok
+	ok = preload("res://scripts/studio/StudioEditorSmoke.gd").new().run(self, scratch) and ok
 	print("[studiotest] %s" % ("ALL GREEN" if ok else "FAIL"))
 	get_tree().quit(0 if ok else 1)
 

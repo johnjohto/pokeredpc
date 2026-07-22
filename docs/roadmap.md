@@ -367,7 +367,13 @@ widgets, including whole object/array overrides, and the shell's record pane now
 the real generated form with Save/Revert. `--studiotest` drives the real controls through
 valid canonical save, invalid local + dangling-ref refusal, add/remove/revert, and custom
 scalar + collection overrides; the saved scratch project returns to `--validate` clean.
-Next: gh #50 (the four focused content editors + custom widgets).
+**Landed: gh #50** (same day): `StudioWidgetCatalog` fills exactly ADR-020's four registry
+slots — the species sprite picker lists and previews front/back PNGs from the opened project,
+the bounded type selector uses validator-owned type IDs, the ordered learnset table edits and
+reorders level/move rows, and the trainer party builder edits ordered party variants and their
+species/level members. Moves and items stay intentionally schema-only. `--studiotest` drives
+real add/remove/edit controls, canonical species + trainer saves, custom-widget Revert, and a
+final full-project validation. Next: gh #51 (live play-test + the Phase-4 gate).
 **Landed: gh #34** (2026-07-20): Catch + Progression are behind the seam and the
 **config-first knobs are real** — `Gen1Catch` (`attempt` over the byte-exact kernel + the
 safari `bait_rate`/`rock_rate` transitions, which moved out of the host's input handler),
