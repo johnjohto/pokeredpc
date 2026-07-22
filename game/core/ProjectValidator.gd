@@ -107,7 +107,8 @@ static func validate_project(dir: String) -> Dictionary:
 # ---- event semantics (gh #42, ADR-019 consequences) ---------------------------------
 
 ## Commands that name a map object.
-const _OBJECT_CMDS := ["trainer_battle", "set_npc_text", "hide_object", "show_object"]
+const _OBJECT_CMDS := ["trainer_battle", "set_npc_text", "hide_object", "show_object",
+	"face_object", "walk_object", "walk_object_to", "walk_together_to"]
 
 
 ## Every object an event names must exist on its map; every cell must lie inside it.
@@ -121,13 +122,9 @@ static func _check_events(dir: String, events: Array, errors: Array) -> void:
 		var m = _map_info(dir, label, maps)
 		if m == null:
 			continue                    # the x-ref pass reports the dangling map itself
-		var objs: Array = []
-		if t.has("object"):
-			objs.append(str(t["object"]))
-		_collect_cmd_objects(inst.get("commands", []), objs)
-		for o in objs:
-			if not (m["objects"] as Dictionary).has(str(o)):
-				errors.append("%s — names object '%s', which is not on map '%s'" % [rel, o, label])
+		if t.has("object") and not (m["objects"] as Dictionary).has(str(t["object"])):
+			errors.append("%s — names object '%s', which is not on map '%s'" % [rel, str(t["object"]), label])
+		_check_cmd_objects(inst.get("commands", []), label, dir, maps, errors, rel)
 		var cw: int = int(m["w"]) * 2
 		var ch: int = int(m["h"]) * 2
 		for c in t.get("cells", []) + t.get("front", []) + t.get("at", []):
@@ -142,17 +139,28 @@ static func _check_events(dir: String, events: Array, errors: Array) -> void:
 					% [rel, str(rg), label, cw, ch])
 
 
-static func _collect_cmd_objects(cmds, objs: Array) -> void:
+## Walk a block with a CURRENT-map context: `warp_to` re-points object resolution at its
+## target — an event's command stream crosses maps exactly where pokered's script does
+## (the Oak intercept walks Pallet into the lab). Branches inherit the context at entry;
+## the parent keeps its own afterwards — a static approximation that holds because Kanto's
+## cross-map records are linear tails (a warp_to inside a branch whose parent then names
+## objects would need per-path analysis; the lint would flag it loudly, not miss it).
+static func _check_cmd_objects(cmds, label: String, dir: String, maps: Dictionary, errors: Array, rel: String) -> void:
 	if not (cmds is Array):
 		return
 	for c in cmds:
 		if not (c is Dictionary):
 			continue
-		if _OBJECT_CMDS.has(str(c.get("cmd", ""))) and c.has("object"):
-			objs.append(str(c["object"]))
-		if str(c.get("cmd", "")) == "if":
-			_collect_cmd_objects(c.get("then", []), objs)
-			_collect_cmd_objects(c.get("else", []), objs)
+		var cmd := str(c.get("cmd", ""))
+		if cmd == "warp_to":
+			label = _bare_id(str(c.get("map", "")))
+		elif _OBJECT_CMDS.has(cmd) and c.has("object"):
+			var m = _map_info(dir, label, maps)
+			if m != null and not (m["objects"] as Dictionary).has(str(c["object"])):
+				errors.append("%s — names object '%s', which is not on map '%s'" % [rel, str(c["object"]), label])
+		elif cmd == "if" or cmd == "ask":
+			_check_cmd_objects(c.get("then", []), label, dir, maps, errors, rel)
+			_check_cmd_objects(c.get("else", []), label, dir, maps, errors, rel)
 
 
 ## The map's object keys + cell dimensions, cached; null when the map file is absent.

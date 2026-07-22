@@ -398,6 +398,143 @@
          "left",
          "right"
         ]
+       },
+       "count": {
+        "type": "integer",
+        "minimum": 1
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "text"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "show_text"
+       },
+       "text": {
+        "type": "string"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "close_text"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "kind"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "emote"
+       },
+       "kind": {
+        "type": "string"
+       },
+       "object": {
+        "type": "string"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "object",
+       "dir",
+       "count"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "walk_object"
+       },
+       "object": {
+        "type": "string"
+       },
+       "dir": {
+        "enum": [
+         "down",
+         "up",
+         "left",
+         "right"
+        ]
+       },
+       "count": {
+        "type": "integer",
+        "minimum": 1
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "to"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "walk_player_to"
+       },
+       "to": {
+        "$ref": "#/$defs/cell"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "object",
+       "to"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "walk_together_to"
+       },
+       "object": {
+        "type": "string"
+       },
+       "to": {
+        "$ref": "#/$defs/cell"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
+       "map"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "warp_to"
+       },
+       "map": {
+        "type": "string",
+        "x-ref": "map"
+       },
+       "warp": {
+        "type": "integer"
        }
       },
       "additionalProperties": false

@@ -9251,7 +9251,7 @@ func _oaktest() -> void:
 		str(player.cell), str(find_path(oak.cell, player.cell + Vector2i(0, 1)))])
 	player_name = "RED"
 	rival_name = "BLUE"
-	cutscene.oak_intercept()                       # fire the coroutine (gate -> lab intro)
+	_on_player_moved(player.cell)                  # row <=1: the authored intercept record fires (wave C)
 	var shot_taken := false
 	var inlab_shot := false
 	var picked := false
@@ -10162,7 +10162,7 @@ func _pt_stage_opening() -> bool:
 			break
 	player.place(Vector2i(exit_x, 1))
 	player.facing = 1
-	cutscene.oak_intercept()                       # gate -> lab intro -> choose-a-mon
+	_on_player_moved(player.cell)                  # the authored intercept record fires (wave C)
 	var picked := false
 	var challenged := false
 	var done := false

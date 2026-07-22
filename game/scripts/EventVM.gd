@@ -37,7 +37,8 @@ const CMDS := ["say", "notice", "if", "give_item", "take_item", "set_flag", "cle
 	"set_var", "set_npc_text", "hide_object", "show_object", "lucky_slot", "play_slots",
 	"club_enter", "club_leave", "trash_reset", "trash_can", "face_object",
 	"face_player", "play_song", "wait", "walk_object_to", "class_battle", "heal_party",
-	"ask", "show_dex_entry", "pic", "clear_pic", "set_starter", "set_rival_starter", "give_mon"]
+	"ask", "show_dex_entry", "pic", "clear_pic", "set_starter", "set_rival_starter", "give_mon",
+	"show_text", "close_text", "emote", "walk_object", "walk_player_to", "walk_together_to", "warp_to"]
 
 ## Player facing indices (Player.facing) by direction word.
 const DIRS := {"down": 0, "up": 1, "left": 2, "right": 3}
@@ -404,7 +405,44 @@ func _run_block(cmds: Array, ctx: Dictionary) -> bool:
 				elif main.player_can_enter(cell + d):
 					main.player.place(cell + d)
 			"walk_player":
-				await main.player.step(DIRS[str(c["dir"])])
+				if c.has("count"):
+					# A multi-step forced walk (lab_intro's aisle follow); stops at walls.
+					await main.cutscene.walk_forward(main.player, DIRS[str(c["dir"])], int(c["count"]))
+				else:
+					await main.player.step(DIRS[str(c["dir"])])
+			"show_text":
+				# A held textbox: types out and STAYS (DoNotWaitForButtonPress) until close_text
+				# — the intercept's "Hey! Wait!" hanging over the emote choreography.
+				main.textbox.show_text(_interp(str(c["text"])))
+			"close_text":
+				main.textbox.advance()
+			"emote":
+				# The EmotionBubble: pops over the player (or a named object), holds its
+				# faithful 60 frames, and hides — one atomic beat, as pokered plays it.
+				var etgt = main.player if str(c.get("object", "")) == "" else main._npc_by_key(str(c["object"]))
+				if etgt != null:
+					etgt.show_emote(str(c["kind"]))
+					await main.cutscene.wait(1.0)
+					etgt.hide_emote()
+			"walk_object":
+				# A dir+count forced walk for an object (walk_forward); stops at walls.
+				var wfo = main._npc_by_key(str(c["object"]))
+				if wfo != null:
+					await main.cutscene.walk_forward(wfo, DIRS[str(c["dir"])], int(c["count"]))
+			"walk_player_to":
+				var wta: Array = c["to"]
+				await main.cutscene.walk(main.player,
+					main.find_path(main.player.cell, Vector2i(int(wta[0]), int(wta[1]))))
+			"walk_together_to":
+				# The lead walks its found path with the player in tow (Oak leading you in).
+				var lead = main._npc_by_key(str(c["object"]))
+				if lead != null:
+					var lta: Array = c["to"]
+					await main.cutscene.walk_together(lead, main.player,
+						main.find_path(lead.cell, Vector2i(int(lta[0]), int(lta[1]))))
+			"warp_to":
+				# A scripted map change mid-event (the intercept walking you into the lab).
+				main.load_world(_bare(str(c["map"])), int(c.get("warp", -1)))
 			"vending":
 				main._vending_enter()
 			"fall_hole":

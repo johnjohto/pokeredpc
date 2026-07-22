@@ -504,73 +504,7 @@ func oak_speech() -> void:
 
 ## Pallet Town intercept (scripts/PalletTown.asm): the player tries to leave town without a
 ## POKéMON, so Oak appears, walks up to them, warns them, and leads them back to his lab.
-func oak_intercept() -> void:
-	main.cutscene_active = true
-	main.modal = null
-	if main.audio:
-		main.audio.play_song("meetprofoak")
-	# "Hey! Wait!" prints with no button wait; a 10-frame beat later the "!" bubble pops over
-	# the player, who turns to face the approaching Oak — and only then does Oak's object
-	# appear (PalletTownOakText .HeyWaitDontGoOutText -> ShowObject).
-	main.textbox.show_text("OAK: Hey! Wait!\nDon't go out!")
-	await wait(1.6)                              # the line types out (DoNotWaitForButtonPress)
-	await wait(10.0 / 60.0)
-	main.player.show_emote("shock")
-	await wait(1.0)                              # EmotionBubble holds 60 frames
-	main.player.hide_emote()
-	main.player.face(DOWN)
-	main.textbox.advance()                       # single page: the box closes
-	var oak = main._npc_by_key("SPRITE_OAK@8,5")
-	if oak:
-		oak.set_shown(true)
-		# Oak walks up to the cell just south of the player
-		await walk(oak, main.find_path(oak.cell, main.player.cell + Vector2i(0, 1)))
-		oak.face(UP)
-	await say("OAK: It's unsafe!\nWild POKéMON live\nin tall grass!\fYou need your own\nPOKéMON for your\nprotection.\nI know!\fHere, come with\nme!")
-	var lab_door := Vector2i(12, 11)             # the OAKS_LAB door warp in Pallet Town
-	if oak:
-		await walk_together(oak, main.player, main.find_path(oak.cell, lab_door))
-		oak.set_shown(false)                      # Oak steps inside
-	await walk(main.player, main.find_path(main.player.cell, lab_door))
-	main.set_event("OAK_APPEARED_IN_PALLET")
-	main.load_world("OaksLab", 1)                # enter the lab at its south door (dest_warp 2)
-	await lab_intro()
-
-
-## Oak's Lab entrance + choose-a-mon speech (scripts/OaksLab.asm). Continues straight from the
-## Pallet intercept: Oak walks in, the player follows up to the table, then the speech that frees
-## the player to pick a starter from the three Poké Balls.
-func lab_intro() -> void:
-	main.cutscene_active = true
-	main.modal = null
-	var oak2 = main._npc_by_key("SPRITE_OAK@5,10")    # the Oak who walks in behind the player
-	if oak2:
-		oak2.set_shown(true)
-		await walk_forward(oak2, UP, 3)
-		oak2.set_shown(false)
-	var oak1 = main._npc_by_key("SPRITE_OAK@5,2")     # Oak reappears at the front of the lab
-	if oak1:
-		oak1.set_shown(true)
-	await walk_forward(main.player, UP, 8)            # follow up the aisle, stopping below the table
-	main.player.face(UP)
-	var rival = main._npc_by_key("SPRITE_BLUE@4,3")
-	if rival:
-		rival.face(UP)
-	main.set_event("FOLLOWED_OAK_INTO_LAB")
-	main.set_event("FOLLOWED_OAK_INTO_LAB_2")
-	if main.audio:
-		main.audio.play_song("oakslab")
-	var rn: String = main.rival_name
-	var pn: String = main.player_name
-	await say("%s: Gramps!\nI'm fed up with\nwaiting!" % rn)
-	await say(("OAK: %s?\nLet me think...\fOh, that's right,\nI told you to\ncome! Just wait!" % rn)
-		+ ("\fHere, %s!\nThere are 3\nPOKéMON here!" % pn)
-		+ "\fHaha!\nThey are inside\nthe POKé BALLs.\fWhen I was young,\nI was a serious\nPOKéMON trainer!"
-		+ "\fIn my old age, I\nhave only 3 left,\nbut you can have\none! Choose!")
-	await say("%s: Hey!\nGramps! What\nabout me?" % rn)
-	await say("OAK: Be patient!\n%s, you can\nhave one too!" % rn)
-	main.set_event("OAK_ASKED_TO_CHOOSE_MON")
-	main.cutscene_active = false
+# (oak_intercept + lab_intro dissolved into pallet_town_oak_intercept.json — wave C, gh #41.)
 
 
 # (choose_starter + rival_takes_starter dissolved into the ball records — wave C, gh #41.)

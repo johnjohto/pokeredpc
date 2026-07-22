@@ -1,5 +1,5 @@
 {
- "$comment": "scripts/PalletTown.asm — leaving Pallet to the north without a POKéMON triggers Oak's intercept (checks YCoord == 1; fires before the player crosses into Route 1).",
+ "$comment": "scripts/PalletTown.asm + scripts/OaksLab.asm — leaving Pallet to the north without a POKéMON (YCoord <= 1): Oak's intercept, FULLY AUTHORED (wave C). 'Hey! Wait!' types and HOLDS (DoNotWaitForButtonPress), the 10-frame beat, the '!' bubble's 60-frame hold, the player turns, only then Oak's object appears (.HeyWaitDontGoOutText -> ShowObject); he walks to the cell south of the player, the warning speech, he leads the player to the lab door (12,11) and steps inside, the player follows in; then the lab half — the entry Oak walks up and hands over to the front Oak, the player follows up the aisle, the rival turns, MUSIC_OAKS_LAB, and the choose-a-mon speech frees the pick.",
  "id": "event:pallet_town_oak_intercept",
  "trigger": {
   "kind": "step",
@@ -13,9 +13,36 @@
   "when": "not GOT_STARTER"
  },
  "commands": [
-  {
-   "cmd": "beat",
-   "name": "oak_intercept"
-  }
+  {"cmd": "play_song", "key": "meetprofoak"},
+  {"cmd": "show_text", "text": "OAK: Hey! Wait!\nDon't go out!"},
+  {"cmd": "wait", "frames": 96},
+  {"cmd": "wait", "frames": 10},
+  {"cmd": "emote", "kind": "shock"},
+  {"cmd": "face_player", "dir": "down"},
+  {"cmd": "close_text"},
+  {"cmd": "show_object", "object": "SPRITE_OAK@8,5"},
+  {"cmd": "walk_object_to", "object": "SPRITE_OAK@8,5", "to": "player", "offset": [0, 1]},
+  {"cmd": "face_object", "object": "SPRITE_OAK@8,5", "dir": "up"},
+  {"cmd": "say", "text": "OAK: It's unsafe!\nWild POKéMON live\nin tall grass!\fYou need your own\nPOKéMON for your\nprotection.\nI know!\fHere, come with\nme!"},
+  {"cmd": "walk_together_to", "object": "SPRITE_OAK@8,5", "to": [12, 11]},
+  {"cmd": "hide_object", "object": "SPRITE_OAK@8,5"},
+  {"cmd": "walk_player_to", "to": [12, 11]},
+  {"cmd": "set_flag", "flag": "OAK_APPEARED_IN_PALLET"},
+  {"cmd": "warp_to", "map": "map:OaksLab", "warp": 1},
+  {"cmd": "show_object", "object": "SPRITE_OAK@5,10"},
+  {"cmd": "walk_object", "object": "SPRITE_OAK@5,10", "dir": "up", "count": 3},
+  {"cmd": "hide_object", "object": "SPRITE_OAK@5,10"},
+  {"cmd": "show_object", "object": "SPRITE_OAK@5,2"},
+  {"cmd": "walk_player", "dir": "up", "count": 8},
+  {"cmd": "face_player", "dir": "up"},
+  {"cmd": "face_object", "object": "SPRITE_BLUE@4,3", "dir": "up"},
+  {"cmd": "set_flag", "flag": "FOLLOWED_OAK_INTO_LAB"},
+  {"cmd": "set_flag", "flag": "FOLLOWED_OAK_INTO_LAB_2"},
+  {"cmd": "play_song", "key": "oakslab"},
+  {"cmd": "say", "text": "{rival}: Gramps!\nI'm fed up with\nwaiting!"},
+  {"cmd": "say", "text": "OAK: {rival}?\nLet me think...\fOh, that's right,\nI told you to\ncome! Just wait!\fHere, {player}!\nThere are 3\nPOKéMON here!\fHaha!\nThey are inside\nthe POKé BALLs.\fWhen I was young,\nI was a serious\nPOKéMON trainer!\fIn my old age, I\nhave only 3 left,\nbut you can have\none! Choose!"},
+  {"cmd": "say", "text": "{rival}: Hey!\nGramps! What\nabout me?"},
+  {"cmd": "say", "text": "OAK: Be patient!\n{rival}, you can\nhave one too!"},
+  {"cmd": "set_flag", "flag": "OAK_ASKED_TO_CHOOSE_MON"}
  ]
 }
