@@ -242,8 +242,15 @@ against a current-map context). `oak_dex_rating` stays as the one ceremony invok
 `--rivallosstest`/`--starterballtest` (both now drive the records' real triggers),
 `--oaktest` end to end windowed after every increment, `--validate` 0 errors, the four md5s
 never moved — and the finale: a fresh `--playthrough --seed 1` NEW GAME → **HALL OF FAME**,
-`validate_gate.py` → **GATE GREEN**, through the fully authored opening. Next questlines:
-parcel/dex → Bill/S.S. Anne → gyms → Silph/Rocket → legendaries/fossils/gifts → endgame.
+`validate_gate.py` → **GATE GREEN**, through the fully authored opening.
+**Questline 2 (parcel/dex) COMPLETE (same session):** the whole errand authored — the mart
+call-over/counter-walk/hand-over, and the delivery + full Pokédex receipt (the rival's
+teleport re-entry via the one new command `place_object`, the handout, the taunt, the
+walk-out) inline in Oak's interact record; Cutscene's errand section is empty. Gate:
+`--parceltest` fully green through the authored errand, the suites green, md5s unchanged,
+and another fresh seed-1 **GATE GREEN** through both authored questlines (an E4 loss +
+lobby reset + retry exercised en route). Next questlines: Bill/S.S. Anne → gyms →
+Silph/Rocket → legendaries/fossils/gifts → endgame.
 **Landed: gh #34** (2026-07-20): Catch + Progression are behind the seam and the
 **config-first knobs are real** — `Gen1Catch` (`attempt` over the byte-exact kernel + the
 safari `bait_rate`/`rock_rate` transitions, which moved out of the host's input handler),
