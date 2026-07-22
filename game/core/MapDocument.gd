@@ -9,6 +9,7 @@ class_name MapDocument
 const BRIDGE_FORMAT := 1
 const CELL_SIZE := 16
 const GID_FLIP_MASK := 0xE0000000
+static var _tsx_cache := {}             # absolute path + exact source hash -> normalized TSX
 
 var project_dir := ""
 var label := ""
@@ -20,6 +21,10 @@ var tiles := PackedInt32Array()       # row-major local TSX tile ids
 var walkable := PackedByteArray()     # row-major, 1 = player may stand
 var feet_tiles := PackedInt32Array()  # ruleset semantic id; local id by default
 var border_tile := 0
+var border_block := -1
+var block_width := 0
+var block_height := 0
+var blocks: Array = []                # optional reversible 32px authoring groups
 var default_spawn := Vector2i.ZERO
 var tileset: Dictionary = {}
 var warps: Array = []
@@ -70,14 +75,39 @@ func runtime_map() -> Dictionary:
 		tile_rows.append(tr)
 		collision_rows.append(cr)
 		feet_rows.append(fr)
-	return {
+	var out := {
 		"_native": "tmx", "name": label, "tileset": str(tileset.get("name", "")),
 		"cell_width": width, "cell_height": height, "tiles": tile_rows,
 		"cell_walkable": collision_rows, "cell_feet": feet_rows,
 		"border_tile": border_tile, "default_spawn": [default_spawn.x, default_spawn.y],
-		"warps": warps.duplicate(true), "connections": [],
-		"bg_events": signs.duplicate(true), "object_events": objects.duplicate(true),
+		"warps": _runtime_records(warps), "connections": [],
+		"bg_events": _runtime_records(signs), "object_events": _runtime_records(objects),
 		"triggers": triggers.duplicate(true), "_tileset": tileset.duplicate(true)}
+	if not blocks.is_empty():
+		out["width"] = block_width
+		out["height"] = block_height
+		out["blocks"] = blocks.duplicate(true)
+		out["border_block"] = border_block
+	return out
+
+
+## Exact format-1-shaped semantic view used only by the Kanto migration oracle.
+## Native runtime-only cell/atlas fields stay out, so parity cannot accidentally
+## pass by comparing two serialization-specific structures.
+func legacy_map(connections: Array = []) -> Dictionary:
+	return {"name": label, "tileset": str(tileset.get("name", "")),
+		"width": block_width, "height": block_height, "blocks": blocks.duplicate(true),
+		"border_block": border_block, "warps": _runtime_records(warps),
+		"connections": connections.duplicate(true), "bg_events": _runtime_records(signs),
+		"object_events": _runtime_records(objects)}
+
+
+static func _runtime_records(records: Array) -> Array:
+	var out: Array = []
+	for record in records:
+		var normalized: Dictionary = record
+		out.append((normalized.get("_runtime", normalized) as Dictionary).duplicate(true))
+	return out
 
 
 func tile_at(cell: Vector2i) -> int:
@@ -141,6 +171,7 @@ func _load(project_root: String, map_label: String) -> String:
 	if bridge < 1:
 		return "%s — missing valid integer property 'pokeredpc:format'" % path
 	border_tile = int(properties.get("pokeredpc:border_tile", 0))
+	border_block = int(properties.get("pokeredpc:border_block", -1))
 	var spawn: Variant = _cell_property(str(properties.get("pokeredpc:default_spawn", "0,0")))
 	if spawn == null:
 		return "%s — property 'pokeredpc:default_spawn' must be 'x,y'" % path
@@ -182,6 +213,9 @@ func _load(project_root: String, map_label: String) -> String:
 	var layer_error := _parse_ground(ground, first_gid)
 	if layer_error != "":
 		return layer_error
+	var block_error := _parse_blocks()
+	if block_error != "":
+		return block_error
 	var objects_error := _parse_objects(root)
 	if objects_error != "":
 		return objects_error
@@ -192,6 +226,12 @@ func _load_tsx(tsx_path: String) -> Dictionary:
 	var bytes := _read_bytes(tsx_path)
 	if not bool(bytes.get("ok", false)):
 		return {"ok": false, "error": bytes["error"]}
+	var hasher := HashingContext.new()
+	hasher.start(HashingContext.HASH_MD5)
+	hasher.update(bytes["bytes"])
+	var cache_key := tsx_path + ":" + hasher.finish().hex_encode()
+	if _tsx_cache.has(cache_key):
+		return {"ok": true, "tileset": (_tsx_cache[cache_key] as Dictionary).duplicate(true)}
 	var parsed := _xml_tree(bytes["bytes"], tsx_path)
 	if not bool(parsed.get("ok", false)):
 		return {"ok": false, "error": parsed["error"]}
@@ -216,20 +256,43 @@ func _load_tsx(tsx_path: String) -> Dictionary:
 	if not FileAccess.file_exists(image_path):
 		return {"ok": false, "error": "%s — image source is missing: %s" % [tsx_path, image_path]}
 	var tile_meta := {}
+	var block_tiles := {}
+	var tile_blocks := {}
 	for tile_node in _children(root, "tile"):
 		var node: Dictionary = tile_node
 		var id := _attr_int(node["attrs"], "id", -1)
 		if id < 0 or id >= count:
 			return {"ok": false, "error": "%s — tile id %d is outside 0..%d" % [
 				tsx_path, id, count - 1]}
-		tile_meta[id] = _properties(node)
-	return {"ok": true, "tileset": {
+		var props := _properties(node)
+		tile_meta[id] = props
+		var block = _block_property(str(props.get("pokeredpc:block", "")))
+		if block != null:
+			var block_id: int = block[0]
+			var quadrant: int = block[1]
+			if not block_tiles.has(block_id):
+				block_tiles[block_id] = [-1, -1, -1, -1]
+			var group: Array = block_tiles[block_id]
+			if int(group[quadrant]) >= 0:
+				return {"ok": false, "error": "%s — duplicate pokeredpc:block %d,%d" % [
+					tsx_path, block_id, quadrant]}
+			group[quadrant] = id
+			block_tiles[block_id] = group
+			tile_blocks[id] = [block_id, quadrant]
+	for block_id in block_tiles:
+		if (block_tiles[block_id] as Array).has(-1):
+			return {"ok": false, "error": "%s — pokeredpc:block %d needs all four quadrants" % [
+				tsx_path, int(block_id)]}
+	var normalized := {
 		"name": str(attrs.get("name", tsx_path.get_file().get_basename())),
 		"path": tsx_path, "source_bytes": bytes["bytes"], "tile_size": CELL_SIZE,
 		"tile_count": count, "columns": columns, "image_path": image_path,
 		"image_width": _attr_int(image_attrs, "width", 0),
 		"image_height": _attr_int(image_attrs, "height", 0),
-		"properties": _properties(root), "tile_properties": tile_meta}}
+		"properties": _properties(root), "tile_properties": tile_meta,
+		"block_tiles": block_tiles, "tile_blocks": tile_blocks}
+	_tsx_cache[cache_key] = normalized.duplicate(true)
+	return {"ok": true, "tileset": normalized}
 
 
 func _parse_ground(layer: Dictionary, first_gid: int) -> String:
@@ -268,6 +331,41 @@ func _parse_ground(layer: Dictionary, first_gid: int) -> String:
 	return ""
 
 
+func _parse_blocks() -> String:
+	var tile_blocks: Dictionary = tileset.get("tile_blocks", {})
+	if tile_blocks.is_empty():
+		return ""                              # block groups are optional for generic maps
+	if width % 2 != 0 or height % 2 != 0:
+		return "%s — pokeredpc:block metadata requires an even 2x2-cell map" % path
+	block_width = width / 2
+	block_height = height / 2
+	blocks = []
+	for by in block_height:
+		var row: Array = []
+		for bx in block_width:
+			var block_id := -1
+			for quadrant in 4:
+				var cx := bx * 2 + quadrant % 2
+				var cy := by * 2 + quadrant / 2
+				var local := int(tiles[cy * width + cx])
+				if not tile_blocks.has(local):
+					return "%s — cell (%d,%d) tile %d has no pokeredpc:block metadata" % [
+						path, cx, cy, local]
+				var member: Array = tile_blocks[local]
+				if int(member[1]) != quadrant:
+					return "%s — cell (%d,%d) uses block quadrant %d; expected %d" % [
+						path, cx, cy, int(member[1]), quadrant]
+				if block_id < 0:
+					block_id = int(member[0])
+				elif block_id != int(member[0]):
+					return "%s — 2x2 cells at block (%d,%d) mix block ids" % [path, bx, by]
+			row.append(block_id)
+		blocks.append(row)
+	if border_block < 0 or not (tileset.get("block_tiles", {}) as Dictionary).has(border_block):
+		return "%s — valid pokeredpc:border_block is required with block metadata" % path
+	return ""
+
+
 func _parse_objects(root: Dictionary) -> String:
 	for group_node in _children(root, "objectgroup"):
 		for object_node in _children(group_node, "object"):
@@ -290,26 +388,46 @@ func _parse_objects(root: Dictionary) -> String:
 			if not _contains(cell):
 				return "%s — object '%s' at %s is outside the map" % [path, object_name, str(cell)]
 			var props := _properties(node)
+			var legacy: Variant = null
+			if props.has("pokeredpc:legacy"):
+				legacy = JSON.parse_string(str(props["pokeredpc:legacy"]))
+				if not (legacy is Dictionary):
+					return "%s — object '%s' has invalid pokeredpc:legacy JSON" % [path, object_name]
+				if int(legacy.get("x", -1)) != cx or int(legacy.get("y", -1)) != cy:
+					return "%s — object '%s' legacy position disagrees with Tiled point" % [path, object_name]
 			match object_class:
 				"pokeredpc:warp":
 					var dest := str(props.get("pokeredpc:dest_map", ""))
-					if not dest.begins_with("map:"):
-						return "%s — warp '%s' needs prefixed property pokeredpc:dest_map" % [path, object_name]
-					warps.append({"id": object_name, "x": cx, "y": cy,
-						"dest_map": dest.substr(4),
-						"dest_warp": int(props.get("pokeredpc:dest_warp", 1))})
+					var dest_const := str(props.get("pokeredpc:dest_const", ""))
+					if dest != "" and not dest.begins_with("map:"):
+						return "%s — warp '%s' property pokeredpc:dest_map must be prefixed" % [path, object_name]
+					if dest == "" and dest_const == "":
+						return "%s — warp '%s' needs pokeredpc:dest_map or an explicit ruleset destination" % [path, object_name]
+					var warp := {"id": object_name, "x": cx, "y": cy,
+						"dest_map": dest.substr(4) if dest != "" else "",
+						"dest_const": dest_const,
+						"dest_warp": int(props.get("pokeredpc:dest_warp", 1))}
+					if legacy != null:
+						warp["_runtime"] = legacy
+					warps.append(warp)
 				"pokeredpc:sign":
-					signs.append({"id": object_name, "x": cx, "y": cy,
+					var sign := {"id": object_name, "x": cx, "y": cy,
 						"text": str(props.get("pokeredpc:text", "")),
-						"event": str(props.get("pokeredpc:event", ""))})
+						"event": str(props.get("pokeredpc:event", ""))}
+					if legacy != null:
+						sign["_runtime"] = legacy
+					signs.append(sign)
 				"pokeredpc:npc":
 					var sprite := str(props.get("pokeredpc:sprite", ""))
 					if sprite == "":
 						return "%s — NPC '%s' needs property pokeredpc:sprite" % [path, object_name]
-					objects.append({"id": object_name, "x": cx, "y": cy, "sprite": sprite,
+					var object := {"id": object_name, "x": cx, "y": cy, "sprite": sprite,
 						"args": [str(props.get("pokeredpc:movement", "STAY")),
 							str(props.get("pokeredpc:facing", "NONE"))],
-						"event": str(props.get("pokeredpc:event", ""))})
+						"event": str(props.get("pokeredpc:event", ""))}
+					if legacy != null:
+						object["_runtime"] = legacy
+					objects.append(object)
 				"pokeredpc:trigger":
 					triggers.append({"id": object_name, "x": cx, "y": cy,
 						"event": str(props.get("pokeredpc:event", ""))})
@@ -407,6 +525,18 @@ static func _cell_property(raw: String):
 			or not str(pieces[1]).strip_edges().is_valid_int():
 		return null
 	return Vector2i(int(str(pieces[0]).strip_edges()), int(str(pieces[1]).strip_edges()))
+
+
+static func _block_property(raw: String):
+	var pieces := raw.split(",", false)
+	if pieces.size() != 2 or not str(pieces[0]).strip_edges().is_valid_int() \
+			or not str(pieces[1]).strip_edges().is_valid_int():
+		return null
+	var block_id := int(str(pieces[0]).strip_edges())
+	var quadrant := int(str(pieces[1]).strip_edges())
+	if block_id < 0 or quadrant < 0 or quadrant > 3:
+		return null
+	return [block_id, quadrant]
 
 
 static func _absolute(file_path: String) -> String:

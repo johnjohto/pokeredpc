@@ -10,6 +10,15 @@ milestones, `PATCH` bumps are fixes/polish. See `docs/roadmap.md` for the live p
 
 ### Added
 
+- **All 223 Kanto maps now ship as native Tiled documents** (gh #53, ADR-023). The
+  extractor deterministically emits `maps/*.tmx`, 24 reversible external `tilesets/*.tsx`
+  atlases, and `data/world.json`; format-2 projects no longer contain interim map JSON.
+  `MapDocument` reconstructs the original block grid and runtime object records while Main
+  consumes native cells, collision, ledges, animation metadata, Cut replacements, and the
+  world graph. The migration is gated by exact 223-map semantic parity, all-tileset mapping
+  and pixel parity, a byte-identical double extraction, Studio and focused behavior suites,
+  unchanged battle-determinism hashes, and a complete seeded Hall-of-Fame playthrough.
+
 - **v2 Phase 5's native-map tracer** (gh #52, ADR-021): Project format 2 replaces
   interim `maps/*.json` with a lossless Tiled bridge (`maps/*.tmx` plus external
   `tilesets/*.tsx`) while format 1 stays loadable. The shared `MapDocument` boundary owns

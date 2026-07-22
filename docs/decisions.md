@@ -2,7 +2,35 @@
 
 Newest first. Each entry: context → decision → consequences.
 
-## ADR-021 — Agent-agnostic instructions: `AGENTS.md` is canonical (2026-07-22)
+## ADR-023 — Kanto maps project to reversible native cells plus a world graph (2026-07-22)
+
+**Context:** ADR-021/gh #52 proved one conservative native TMX map, but Kanto's 223 interim
+JSON maps carry 32×32 block identity, 8×8 semantic tile ids, 78 seamless connections,
+runtime block replacement, 805 warps, and 1,119 signs/objects. Flattening only the pixels
+would make the game look right while breaking Cut, doors, switches, collision, encounters,
+or Studio's future block brush. Keeping the JSON beside TMX would create two authorities.
+**Decision:** (1) The extractor emits Project format 2 directly: 223 TMX maps, 24 external
+TSX files, and no project `maps/*.json`. (2) Each Gen-1 block becomes four native 16×16
+atlas cells (`local_id = block_id * 4 + quadrant`). Each cell records its reversible
+`pokeredpc:block`, exact four `pokeredpc:subtiles`, representative feet/bottom-right ids,
+and collision/grass/counter semantics. Composite PNGs contain those exact source pixels;
+the Engine still animates water and flowers at the preserved 8×8 level. (3) Seamless
+cardinal connections live in schema-validated `data/world.json`, because they relate maps
+rather than belonging to one map's local geometry. (4) Imported Kanto objects expose the
+generic typed properties and carry an owned compact `pokeredpc:legacy` payload for exact
+Gen-1-only args/trainer text (including control characters XML cannot represent directly).
+It is migration provenance, not a second map source: geometry, class, name, and common
+fields remain native Tiled content. (5) `MapDocument.legacy_map()` is the explicit parity
+oracle; the Engine uses `runtime_map()`. TSX parse results cache by absolute path plus exact
+source hash, so 223 maps sharing 24 tilesets do not multiply validation cost or go stale.
+**Consequences:** Kanto now dogfoods the same native map seam creators use while format 1
+remains loadable. Dynamic block changes stay faithful and later Studio block painting can
+round-trip between 16×16 cells and optional 32×32 brushes. The generated Project is larger
+and deliberately redundant at the TSX property level, buying transparent, independently
+testable semantics. `--projparitytest` compares all 223 legacy views and all 24 native
+atlases (metadata plus pixels); the seeded full playthrough remains the behavioral proof.
+
+## ADR-022 — Agent-agnostic instructions: `AGENTS.md` is canonical (2026-07-22)
 
 **Context:** The repo brief lived in `CLAUDE.md`, which only Claude Code reads. Other coding
 agents (Codex, Cursor, Gemini CLI, Copilot, …) have converged on the cross-tool `AGENTS.md`
@@ -22,7 +50,8 @@ per-cell collision, project-owned art, typed objects, and lossless coexistence w
 features pokeredpc does not understand. Engine, Studio, validation, and tests would drift if
 each learned XML independently. The tracer is gh #52.
 **Decision:** (1) **Project format 2 replaces `maps/*.json` with `maps/*.tmx` plus external
-`tilesets/*.tsx`; format 1 stays loadable.** Kanto migrates separately in gh #53. Each map
+`tilesets/*.tsx`; format 1 stays loadable.** Kanto's projection is specified by ADR-023/gh
+#53. Each map
 also carries a `pokeredpc:format` bridge version, so a newer map convention refuses naming
 both sides even inside a supported Project. (2) **The canonical grid is the 16×16 movement
 cell.** A 32×32 Gen-1 block is optional `pokeredpc:block` authoring metadata, never the

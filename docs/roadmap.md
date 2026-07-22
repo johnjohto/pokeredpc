@@ -403,8 +403,19 @@ proves the adapter. Studio gained a Maps workspace whose action bar, tool rail, 
 canvas, inspector/layers, charcoal surfaces, and mint/cyan/magenta states follow the two
 user-supplied reference boards now pinned in `docs/assets/studio/` and
 `docs/v2/studio-visual-direction.md`; `--studiotest` drives its preview and Save. The Engine
-and Studio tracer PNGs are SHA-256-identical. Next: gh #53 — migrate Kanto's 223 maps to the
-native bridge without moving the standing gameplay or battle determinism gates.
+and Studio tracer PNGs are SHA-256-identical. **Landed: gh #53** (same day; ADR-023): the
+extractor now deterministically emits all 223 Kanto maps as native TMX, 24 external TSX atlases,
+and the connection graph as `data/world.json`; no map JSON remains in a format-2 project. Each
+legacy 32×32 block is represented by four reversible 16×16 cells, while typed Tiled objects and
+an owned legacy payload preserve the exact runtime record through one `MapDocument` seam. Main
+renders, collides, animates water/flowers, applies Cut and dynamic block replacement, and resolves
+connections from the native documents. Two consecutive extractions produced the same full-tree
+SHA-256 (`EF5FE5CCB3A1209D17A0407B06606DB2F5A2374136D8BF733C6C538625F90F9D`);
+validation covered 1,613 files with zero errors; parity covered all 223 maps and all 24 TSX atlas
+mappings/pixels; schema, self, map, warp, event, sight, Cut, TMX, and Studio gates passed; the four
+battle stream hashes remained unchanged; and `--playthrough --seed=1 --ptwatchdog=120` cleared all
+21 checkpoints and entered the Hall of Fame with a level-71 lead. Next: gh #54 — native map
+painting with undo/redo and authored TMX saves.
 **Landed: gh #34** (2026-07-20): Catch + Progression are behind the seam and the
 **config-first knobs are real** — `Gen1Catch` (`attempt` over the byte-exact kernel + the
 safari `bait_rate`/`rock_rate` transitions, which moved out of the host's input handler),

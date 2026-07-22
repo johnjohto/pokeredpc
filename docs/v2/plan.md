@@ -3,8 +3,9 @@
 **Status:** **active — Phase 5 (map + event editors, gh #19) began 2026-07-22.** The
 build-out is tracked as gh #14 with phase issues #15–#21. Phases 1–4 are complete:
 versioned Project/Core, ruleset seam, authored Event VM, and the Studio MVP. The first
-format-2 native TMX map now crosses the shared `MapDocument` seam into both Engine and
-Studio (ADR-021, gh #52); Kanto migration and editing tools follow. The gates that guarded
+format-2 native TMX map crosses the shared `MapDocument` seam into both Engine and Studio
+(ADR-021, gh #52), and all 223 Kanto maps now ship through that seam (ADR-023, gh #53).
+Painting and object/event editing follow. The gates that guarded
 the v2 start remain permanent oracles: 1.0 shipped 2026-07-17 and v1.1 multiplayer shipped
 2026-07-20. ADR-013 records the foundational product decisions.
 

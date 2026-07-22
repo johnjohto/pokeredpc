@@ -1232,16 +1232,28 @@ func _get_native_tileset(data: Dictionary) -> Dictionary:
 		var texture := ImageTexture.create_from_image(image)
 		var grass := -1
 		var counters: Array = []
+		var subtiles := {}
 		for tile_id in (meta.get("tile_properties", {}) as Dictionary):
 			var props: Dictionary = meta["tile_properties"][tile_id]
 			if bool(props.get("pokeredpc:grass", false)) and grass < 0:
-				grass = int(tile_id)
+				grass = int(props.get("pokeredpc:feet_tile", tile_id))
 			if bool(props.get("pokeredpc:counter", false)):
 				counters.append(int(props.get("pokeredpc:feet_tile", tile_id)))
+			var raw_subtiles := str(props.get("pokeredpc:subtiles", "")).split(",", false)
+			if raw_subtiles.size() == 4:
+				subtiles[int(tile_id)] = [int(raw_subtiles[0]), int(raw_subtiles[1]),
+					int(raw_subtiles[2]), int(raw_subtiles[3])]
+		var ledges: Array = []
+		var ledge_json := str((meta.get("properties", {}) as Dictionary).get("pokeredpc:ledges", ""))
+		if ledge_json != "":
+			var parsed_ledges = JSON.parse_string(ledge_json)
+			if parsed_ledges is Array:
+				ledges = parsed_ledges
 		_ts_cache[key] = {"native": true, "tex": texture,
 			"slug": str(meta.get("name", "")), "cols": int(meta.get("columns", 1)),
 			"tile_size": int(meta.get("tile_size", 16)), "tile_properties": meta.get("tile_properties", {}),
-			"grass_tile": grass, "ledges": [], "counter_tiles": counters}
+			"grass_tile": grass, "ledges": ledges, "counter_tiles": counters,
+			"block_tiles": meta.get("block_tiles", {}), "subtiles": subtiles}
 	return _ts_cache[key]
 
 
@@ -1263,7 +1275,28 @@ func _compute_collision(grid: Array, blockset: Array, wk: Dictionary, w: int, h:
 ## collision tiles and the render. Mirrors pokered's ReplaceTileBlock.
 func set_block(bx: int, by: int, block_id: int) -> void:
 	if str(map.get("_native", "")) == "tmx":
-		push_error("set_block requires optional pokeredpc:block metadata (Phase 5.2)")
+		var ts: Dictionary = placed[0]["ts"]
+		var block_tiles: Dictionary = ts.get("block_tiles", {})
+		if not block_tiles.has(block_id):
+			push_error("set_block: native tileset has no pokeredpc:block %d" % block_id)
+			return
+		if bx < 0 or by < 0 or bx >= int(map.get("width", 0)) or by >= int(map.get("height", 0)):
+			push_error("set_block: block cell (%d,%d) is outside the map" % [bx, by])
+			return
+		map["blocks"][by][bx] = block_id
+		var group: Array = block_tiles[block_id]
+		for quadrant in 4:
+			var cx := bx * 2 + quadrant % 2
+			var cy := by * 2 + quadrant / 2
+			var local := int(group[quadrant])
+			var props: Dictionary = ts["tile_properties"].get(local, {})
+			var can_walk := 1 if bool(props.get("pokeredpc:walkable", false)) else 0
+			map["tiles"][cy][cx] = local
+			map["cell_walkable"][cy][cx] = can_walk
+			map["cell_feet"][cy][cx] = int(props.get("pokeredpc:feet_tile", local))
+			collision[cy * gw + cx] = can_walk
+		placed[0]["collision"] = collision
+		queue_redraw()
 		return
 	map["blocks"][by][bx] = block_id
 	var ts: Dictionary = placed[0]["ts"]
@@ -1290,6 +1323,7 @@ func _make_placed(label: String, data: Dictionary, ox: int, oy: int) -> Dictiona
 		return {"label": label, "data": data, "w": bw, "h": bh, "cw": cw, "ch": ch,
 			"ox": ox, "oy": oy, "ts": _get_native_tileset(data), "collision": col,
 			"border": int(data.get("border_tile", 0)), "native": true,
+			"border_block": int(data.get("border_block", -1)),
 			"clip": [ox, ox + bw, oy, oy + bh]}
 	var ts := _get_tileset(str(data["tileset"]))
 	var w := int(data["width"])
@@ -1298,6 +1332,7 @@ func _make_placed(label: String, data: Dictionary, ox: int, oy: int) -> Dictiona
 		"ox": ox, "oy": oy, "ts": ts,
 		"collision": _compute_collision(data["blocks"], ts["blockset"], ts["walkable"], w, h),
 		"border": int(data.get("border_block", 0)), "native": false,
+		"border_block": int(data.get("border_block", 0)),
 		# Render clip in center-block coords (gh #124). Default = the map's own extent; a connected
 		# neighbour is narrowed perpendicular to the connection so it can't overhang past the current
 		# map's edge — that region is the border block, as in pokered (see load_world).
@@ -1319,7 +1354,7 @@ func load_world(center: String, arrive_idx := -1, spawn_override = null, keep_fa
 	gw = c["cw"]; gh = c["ch"]
 	collision = c["collision"]
 	_blocked_cells = {}
-	border_block = c["border"]
+	border_block = c["border_block"]
 	center_label = center
 	# BIT_ALWAYS_ON_BIKE persists across Route 16/17/18 connections, but nowhere else. The original
 	# gates explicitly clear it (scripts/Route16Gate1F.asm / Route18Gate1F.asm); this also defends
@@ -2533,7 +2568,7 @@ func _try_cut(front: Vector2i) -> bool:
 	var bid := int(map["blocks"][front.y / 2][front.x / 2])
 	if not CUT_TREE_BLOCKS.has(bid):
 		return false
-	var tile := int(placed[0]["ts"]["blockset"][bid][SUB[front.y % 2][front.x % 2]])
+	var tile := _feet_tile(front)
 	if tile != cut_tile:                               # facing a non-tree quadrant of a tree block
 		return false
 	var cutter := _mon_with_move("CUT")
@@ -2551,13 +2586,23 @@ func _try_cut(front: Vector2i) -> bool:
 func _cut_tree_anim(front: Vector2i, bid: int, cutter: String) -> void:
 	cutscene_active = true
 	var ts: Dictionary = placed[0]["ts"]
-	var bdef: Array = ts["blockset"][bid]
 	var qx := front.x % 2                              # which 16x16 quadrant of the 32x32 block the tree is
 	var qy := front.y % 2
 	var tiles: Array = []
-	for ty in 2:
-		for tx in 2:
-			tiles.append({"tid": int(bdef[(qy * 2 + ty) * 4 + (qx * 2 + tx)]), "ox": tx * TILE, "oy": ty * TILE})
+	if bool(placed[0].get("native", false)):
+		var local := _pm_tile_id(placed[0], front.x, front.y)
+		var source_origin := Vector2((local % int(ts["cols"])) * 16,
+			(local / int(ts["cols"])) * 16)
+		for ty in 2:
+			for tx in 2:
+				tiles.append({"src": Rect2(source_origin + Vector2(tx * TILE, ty * TILE),
+					Vector2(TILE, TILE)), "ox": tx * TILE, "oy": ty * TILE})
+	else:
+		var bdef: Array = ts["blockset"][bid]
+		for ty in 2:
+			for tx in 2:
+				tiles.append({"tid": int(bdef[(qy * 2 + ty) * 4 + (qx * 2 + tx)]),
+					"ox": tx * TILE, "oy": ty * TILE})
 	_cut_fx = {"cell": front, "dx": 0.0, "tiles": tiles, "tex": ts["tex"], "cols": int(ts["cols"])}
 	set_block(front.x / 2, front.y / 2, int(CUT_TREE_BLOCKS[bid]))   # clear the tree behind the overlay
 	if audio:
@@ -3588,8 +3633,14 @@ func _feet_tile_or_border(cell: Vector2i) -> int:
 		return -1
 	var center: Dictionary = placed[0]
 	if bool(center.get("native", false)):
-		var props: Dictionary = center["ts"]["tile_properties"].get(border_block, {})
-		return int(props.get("pokeredpc:feet_tile", border_block))
+		var tile_id := int(center.get("border", 0))
+		var groups: Dictionary = center["ts"].get("block_tiles", {})
+		var native_border_block := int(center.get("border_block", -1))
+		if native_border_block >= 0 and groups.has(native_border_block):
+			var quadrant := posmod(cell.y, 2) * 2 + posmod(cell.x, 2)
+			tile_id = int((groups[native_border_block] as Array)[quadrant])
+		var props: Dictionary = center["ts"]["tile_properties"].get(tile_id, {})
+		return int(props.get("pokeredpc:feet_tile", tile_id))
 	return int(center["ts"]["blockset"][border_block][SUB[posmod(cell.y, 2)][posmod(cell.x, 2)]])
 
 
@@ -4559,7 +4610,40 @@ func _draw_block(pm: Dictionary, bid: int, bx: int, by: int) -> void:
 ## the unused edge of their last batch with the declared border tile.
 func _draw_native_block(pm: Dictionary, bx: int, by: int, only_border := false) -> void:
 	for quad in _native_block_quads(pm, bx, by, only_border):
-		draw_texture_rect_region(pm["ts"]["tex"], quad["dst"], quad["src"])
+		_draw_native_cell(pm, quad)
+
+
+## Native Kanto cells are composite 16px atlas tiles, but their owned `subtiles`
+## metadata preserves the four source 8px ids. Draw a cell in one blit normally;
+## split only animated flower/water cells so the original vcopy effects survive.
+func _draw_native_cell(pm: Dictionary, quad: Dictionary) -> void:
+	var ts: Dictionary = pm["ts"]
+	var tile_id := int(quad["tile"])
+	var subtiles: Array = (ts.get("subtiles", {}) as Dictionary).get(tile_id, [])
+	var is_overworld := str(ts.get("slug", "")) == "overworld"
+	var is_water_tileset := str(ts.get("slug", "")) in WATER_TILESETS
+	var animated := subtiles.size() == 4 and ((is_overworld and subtiles.has(3))
+		or (is_water_tileset and _water_off > 0 and subtiles.has(0x14)))
+	if not animated:
+		draw_texture_rect_region(ts["tex"], quad["dst"], quad["src"])
+		return
+	for sub in 4:
+		var tid := int(subtiles[sub])
+		var offset := Vector2((sub % 2) * TILE, (sub / 2) * TILE)
+		var dst := Rect2((quad["dst"] as Rect2).position + offset, Vector2(TILE, TILE))
+		var src_pos := (quad["src"] as Rect2).position + offset
+		if tid == 3 and is_overworld and _flower_tex != null:
+			var fcol: int = _FLOWER_SEQ[_flower_frame]
+			draw_texture_rect_region(_flower_tex, dst, Rect2(fcol * TILE, 0, TILE, TILE))
+		elif tid == 0x14 and is_water_tileset and _water_off > 0:
+			var wo := float(_water_off)
+			draw_texture_rect_region(ts["tex"],
+				Rect2(dst.position + Vector2(wo, 0), Vector2(TILE - wo, TILE)),
+				Rect2(src_pos, Vector2(TILE - wo, TILE)))
+			draw_texture_rect_region(ts["tex"], Rect2(dst.position, Vector2(wo, TILE)),
+				Rect2(src_pos + Vector2(TILE - wo, 0), Vector2(wo, TILE)))
+		else:
+			draw_texture_rect_region(ts["tex"], dst, Rect2(src_pos, Vector2(TILE, TILE)))
 
 
 func _native_block_quads(pm: Dictionary, bx: int, by: int, only_border := false) -> Array:
@@ -4576,9 +4660,14 @@ func _native_block_quads(pm: Dictionary, bx: int, by: int, only_border := false)
 			var tile_id: int = int(pm["border"])
 			if not only_border and _pm_contains(pm, lx, ly):
 				tile_id = _pm_tile_id(pm, lx, ly)
+			elif only_border or not _pm_contains(pm, lx, ly):
+				var groups: Dictionary = ts.get("block_tiles", {})
+				var native_border_block := int(pm.get("border_block", -1))
+				if native_border_block >= 0 and groups.has(native_border_block):
+					tile_id = int((groups[native_border_block] as Array)[cy * 2 + cx])
 			var dst := Rect2(bx * BLOCK + cx * cell_size, by * BLOCK + cy * cell_size,
 				cell_size, cell_size)
-			out.append({"dst": dst, "src": Rect2(
+			out.append({"tile": tile_id, "dst": dst, "src": Rect2(
 				(tile_id % cols) * cell_size, (tile_id / cols) * cell_size,
 				cell_size, cell_size)})
 	return out
@@ -4625,10 +4714,15 @@ func _draw() -> void:
 		var cols: int = cf["cols"]
 		var sq: float = cf["dx"]                            # the two halves squeeze toward centre as it's cut
 		for t in cf["tiles"]:
-			var tid: int = t["tid"]
 			var hx: float = sq if t["ox"] == 0 else -sq     # left half drifts right, right half left (AnimCut)
-			draw_texture_rect_region(cf["tex"], Rect2(base + Vector2(t["ox"] + hx, t["oy"]), Vector2(TILE, TILE)),
-				Rect2((tid % cols) * TILE, (tid / cols) * TILE, TILE, TILE))
+			var src: Rect2
+			if t.has("src"):
+				src = t["src"]
+			else:
+				var tid: int = t["tid"]
+				src = Rect2((tid % cols) * TILE, (tid / cols) * TILE, TILE, TILE)
+			draw_texture_rect_region(cf["tex"],
+				Rect2(base + Vector2(t["ox"] + hx, t["oy"]), Vector2(TILE, TILE)), src)
 
 
 # ---- verification helpers --------------------------------------------------
@@ -4679,7 +4773,7 @@ func _tmxtest() -> void:
 	gw = placed[0]["cw"]
 	gh = placed[0]["ch"]
 	collision = placed[0]["collision"]
-	border_block = placed[0]["border"]
+	border_block = placed[0]["border_block"]
 	center_tileset = str(data.get("tileset", ""))
 	ok = _tmx_check("Engine adapter keeps 16px cell dimensions",
 		gw == 4 and gh == 3 and map_w == 2 and map_h == 2,
@@ -5681,6 +5775,7 @@ func _projparitytest() -> void:
 	ok = _schema_check("parity tilesets (5 sampled)", ts_ok, "") and ok
 	var map_ok := true
 	var map_n := 0
+	var tileset_representatives := {}
 	var mda := DirAccess.open("res://assets/maps")
 	mda.list_dir_begin()
 	var mf := mda.get_next()
@@ -5688,15 +5783,92 @@ func _projparitytest() -> void:
 		if mf.ends_with(".json"):
 			map_n += 1
 			var label := mf.get_basename()
-			if _deep_diff(_load_json_any("res://assets/maps/" + mf),
-					ProjectData.map_json(label), "/") != "" or not ProjectData.map_exists(label):
+			var legacy_map: Dictionary = _load_json_any("res://assets/maps/" + mf)
+			tileset_representatives[str(legacy_map["tileset"])] = label
+			var map_diff := _deep_diff(legacy_map,
+				ProjectData.map_legacy(label), "/")
+			if map_diff != "" or not ProjectData.map_exists(label):
 				map_ok = false
-				print("[schema] map parity FAIL: %s" % label)
+				print("[schema] map parity FAIL: %s — %s" % [label, map_diff])
 		mf = mda.get_next()
 	mda.list_dir_end()
 	ok = _schema_check("parity maps (%d compared)" % map_n, map_ok and map_n > 200, "") and ok
+	var native_tileset_ok := true
+	var native_tileset_detail := ""
+	for slug in tileset_representatives:
+		var detail := _native_tileset_parity(str(slug), str(tileset_representatives[slug]))
+		if detail != "":
+			native_tileset_ok = false
+			native_tileset_detail = "%s: %s" % [slug, detail]
+			break
+	ok = _schema_check("parity native TSX atlases (%d compared)" % tileset_representatives.size(),
+		native_tileset_ok and tileset_representatives.size() == 24,
+		native_tileset_detail) and ok
 	print("[parity] %s" % ("ALL GREEN" if ok else "FAIL"))
 	get_tree().quit(0 if ok else 1)
+
+
+## Independent format-2 atlas oracle: a representative map opens each TSX, then
+## every reversible block quadrant is compared to the legacy block definition and
+## all four 8px source regions. This covers blocks absent from current maps but used
+## later by ReplaceTileBlock doors, switches, and Cut.
+func _native_tileset_parity(slug: String, map_label: String) -> String:
+	var opened := MapDocument.open(ProjectData.dir, map_label)
+	if not bool(opened.get("ok", false)):
+		return str(opened.get("error", "cannot open native map"))
+	var document: MapDocument = opened["document"]
+	var meta: Dictionary = document.tileset
+	var groups: Dictionary = meta.get("block_tiles", {})
+	var legacy: Dictionary = ProjectData.legacy("tilesets/%s.json" % slug)
+	var block_defs: Array = legacy.get("blocks", [])
+	if groups.size() != block_defs.size():
+		return "block groups %d vs %d" % [groups.size(), block_defs.size()]
+	var native_result := document.load_image()
+	var native_image: Image = native_result.get("image")
+	var legacy_texture := load("res://assets/tilesets/%s.png" % slug) as Texture2D
+	var legacy_image: Image = legacy_texture.get_image() if legacy_texture != null else null
+	if native_image == null or legacy_image == null:
+		return "native or legacy atlas image did not load"
+	var native_cols := int(meta.get("columns", 0))
+	var legacy_cols := int(legacy.get("tile_cols", 0))
+	for block_id in block_defs.size():
+		if not groups.has(block_id):
+			return "missing block group %d" % block_id
+		var group: Array = groups[block_id]
+		var block: Array = block_defs[block_id]
+		for quadrant in 4:
+			var local := int(group[quadrant])
+			var qx := (quadrant % 2) * 2
+			var qy := (quadrant / 2) * 2
+			var expected := [int(block[qy * 4 + qx]), int(block[qy * 4 + qx + 1]),
+				int(block[(qy + 1) * 4 + qx]), int(block[(qy + 1) * 4 + qx + 1])]
+			var props: Dictionary = (meta.get("tile_properties", {}) as Dictionary).get(local, {})
+			var raw := str(props.get("pokeredpc:subtiles", "")).split(",", false)
+			if raw.size() != 4:
+				return "block %d quadrant %d has no four-subtile metadata" % [block_id, quadrant]
+			for sub in 4:
+				var source_id := int(raw[sub])
+				if source_id != int(expected[sub]):
+					return "block %d quadrant %d subtile %d is %d vs %d" % [
+						block_id, quadrant, sub, source_id, int(expected[sub])]
+				var source_origin := Vector2i((source_id % legacy_cols) * TILE,
+					(source_id / legacy_cols) * TILE)
+				var native_origin := Vector2i((local % native_cols) * 16 + (sub % 2) * TILE,
+					(local / native_cols) * 16 + (sub / 2) * TILE)
+				for py in TILE:
+					for px in TILE:
+						var expected_color := Color(0, 0, 0, 0)
+						var source_pixel := source_origin + Vector2i(px, py)
+						if source_pixel.x < legacy_image.get_width() \
+								and source_pixel.y < legacy_image.get_height():
+							expected_color = legacy_image.get_pixelv(source_pixel)
+						if native_image.get_pixelv(native_origin + Vector2i(px, py)) != expected_color:
+							return "block %d quadrant %d subtile %d pixel (%d,%d) differs" % [
+								block_id, quadrant, sub, px, py]
+			if int(props.get("pokeredpc:feet_tile", -1)) != int(expected[2]) \
+					or int(props.get("pokeredpc:bottom_right_tile", -1)) != int(expected[3]):
+				return "block %d quadrant %d semantic tile ids differ" % [block_id, quadrant]
+	return ""
 
 
 func _load_json_any(path: String):

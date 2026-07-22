@@ -8,6 +8,7 @@ ADR-021 records why this seam and the conservative tracer subset exist.
 
 ```
 project/
+  data/world.json
   maps/<MapLabel>.tmx
   tilesets/<tileset>.tsx
   assets/<atlas>.png
@@ -17,9 +18,10 @@ The TMX map is finite, orthogonal, and uses 16×16 tiles. One tile is one moveme
 cell. Pixel coordinates therefore convert directly as `cell = pixel / 16`; objects must be
 point objects aligned to that grid. Maps may have odd cell dimensions.
 
-Gen-1's 32×32 blocks are optional authoring groups, not geometry. A tileset may attach a
-`pokeredpc:block` string to a tile so Studio can offer a block brush without making projects
-or other rulesets depend on the Game Boy representation.
+Gen-1's 32×32 blocks are optional authoring groups, not geometry. Kanto's importer maps
+each block to four native cells and attaches reversible `pokeredpc:block` metadata so
+Studio can offer a block brush without making other projects or rulesets use Game Boy
+geometry. ADR-023 records this cutover.
 
 ## TMX contract
 
@@ -36,6 +38,7 @@ Map properties owned by pokeredpc:
 |---|---|---|
 | `pokeredpc:format` | int | Tiled bridge version. Current value: `1`. |
 | `pokeredpc:border_tile` | int | Local TSX tile ID drawn outside the map/at an odd batch edge. |
+| `pokeredpc:border_block` | int | Optional reversible 32×32 border group used by block-authored projects. |
 | `pokeredpc:default_spawn` | string `x,y` | Initial movement cell when no warp/spawn override is named. |
 
 The Project manifest's `format: 2` and the map's `pokeredpc:format: 1` version different
@@ -49,13 +52,27 @@ The external tileset is one 16×16 atlas image. Local tile IDs use these propert
 |---|---|---|
 | `pokeredpc:walkable` | bool | Whether the player may stand on this cell. Absent is solid. |
 | `pokeredpc:feet_tile` | int | Optional ruleset semantic tile ID; defaults to the local tile ID. |
-| `pokeredpc:block` | string | Optional Studio block-brush grouping/position metadata. |
+| `pokeredpc:block` | string `id,quadrant` | Optional reversible block id and quadrant (`0` top-left through `3` bottom-right). |
+| `pokeredpc:subtiles` | string `a,b,c,d` | Optional exact four 8×8 source ids, used by Kanto animation/parity. |
 | `pokeredpc:grass` | bool | Optional grass semantic for Engine presentation. |
 | `pokeredpc:counter` | bool | Optional counter semantic for interaction. |
 | `pokeredpc:bottom_right_tile` | int | Optional Gen-1 semantic used by ledge-style checks. |
 
 The atlas loads directly from the opened Project with `Image.load_from_file`; it never
 silently falls back to similarly named extracted `res://assets` content.
+
+Kanto's TSX also carries a tileset-level `pokeredpc:ledges` compact-JSON property. The
+Engine consumes its semantic 8×8 ids through the same rules as format 1. Composite atlas
+cells normally draw in one blit; flower and water cells split into their preserved four
+subtiles only while animating.
+
+## World graph
+
+`data/world.json` owns seamless map placement. Its `maps` object is keyed by stable map id;
+each value is an ordered list of `{direction, map, offset}` records. Direction is cardinal,
+the destination is an `x-ref`-validated `map:<label>`, and offset remains in 32px block
+units to preserve pokered's connection headers. `ProjectData` injects the selected map's
+connections into the runtime view; a TMX document remains local geometry.
 
 ## Gameplay objects
 
@@ -64,7 +81,7 @@ their Tiled `class` (or legacy `type`) selects one of these records:
 
 | Class | Required/recognized properties |
 |---|---|
-| `pokeredpc:warp` | `pokeredpc:dest_map` (`map:<label>`), `pokeredpc:dest_warp` (int) |
+| `pokeredpc:warp` | `pokeredpc:dest_map` (`map:<label>`) or explicit `pokeredpc:dest_const` ruleset sentinel; `pokeredpc:dest_warp` (int) |
 | `pokeredpc:npc` | `pokeredpc:sprite`, optional `pokeredpc:movement`, `pokeredpc:facing`, `pokeredpc:event` |
 | `pokeredpc:sign` | optional `pokeredpc:text`, `pokeredpc:event` |
 | `pokeredpc:trigger` | optional `pokeredpc:event` |
@@ -72,6 +89,10 @@ their Tiled `class` (or legacy `type`) selects one of these records:
 Map and event references are validated with the same stable ID registry as JSON content.
 An unknown `pokeredpc:*` class refuses; a third-party class is preserved but ignored by the
 runtime.
+
+Extractor-authored Kanto objects additionally carry `pokeredpc:legacy`, compact JSON of the
+exact former runtime record. This preserves ordered macro arguments and trainer-dialogue
+control characters while common fields remain visible as typed Tiled properties.
 
 ## Round trips and ownership
 
@@ -93,3 +114,7 @@ same preservation requirement when tile/collision tools begin writing it.
 - `--studiotest` mounts the real three-column Studio workspace, renders
   `game/studio_tmx.png`, and saves through its real document control.
 - The two PNGs must be byte-identical; the fixture currently renders 64×48 pixels.
+- `--projparitytest` deep-compares all 223 native maps with the legacy semantic oracle and
+  independently compares all 24 TSX block mappings and composite pixels.
+- The Kanto gate also requires two byte-identical extractions, zero validation errors,
+  unchanged battle stream hashes, and the seeded NEW GAME → HALL OF FAME playthrough.

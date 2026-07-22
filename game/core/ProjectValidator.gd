@@ -80,8 +80,10 @@ static func validate_project(dir: String) -> Dictionary:
 			_register_native_map(entry, rel, ids)
 			var document: MapDocument = opened["document"]
 			for warp in document.warps:
-				refs.append({"prefix": "map", "value": "map:" + str(warp.get("dest_map", "")),
-					"path": "%s: warp '%s'/pokeredpc:dest_map" % [rel, str(warp.get("id", ""))]})
+				var dest_map := str(warp.get("dest_map", ""))
+				if dest_map != "":               # LAST_MAP is a ruleset sentinel, not a map id
+					refs.append({"prefix": "map", "value": "map:" + dest_map,
+						"path": "%s: warp '%s'/pokeredpc:dest_map" % [rel, str(warp.get("id", ""))]})
 			for object in document.objects + document.signs + document.triggers:
 				var event_id := str(object.get("event", ""))
 				if event_id != "":

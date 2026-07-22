@@ -2219,12 +2219,209 @@ def _pj_write(rel, obj):
         f.write("\n")
 
 
+def _pj_write_text(rel, value):
+    """Deterministic UTF-8/LF writer for native project documents (TMX/TSX)."""
+    p = PROJ / rel
+    p.parent.mkdir(parents=True, exist_ok=True)
+    with open(p, "w", encoding="utf-8", newline="\n") as f:
+        f.write(value.rstrip("\n") + "\n")
+
+
+def _xml(value):
+    """XML-attribute escaping. JSON payloads escape control characters before this seam."""
+    import html
+    return html.escape(str(value), quote=True)
+
+
+def _xml_property(name, value, value_type="", indent="  "):
+    typed = f' type="{_xml(value_type)}"' if value_type else ""
+    if value_type == "bool":
+        value = "true" if value else "false"
+    return f'{indent}<property name="{_xml(name)}"{typed} value="{_xml(value)}"/>'
+
+
+def _compact_json(value):
+    """Printable XML-safe JSON for lossless Gen-1 payloads inside owned properties."""
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def _emit_native_tileset(slug_name):
+    """Emit one deterministic 16px TSX atlas from a legacy 8px tileset/blockset.
+
+    Local tile `block_id * 4 + quadrant` is one 16x16 movement cell. Its properties
+    retain the exact four source tile ids plus the Gen-1 representative feet and
+    bottom-right ids, so Core can reconstruct collision/special-tile semantics and
+    can reverse four cells back into a 32x32 block for dynamic replacement.
+    """
+    from PIL import Image
+
+    source = json.load(open(OUT / "tilesets" / f"{slug_name}.json", encoding="utf-8"))
+    source_image = Image.open(OUT / "tilesets" / f"{slug_name}.png").convert("RGBA")
+    blocks = source["blocks"]
+    source_cols = int(source["tile_cols"])
+    tile_count = len(blocks) * 4
+    columns = 16
+    rows = (tile_count + columns - 1) // columns
+    atlas = Image.new("RGBA", (columns * 16, rows * 16), (0, 0, 0, 0))
+    walkable = {int(v) for v in source["walkable_tiles"]}
+    counters = {int(v) for v in source.get("counter_tiles", [])}
+    grass = int(source.get("grass_tile", -1))
+
+    tile_properties = []
+    for block_id, block in enumerate(blocks):
+        for quadrant in range(4):
+            sx, sy = quadrant % 2, quadrant // 2
+            subtiles = [
+                int(block[(sy * 2) * 4 + sx * 2]),
+                int(block[(sy * 2) * 4 + sx * 2 + 1]),
+                int(block[(sy * 2 + 1) * 4 + sx * 2]),
+                int(block[(sy * 2 + 1) * 4 + sx * 2 + 1]),
+            ]
+            local_id = block_id * 4 + quadrant
+            dx, dy = (local_id % columns) * 16, (local_id // columns) * 16
+            for sub, source_id in enumerate(subtiles):
+                tx, ty = source_id % source_cols, source_id // source_cols
+                crop = source_image.crop((tx * 8, ty * 8, tx * 8 + 8, ty * 8 + 8))
+                atlas.paste(crop, (dx + (sub % 2) * 8, dy + (sub // 2) * 8))
+            feet, bottom_right = subtiles[2], subtiles[3]
+            tile_properties.append((local_id, block_id, quadrant, subtiles, feet,
+                                    bottom_right, feet in walkable, feet == grass,
+                                    feet in counters))
+
+    image_rel = Path("assets") / "tilesets" / "native" / f"{slug_name}.png"
+    image_path = PROJ / image_rel
+    image_path.parent.mkdir(parents=True, exist_ok=True)
+    atlas.save(image_path)
+
+    lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        (f'<tileset version="1.11" tiledversion="1.11.2" name="{_xml(slug_name)}" '
+         f'tilewidth="16" tileheight="16" tilecount="{tile_count}" columns="{columns}">'),
+        " <properties>",
+        _xml_property("pokeredpc:source_tile_size", 8, "int", "  "),
+    ]
+    if source.get("ledges"):
+        lines.append(_xml_property("pokeredpc:ledges", _compact_json(source["ledges"]), "", "  "))
+    lines += [
+        " </properties>",
+        (f' <image source="../{image_rel.as_posix()}" width="{atlas.width}" '
+         f'height="{atlas.height}"/>'),
+    ]
+    for local_id, block_id, quadrant, subtiles, feet, br, can_walk, is_grass, is_counter in tile_properties:
+        lines += [f' <tile id="{local_id}">', "  <properties>",
+                  _xml_property("pokeredpc:block", f"{block_id},{quadrant}", "", "   "),
+                  _xml_property("pokeredpc:subtiles", ",".join(str(v) for v in subtiles), "", "   "),
+                  _xml_property("pokeredpc:walkable", can_walk, "bool", "   "),
+                  _xml_property("pokeredpc:feet_tile", feet, "int", "   "),
+                  _xml_property("pokeredpc:bottom_right_tile", br, "int", "   ")]
+        if is_grass:
+            lines.append(_xml_property("pokeredpc:grass", True, "bool", "   "))
+        if is_counter:
+            lines.append(_xml_property("pokeredpc:counter", True, "bool", "   "))
+        lines += ["  </properties>", " </tile>"]
+    lines.append("</tileset>")
+    _pj_write_text(f"tilesets/{slug_name}.tsx", "\n".join(lines))
+
+
+def _emit_tiled_object(lines, object_id, name, object_class, record, typed):
+    """Append one point object. `record` is the exact v1 runtime payload; `typed`
+    exposes the fields common to generic maps while the owned legacy property keeps
+    every Kanto-only argument/text byte reversible during the cutover."""
+    lines += [
+        (f'  <object id="{object_id}" name="{_xml(name)}" class="{_xml(object_class)}" '
+         f'x="{int(record["x"]) * 16}" y="{int(record["y"]) * 16}">'),
+        "   <point/>",
+        "   <properties>",
+    ]
+    for key, value, value_type in typed:
+        if value is not None and value != "":
+            lines.append(_xml_property(key, value, value_type, "    "))
+    lines.append(_xml_property("pokeredpc:legacy", _compact_json(record), "", "    "))
+    lines += ["   </properties>", "  </object>"]
+
+
+def _emit_native_map(source):
+    """Emit a format-2 TMX whose Ground layer is the exact 16px expansion of v1 blocks."""
+    block_width, block_height = int(source["width"]), int(source["height"])
+    width, height = block_width * 2, block_height * 2
+    ground_rows = []
+    for by, row in enumerate(source["blocks"]):
+        for sy in range(2):
+            cells = []
+            for block_id in row:
+                base = int(block_id) * 4
+                cells.extend([base + sy * 2 + 1, base + sy * 2 + 2])  # local id + firstgid
+            ground_rows.append(",".join(str(v) for v in cells))
+
+    object_count = len(source["warps"]) + len(source["bg_events"]) + len(source["object_events"])
+    lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        (f'<map version="1.11" tiledversion="1.11.2" orientation="orthogonal" '
+         f'renderorder="right-down" width="{width}" height="{height}" tilewidth="16" '
+         f'tileheight="16" infinite="0" nextlayerid="3" nextobjectid="{object_count + 1}">'),
+        " <properties>",
+        _xml_property("pokeredpc:format", 1, "int", "  "),
+        _xml_property("pokeredpc:border_block", int(source["border_block"]), "int", "  "),
+        _xml_property("pokeredpc:border_tile", int(source["border_block"]) * 4, "int", "  "),
+        _xml_property("pokeredpc:default_spawn", f"{width // 2},{height // 2}", "", "  "),
+        " </properties>",
+        f' <tileset firstgid="1" source="../tilesets/{_xml(source["tileset"])}.tsx"/>',
+        f' <layer id="1" name="Ground" width="{width}" height="{height}">',
+        '  <data encoding="csv">',
+        ",\n".join(ground_rows),
+        "</data>",
+        " </layer>",
+        ' <objectgroup id="2" name="Gameplay">',
+    ]
+    object_id = 1
+    for i, warp in enumerate(source["warps"], 1):
+        typed = [("pokeredpc:dest_const", warp.get("dest_const", ""), ""),
+                 ("pokeredpc:dest_map", "map:" + warp["dest_map"] if warp.get("dest_map") else "", ""),
+                 ("pokeredpc:dest_warp", int(warp["dest_warp"]), "int")]
+        _emit_tiled_object(lines, object_id, f"warp_{i:03d}", "pokeredpc:warp", warp, typed)
+        object_id += 1
+    for i, sign in enumerate(source["bg_events"], 1):
+        typed = [("pokeredpc:text", sign.get("text", ""), "")]
+        _emit_tiled_object(lines, object_id, f"sign_{i:03d}", "pokeredpc:sign", sign, typed)
+        object_id += 1
+    used_names = {}
+    for npc in source["object_events"]:
+        base_name = f'{npc["sprite"]}@{npc["x"]},{npc["y"]}'
+        used_names[base_name] = used_names.get(base_name, 0) + 1
+        name = base_name if used_names[base_name] == 1 else f'{base_name}#{used_names[base_name]}'
+        args = npc.get("args", [])
+        typed = [("pokeredpc:sprite", npc["sprite"], ""),
+                 ("pokeredpc:movement", args[0] if len(args) > 0 else "STAY", ""),
+                 ("pokeredpc:facing", args[1] if len(args) > 1 else "NONE", "")]
+        _emit_tiled_object(lines, object_id, name, "pokeredpc:npc", npc, typed)
+        object_id += 1
+    lines += [" </objectgroup>", "</map>"]
+    _pj_write_text(f'maps/{source["name"]}.tmx', "\n".join(lines))
+
+
+def _emit_native_kanto():
+    """Format-2 cutover: deterministic TMX/TSX maps plus the canonical world graph."""
+    maps = [json.load(open(f, encoding="utf-8"))
+            for f in sorted((OUT / "maps").glob("*.json"))]
+    used_tilesets = sorted({m["tileset"] for m in maps})
+    for slug_name in used_tilesets:
+        _emit_native_tileset(slug_name)
+    for source in maps:
+        _emit_native_map(source)
+    _pj_write("data/world.json", {"maps": {
+        "map:" + m["name"]: [{"direction": c["dir"], "map": "map:" + c["map"],
+                               "offset": int(c["offset"])} for c in m["connections"]]
+        for m in maps
+    }})
+    return len(maps), len(used_tilesets)
+
+
 def build_project():
     """gh #24 (ADR-017 d6): emit the v2 Kanto project — the extractor IS the importer.
-    Reads the just-emitted per-type JSONs back and writes game/project/ in the format-1
+    Reads the just-emitted per-type JSONs back and writes game/project/ in the format-2
     shape (docs/v2/project-format.md): per-record entity files addressed by stable string
     ids (`species:abra`, `move:pound` — positional resolution ends at this boundary),
-    table singletons, v1's map JSON carried verbatim as the documented interim format,
+    table singletons, deterministic TMX/TSX maps plus the canonical world graph,
     remaining presentation blobs verbatim under presentation/, and every binary asset
     under assets/. Reading back (rather than plumbing every build_* return) keeps this
     one stage; direct emission replaces it when gh #25 retires the legacy assets tree.
@@ -2394,11 +2591,9 @@ def build_project():
         for f in sorted(events_src.glob("*.json")):
             shutil.copyfile(f, PROJ / "data" / "events" / f.name)
 
-    # interim maps + presentation blobs: verbatim byte-copies (deterministic, and the
-    # map shape is explicitly the v1 interim format per ADR-017 d5)
-    for f in sorted((OUT / "maps").glob("*.json")):
-        (PROJ / "maps").mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(f, PROJ / "maps" / f.name)
+    # Format 2: native Tiled maps replace the interim project JSON copies. The legacy
+    # files remain in game/assets as the parity oracle, not as project source.
+    native_map_count, native_tileset_count = _emit_native_kanto()
     presentation = ["audio.json", "sfx.json", "charmap.json", "credits.json",
                     "dungeon_maps.json", "map_music.json", "move_anims.json",
                     "spinners.json", "title_intro.json", "title_mons.json",
@@ -2447,7 +2642,7 @@ def build_project():
             g = "items"
         elif rel.startswith("data/trainers/"):
             g = "trainers"
-        elif rel.startswith("maps/"):
+        elif rel.startswith("maps/") or rel.startswith("tilesets/"):
             g = "maps"
         elif rel.startswith("presentation/"):
             g = "presentation"
@@ -2460,12 +2655,12 @@ def build_project():
     parts = {g: h.hexdigest() for g, h in groups.items()}
     content = hashlib.md5("".join(parts[k] for k in sorted(parts)).encode()).hexdigest()
     version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
-    _pj_write("manifest.json", {"format": 1, "id": "kanto", "name": "Pokémon Red (Kanto)",
+    _pj_write("manifest.json", {"format": 2, "id": "kanto", "name": "Pokémon Red (Kanto)",
                                 "version": version, "ruleset": "gen1",
                                 "identity": {"parts": parts, "content_hash": content}})
     print(f"project: {len(base)} species, {len(moves)} moves, {len(items)} items, "
-          f"{len(trainers)} trainers, {len(list((PROJ / 'maps').glob('*.json')))} maps, "
-          f"{n_assets} assets -> {PROJ}")
+          f"{len(trainers)} trainers, {native_map_count} native maps, "
+          f"{native_tileset_count} native tilesets, {n_assets} assets -> {PROJ}")
     print(f"project identity: {len(parts)} parts, content_hash={content}")
     return parts
 

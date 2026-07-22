@@ -1,0 +1,48 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "schema:world",
+ "$comment": "The format-2 world graph. Maps own local geometry and objects in TMX; seamless cardinal placement is a project-level relation with Gen-1 block offsets.",
+ "type": "object",
+ "required": [
+  "maps"
+ ],
+ "properties": {
+  "maps": {
+   "type": "object",
+   "x-ref-keys": "map",
+   "additionalProperties": {
+    "type": "array",
+    "items": {
+     "type": "object",
+     "required": [
+      "direction",
+      "map",
+      "offset"
+     ],
+     "properties": {
+      "direction": {
+       "enum": [
+        "north",
+        "south",
+        "west",
+        "east"
+       ]
+      },
+      "map": {
+       "type": "string",
+       "x-ref": "map"
+      },
+      "offset": {
+       "type": "integer"
+      }
+     },
+     "additionalProperties": false
+    }
+   }
+  },
+  "custom": {
+   "type": "object"
+  }
+ },
+ "additionalProperties": false
+}

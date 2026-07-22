@@ -20,7 +20,7 @@ RPGs without opening the Godot editor.
 | Native Pokémon Red | **v1.2.0 shipped** — all 223 maps, complete critical path, battles, saves, audio, and Cable Club multiplayer |
 | v2 Core | **Phases 1–3 complete** — versioned projects, stable IDs, ruleset modules, formulas, and authored Event VM |
 | Studio | **Phase 4 complete** — project browser, schema-driven content editors, validation, canonical Save/Revert, and isolated live play-test |
-| Maps and events | **Phase 5 active** — native Tiled TMX/TSX maps now render identically in Engine and Studio; painting and Kanto migration follow |
+| Maps and events | **Phase 5 active** — all 223 Kanto maps now use native Tiled TMX/TSX in Engine and Studio; painting follows |
 
 The detailed, evidence-backed tracker is [docs/roadmap.md](docs/roadmap.md). The v2 product
 direction lives in [docs/v2/plan.md](docs/v2/plan.md), and the supplied Studio reference
@@ -70,7 +70,7 @@ Developers can open the focused Phase-5 native-map tracer directly:
 pwsh tools/run.ps1 --studio-map-fixture
 ```
 
-The map surface is intentionally read-only in this tracer. Painting, collision editing,
+The map surface is currently read-only. Painting, collision editing,
 objects, world connections, event authoring, undo/redo, and softlock lints are the remaining
 Phase-5 slices. MIDI and pluggable chiptune import are tracked for the later asset-pipeline
 phase in [gh #60](https://github.com/johnjohto/pokeredpc/issues/60).

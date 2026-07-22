@@ -18,6 +18,7 @@ const SUPPORTED_FORMAT := 2
 static var dir := ""                  # the opened project directory ("" = not opened)
 static var manifest: Dictionary = {}
 static var _legacy := {}              # old asset filename -> reconstructed data
+static var _world := {}               # format-2 map id -> seamless connection records
 
 
 static func open(project_dir: String) -> String:
@@ -36,6 +37,7 @@ static func open(project_dir: String) -> String:
 	dir = project_dir
 	manifest = m
 	_legacy = {}
+	_world = _read_json(project_dir.path_join("data/world.json")) if fmt >= 2 else {}
 	_build_legacy()
 	return ""
 
@@ -87,8 +89,26 @@ static func map_json(label: String):
 		if not bool(opened.get("ok", false)):
 			push_error("[project] " + str(opened.get("error", "cannot load map")))
 			return {}
-		return (opened["document"] as MapDocument).runtime_map()
+		var runtime := (opened["document"] as MapDocument).runtime_map()
+		runtime["connections"] = _connections_for(label)
+		return runtime
 	return _read_json(dir.path_join("maps/%s.json" % label))
+
+
+## Migration oracle: the exact format-1 semantic dictionary represented by a native
+## map. Engine-only cell/atlas fields are deliberately excluded.
+static func map_legacy(label: String):
+	if int(manifest.get("format", 1)) < 2:
+		return _read_json(dir.path_join("maps/%s.json" % label))
+	var opened := MapDocument.open(dir, label)
+	if not bool(opened.get("ok", false)):
+		push_error("[project] " + str(opened.get("error", "cannot load map")))
+		return {}
+	# The format-1 oracle was parsed from JSON, whose numeric domain is float in Godot;
+	# round-trip this test-only view through the same parser so parity checks values and
+	# shape rather than GDScript's incidental XML-int versus JSON-float distinction.
+	return JSON.parse_string(JSON.stringify(
+		(opened["document"] as MapDocument).legacy_map(_connections_for(label))))
 
 
 static func map_labels() -> Array:
@@ -98,6 +118,16 @@ static func map_labels() -> Array:
 		if file.ends_with(extension):
 			out.append(file.get_basename())
 	out.sort()
+	return out
+
+
+static func _connections_for(label: String) -> Array:
+	var maps: Dictionary = _world.get("maps", {})
+	var out: Array = []
+	for connection in maps.get("map:" + label, []):
+		out.append({"dir": str(connection.get("direction", "")),
+			"map": _bare(str(connection.get("map", ""))),
+			"offset": int(connection.get("offset", 0))})
 	return out
 
 

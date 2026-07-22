@@ -73,6 +73,12 @@
    "kind": "table"
   },
   {
+   "path": "data/world.json",
+   "schema": "world",
+   "kind": "table",
+   "since_format": 2
+  },
+  {
    "path": "data/text.json",
    "schema": "text",
    "kind": "table"

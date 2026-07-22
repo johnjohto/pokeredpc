@@ -4,7 +4,7 @@ The **Project** is v2's shareable artifact (ADR-013, ADR-017): a portable direct
 data + maps + assets + a ruleset selection that `Engine(Project) → playable game` and
 `Studio(Project) → edits the same Project`. **Format 1** was pinned by ADR-017 and
 implemented from gh #22 on. **Format 2** (ADR-021, gh #52) replaces interim JSON maps with
-native Tiled TMX/TSX while retaining format-1 loading; Kanto's migration is gh #53. From
+native Tiled TMX/TSX while retaining format-1 loading; Kanto migrated in gh #53/ADR-023. From
 format 2 onward, incompatible changes are format bumps plus linear migrations.
 
 ## Serialization
@@ -56,6 +56,7 @@ project/
                          stat boosts, field-move badge gates, the two stat-stage
                          tables, the high-crit move list); absent keys fall back
                          to the ruleset's built-in faithful defaults
+    world.json           format 2+ — cardinal map connections keyed by stable map id
   maps/<Label>.json      format 1 only — interim extracted map JSON (bare `name`)
   maps/<Label>.tmx       format 2+ — native Tiled map (ADR-021)
   tilesets/<name>.tsx    format 2+ — external Tiled atlas metadata
@@ -108,9 +109,11 @@ cannot share play-test progress (ADR-020 d5, gh #51).
 
 For format 2, `ProjectData.map_json(label)` opens `MapDocument` and returns its normalized
 runtime adapter: 16×16 tile/collision/semantic rows, typed object arrays, authored spawn,
-and project-local tileset metadata. Main renders those cells directly while format-1 maps
-continue through the blockset adapter. Both shapes cross the same placement/collision
-helpers; serialization details do not leak into gameplay call sites.
+project-local tileset metadata, and the selected map's `data/world.json` connections. Main
+renders those cells directly while format-1 maps continue through the blockset adapter.
+`map_legacy(label)` is the explicit migration-test view: it reconstructs the old semantic
+dictionary without exposing native runtime fields. Both runtime shapes cross the same
+placement/collision helpers; serialization details do not leak into gameplay call sites.
 
 ## Schemas + validator (gh #22)
 
@@ -134,6 +137,8 @@ v1's parallel per-type dicts into records (species = base stats + learnsets + ev
 dex + cry + icon + sprites; items absorb prices and the TM→move mapping; trainers absorb
 pics) and prefixing every cross-reference. Same bring-your-own-source, personal-use model
 as v1 (`pokered/` and everything extracted stay git-ignored, never redistributed).
+Format 2 emits Kanto as 223 TMX maps, 24 external TSX composite atlases, and
+`data/world.json`; interim map JSON remains only under `game/assets/` as the parity oracle.
 Emission is **deterministic**: two extractions produce byte-identical trees (the gh #24
 gate), which is what makes the gh #23 identity hash meaningful. The project root carries
 a `.gdignore` so Godot never imports the tree — the runtime reads it via raw
