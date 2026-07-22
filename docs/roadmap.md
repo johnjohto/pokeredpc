@@ -347,6 +347,14 @@ undo stack until Phase 5; the gate is `--studiotest` headless + the full-project
 identity sweep + a seed-1 GATE GREEN on a Studio-round-tripped project. Sub-issues
 **gh #47–#51** (shell/browser → canonical writer → form engine → the four editors →
 play-test + gate). Out by decision: event editing (Phase 5), importer GUI (Phase 7).
+**Landed: gh #47** (2026-07-22): the `--studio` launch seam (one binary, two faces; Main
+inert beside the shell), StudioShell with the project browser + recents, the four-type
+sidebar/record list, `ProjectData.records(kind)`, and `--studiotest` (scratch-copies Kanto,
+asserts the counts 151/165/152/47, proves the loud non-fatal refusal). **Landed: gh #48**
+(same day): `CanonJSON` — the GDScript twin of the extractor's `_pj_write` (code-point key
+sort, Python's escape set, whole-float→int re-emission) — proven by `--studiotest`'s sweep:
+all 515 records of the four kinds re-serialize **byte-identical** against the extractor's
+raw tree. Next: gh #49 (the schema-driven form engine).
 **Landed: gh #34** (2026-07-20): Catch + Progression are behind the seam and the
 **config-first knobs are real** — `Gen1Catch` (`attempt` over the byte-exact kernel + the
 safari `bait_rate`/`rock_rate` transitions, which moved out of the host's input handler),
