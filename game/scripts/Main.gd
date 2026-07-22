@@ -349,6 +349,17 @@ func _parse_seed_arg() -> int:
 
 
 func _ready() -> void:
+	# ADR-020 d1 (gh #47): one binary, two faces — `--studio` (or any --studio-* arg)
+	# boots the editor shell instead of the game. The shell mounts BESIDE Main (a root
+	# child, so disabling Main cannot disable it) and Main goes fully inert; Phase 7's
+	# packaging bakes separate main scenes per export preset.
+	for ua in OS.get_cmdline_user_args():
+		if str(ua).begins_with("--studio"):     # --studio / --studiotest / --studio-project=
+			var shell: Control = preload("res://scripts/studio/StudioShell.gd").new()
+			get_tree().root.add_child.call_deferred(shell)
+			process_mode = Node.PROCESS_MODE_DISABLED
+			visible = false
+			return
 	var _seed := _parse_seed_arg()
 	if _seed >= 0:
 		seed(_seed)

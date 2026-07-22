@@ -66,6 +66,13 @@ static func events() -> Dictionary:
 	return _read_records("data/events")
 
 
+## Per-record access for a content kind ("species"/"moves"/"items"/"trainers"/"events"…):
+## {basename: record} straight off data/<kind>/. Studio's editors read and list through
+## this (ADR-020, gh #47) — the legacy tables above stay the ENGINE's view.
+static func records(kind: String) -> Dictionary:
+	return _read_records("data/" + kind)
+
+
 static func map_exists(label: String) -> bool:
 	return FileAccess.file_exists(dir.path_join("maps/%s.json" % label))
 
