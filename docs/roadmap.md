@@ -387,6 +387,20 @@ of Fame. **Landed: gh #59** (same day): Studio now breaks away from the game's 1
 viewport before it builds any controls, opening as a native resizable 1280×800 desktop window
 (900×600 minimum); the game keeps its faithful 3× stretch, and `--studiotest` asserts that the two
 window profiles cannot drift back together. Next: Phase 5 — map + event editors (gh #19).
+**Phase 5 activated** (2026-07-22) as approved tracer-bullet issues **gh #52–#58** (native
+TMX tracer → Kanto cutover → painting → objects/world graph → event editor → softlock
+lints → phase gate). **Landed: gh #52** (same day; ADR-021): Project format 2 claims
+`maps/*.tmx` + external `tilesets/*.tsx` while format 1 remains loadable; one deep
+`MapDocument` seam serves ProjectData, ProjectValidator, Engine, Studio, and tests with a
+canonical 16×16 cell model, project-contained raw imagery, typed Tiled gameplay objects,
+newer/malformed refusal, and byte-identical no-op source preservation. Main renders native
+cells and consumes TSX walkability through its existing world/collision seam; `--tmxtest`
+proves the adapter. Studio gained a Maps workspace whose action bar, tool rail, dominant
+canvas, inspector/layers, charcoal surfaces, and mint/cyan/magenta states follow the two
+user-supplied reference boards now pinned in `docs/assets/studio/` and
+`docs/v2/studio-visual-direction.md`; `--studiotest` drives its preview and Save. The Engine
+and Studio tracer PNGs are SHA-256-identical. Next: gh #53 — migrate Kanto's 223 maps to the
+native bridge without moving the standing gameplay or battle determinism gates.
 **Landed: gh #34** (2026-07-20): Catch + Progression are behind the seam and the
 **config-first knobs are real** — `Gen1Catch` (`attempt` over the byte-exact kernel + the
 safari `bait_rate`/`rock_rate` transitions, which moved out of the host's input handler),

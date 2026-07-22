@@ -21,7 +21,7 @@ class_name ProjectValidator
 ##    exist on the record's map, and every declared cell/region must lie inside it —
 ##    a dangling trigger seals a path as silently as dead code would.
 
-const SUPPORTED_FORMAT := 1
+const SUPPORTED_FORMAT := 2
 const SCHEMA_DIR := "res://core/schemas/"
 
 
@@ -45,6 +45,7 @@ static func validate_project(dir: String) -> Dictionary:
 	var ids := {}                       # prefix -> {full_id: true}
 	var refs: Array = []                # {prefix, value, path(file-qualified)}
 	var events: Array = []              # event records, for the semantic pass (gh #42)
+	var project_format := 0
 
 	# The manifest gates everything: read it first so a format refusal leads the report.
 	if files.has("manifest.json"):
@@ -52,6 +53,8 @@ static func validate_project(dir: String) -> Dictionary:
 		var manifest = _load_json_file(dir.path_join("manifest.json"), m_errors)
 		if m_errors.is_empty() and manifest is Dictionary and manifest.has("format"):
 			var fmt = manifest["format"]
+			if fmt is float or fmt is int:
+				project_format = int(fmt)
 			if (fmt is float or fmt is int) and int(fmt) > SUPPORTED_FORMAT:
 				errors.append("manifest.json — project format %d; this build supports format %d — update the engine"
 					% [int(fmt), SUPPORTED_FORMAT])
@@ -61,12 +64,29 @@ static func validate_project(dir: String) -> Dictionary:
 		errors.append("manifest.json — missing (a project requires a manifest)")
 
 	for rel in files:
-		var entry := _match_layout(layout, rel)
+		var entry := _match_layout(layout, rel, project_format)
 		if entry.is_empty():
 			errors.append("%s — unclaimed file (no place in the project format)" % rel)
 			continue
 		var kind := str(entry.get("kind", ""))
-		if kind == "asset":
+		if kind == "asset" or kind == "native_asset":
+			continue
+		if kind == "native_map":
+			var map_label: String = str(rel).get_file().get_basename()
+			var opened := MapDocument.open(dir, map_label)
+			if not bool(opened.get("ok", false)):
+				errors.append("%s — %s" % [rel, str(opened.get("error", "invalid TMX map"))])
+				continue
+			_register_native_map(entry, rel, ids)
+			var document: MapDocument = opened["document"]
+			for warp in document.warps:
+				refs.append({"prefix": "map", "value": "map:" + str(warp.get("dest_map", "")),
+					"path": "%s: warp '%s'/pokeredpc:dest_map" % [rel, str(warp.get("id", ""))]})
+			for object in document.objects + document.signs + document.triggers:
+				var event_id := str(object.get("event", ""))
+				if event_id != "":
+					refs.append({"prefix": "event", "value": event_id,
+						"path": "%s: object '%s'/pokeredpc:event" % [rel, str(object.get("id", ""))]})
 			continue
 		var file_errors: Array = []
 		var inst = _load_json_file(dir.path_join(rel), file_errors)
@@ -181,8 +201,8 @@ static func _check_events(dir: String, events: Array, errors: Array) -> void:
 		if t.has("object") and not (m["objects"] as Dictionary).has(str(t["object"])):
 			errors.append("%s — names object '%s', which is not on map '%s'" % [rel, str(t["object"]), label])
 		_check_cmd_objects(inst.get("commands", []), label, dir, maps, errors, rel)
-		var cw: int = int(m["w"]) * 2
-		var ch: int = int(m["h"]) * 2
+		var cw: int = int(m["cw"])
+		var ch: int = int(m["ch"])
 		for c in t.get("cells", []) + t.get("front", []) + t.get("at", []):
 			if int(c[0]) < 0 or int(c[1]) < 0 or int(c[0]) >= cw or int(c[1]) >= ch:
 				errors.append("%s — cell (%d,%d) is outside map '%s' (%dx%d cells)"
@@ -223,6 +243,19 @@ static func _check_cmd_objects(cmds, label: String, dir: String, maps: Dictionar
 static func _map_info(dir: String, label: String, cache: Dictionary):
 	if cache.has(label):
 		return cache[label]
+	var tmx_path := dir.path_join("maps/%s.tmx" % label)
+	if FileAccess.file_exists(tmx_path):
+		var opened := MapDocument.open(dir, label)
+		if not bool(opened.get("ok", false)):
+			cache[label] = null
+			return null
+		var document: MapDocument = opened["document"]
+		var native_objects := {}
+		for o in document.objects:
+			native_objects[str(o.get("id", ""))] = true
+		var native_info := {"objects": native_objects, "cw": document.width, "ch": document.height}
+		cache[label] = native_info
+		return native_info
 	var path := dir.path_join("maps/%s.json" % label)
 	if not FileAccess.file_exists(path):
 		cache[label] = null
@@ -236,7 +269,8 @@ static func _map_info(dir: String, label: String, cache: Dictionary):
 	for o in m.get("object_events", []):
 		if o is Dictionary:
 			objects["%s@%d,%d" % [str(o.get("sprite", "")), int(o.get("x", -1)), int(o.get("y", -1))]] = true
-	var info := {"objects": objects, "w": int(m.get("width", 0)), "h": int(m.get("height", 0))}
+	var info := {"objects": objects, "cw": int(m.get("width", 0)) * 2,
+		"ch": int(m.get("height", 0)) * 2}
 	cache[label] = info
 	return info
 
@@ -260,6 +294,13 @@ static func _register_record(entry: Dictionary, rel: String, inst: Dictionary,
 	ids[prefix][prefix + ":" + base] = true
 
 
+static func _register_native_map(entry: Dictionary, rel: String, ids: Dictionary) -> void:
+	var prefix := str(entry.get("id_prefix", "map"))
+	if not ids.has(prefix):
+		ids[prefix] = {}
+	ids[prefix][prefix + ":" + rel.get_file().get_basename()] = true
+
+
 static func _register_declared(declares: Dictionary, inst: Dictionary, ids: Dictionary) -> void:
 	var prefix := str(declares.get("prefix", ""))
 	var node = inst
@@ -277,8 +318,11 @@ static func _register_declared(declares: Dictionary, inst: Dictionary, ids: Dict
 
 ## First layout entry whose path pattern claims `rel`; {} when unclaimed. Patterns are
 ## segment-wise globs ('*' within one segment); a trailing '**' claims a whole subtree.
-static func _match_layout(layout: Array, rel: String) -> Dictionary:
+static func _match_layout(layout: Array, rel: String, project_format := SUPPORTED_FORMAT) -> Dictionary:
 	for entry in layout:
+		if project_format < int(entry.get("since_format", 1)) \
+				or project_format > int(entry.get("until_format", 2147483647)):
+			continue
 		var pattern := str(entry.get("path", ""))
 		if pattern.ends_with("/**"):
 			if rel.begins_with(pattern.substr(0, pattern.length() - 2)):

@@ -368,6 +368,12 @@ func _ready() -> void:
 		randomize()
 	Keybinds.apply()                  # apply user-editable key bindings (user://keybinds.cfg)
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	# The format-2 map tracer is intentionally a complete focused Engine boot: it
+	# needs no extracted Kanto project or presentation assets, only MapDocument and
+	# its tracked fixture. This proves a native project map can reach Main directly.
+	if "--tmxtest" in OS.get_cmdline_user_args():
+		_tmxtest()
+		return
 	# gh #25 (ADR-017): every data table now loads from the PROJECT (res://project, the
 	# extractor's emission, or --project=<dir>) through the Core loader, which rebuilds
 	# the exact v1 shapes — proven equal by --projparitytest. Textures still load from
@@ -1212,6 +1218,33 @@ func _get_tileset(slug: String) -> Dictionary:
 	return _ts_cache[slug]
 
 
+## Format-2 maps point at their project-local TSX atlas. Load it raw through the
+## normalized MapDocument view; Studio and Engine therefore preview the creator's
+## actual project asset, never the repo's res://assets lookalike (gh #52).
+func _get_native_tileset(data: Dictionary) -> Dictionary:
+	var meta: Dictionary = data.get("_tileset", {})
+	var key := "tmx:" + str(meta.get("path", ""))
+	if not _ts_cache.has(key):
+		var image := Image.load_from_file(str(meta.get("image_path", "")))
+		if image == null or image.is_empty():
+			push_error("[map] cannot load project tileset image " + str(meta.get("image_path", "")))
+			image = Image.create(16, 16, false, Image.FORMAT_RGBA8)
+		var texture := ImageTexture.create_from_image(image)
+		var grass := -1
+		var counters: Array = []
+		for tile_id in (meta.get("tile_properties", {}) as Dictionary):
+			var props: Dictionary = meta["tile_properties"][tile_id]
+			if bool(props.get("pokeredpc:grass", false)) and grass < 0:
+				grass = int(tile_id)
+			if bool(props.get("pokeredpc:counter", false)):
+				counters.append(int(props.get("pokeredpc:feet_tile", tile_id)))
+		_ts_cache[key] = {"native": true, "tex": texture,
+			"slug": str(meta.get("name", "")), "cols": int(meta.get("columns", 1)),
+			"tile_size": int(meta.get("tile_size", 16)), "tile_properties": meta.get("tile_properties", {}),
+			"grass_tile": grass, "ledges": [], "counter_tiles": counters}
+	return _ts_cache[key]
+
+
 func _compute_collision(grid: Array, blockset: Array, wk: Dictionary, w: int, h: int) -> PackedByteArray:
 	var col := PackedByteArray()
 	col.resize(w * 2 * h * 2)
@@ -1229,6 +1262,9 @@ func _compute_collision(grid: Array, blockset: Array, wk: Dictionary, w: int, h:
 ## Replace a block in the center map at runtime (e.g. an opening door), updating both its 4
 ## collision tiles and the render. Mirrors pokered's ReplaceTileBlock.
 func set_block(bx: int, by: int, block_id: int) -> void:
+	if str(map.get("_native", "")) == "tmx":
+		push_error("set_block requires optional pokeredpc:block metadata (Phase 5.2)")
+		return
 	map["blocks"][by][bx] = block_id
 	var ts: Dictionary = placed[0]["ts"]
 	var bdef: Array = ts["blockset"][block_id]
@@ -1241,12 +1277,27 @@ func set_block(bx: int, by: int, block_id: int) -> void:
 
 
 func _make_placed(label: String, data: Dictionary, ox: int, oy: int) -> Dictionary:
+	if str(data.get("_native", "")) == "tmx":
+		var cw := int(data.get("cell_width", 0))
+		var ch := int(data.get("cell_height", 0))
+		var col := PackedByteArray()
+		col.resize(cw * ch)
+		for y in ch:
+			for x in cw:
+				col[y * cw + x] = int(data["cell_walkable"][y][x])
+		var bw := ceili(float(cw) / 2.0)
+		var bh := ceili(float(ch) / 2.0)
+		return {"label": label, "data": data, "w": bw, "h": bh, "cw": cw, "ch": ch,
+			"ox": ox, "oy": oy, "ts": _get_native_tileset(data), "collision": col,
+			"border": int(data.get("border_tile", 0)), "native": true,
+			"clip": [ox, ox + bw, oy, oy + bh]}
 	var ts := _get_tileset(str(data["tileset"]))
 	var w := int(data["width"])
 	var h := int(data["height"])
-	return {"label": label, "data": data, "w": w, "h": h, "ox": ox, "oy": oy, "ts": ts,
+	return {"label": label, "data": data, "w": w, "h": h, "cw": w * 2, "ch": h * 2,
+		"ox": ox, "oy": oy, "ts": ts,
 		"collision": _compute_collision(data["blocks"], ts["blockset"], ts["walkable"], w, h),
-		"border": int(data.get("border_block", 0)),
+		"border": int(data.get("border_block", 0)), "native": false,
 		# Render clip in center-block coords (gh #124). Default = the map's own extent; a connected
 		# neighbour is narrowed perpendicular to the connection so it can't overhang past the current
 		# map's edge — that region is the border block, as in pokered (see load_world).
@@ -1265,7 +1316,7 @@ func load_world(center: String, arrive_idx := -1, spawn_override = null, keep_fa
 	placed.append(c)
 	map = c["data"]
 	map_w = c["w"]; map_h = c["h"]
-	gw = map_w * 2; gh = map_h * 2
+	gw = c["cw"]; gh = c["ch"]
 	collision = c["collision"]
 	_blocked_cells = {}
 	border_block = c["border"]
@@ -1284,8 +1335,10 @@ func load_world(center: String, arrive_idx := -1, spawn_override = null, keep_fa
 		if not _map_exists(label):
 			continue
 		var nd: Dictionary = ProjectData.map_json(label)
-		var nw := int(nd["width"])
-		var nh := int(nd["height"])
+		var nsize := Vector2i(ceili(float(int(nd.get("cell_width", int(nd.get("width", 0)) * 2))) / 2.0),
+			ceili(float(int(nd.get("cell_height", int(nd.get("height", 0)) * 2))) / 2.0))
+		var nw := nsize.x
+		var nh := nsize.y
 		var off := int(conn["offset"])
 		var ox := 0
 		var oy := 0
@@ -1404,6 +1457,10 @@ func _default_spawn() -> Vector2i:
 	for ev in map.get("object_events", []):
 		taken[Vector2i(int(ev["x"]), int(ev["y"]))] = true
 	var c := Vector2i(gw / 2, gh / 2)
+	if str(map.get("_native", "")) == "tmx":
+		var authored: Array = map.get("default_spawn", [])
+		if authored.size() == 2:
+			c = Vector2i(int(authored[0]), int(authored[1]))
 	if _raw_walk(c) and not taken.has(c):
 		return c
 	for radius in range(0, maxi(gw, gh)):
@@ -1463,7 +1520,9 @@ func _spawn_npcs() -> void:
 			if not an.begins_with("OPP_") and item_names.has(an):
 				npc.item = str(item_names[an])
 				break
-		npc.key = "%s@%d,%d" % [sprite, int(ev["x"]), int(ev["y"])]
+		# Native TMX objects carry a creator-stable Tiled name. Format-1 objects retain
+		# the legacy sprite@cell key so existing authored Kanto events do not move.
+		npc.key = str(ev.get("id", "%s@%d,%d" % [sprite, int(ev["x"]), int(ev["y"])]))
 		npc.set_shown(_object_shown(center_label, npc.key))
 		if npc.item != "" and picked_items.has("%s:%d,%d" % [center_label, npc.cell.x, npc.cell.y]):
 			npc.set_shown(false)                    # already collected
@@ -2328,8 +2387,7 @@ func _party_labels() -> Array:
 func _tile_at(cell: Vector2i) -> int:
 	if cell.x < 0 or cell.y < 0 or cell.x >= gw or cell.y >= gh:
 		return -1
-	var bid := int(map["blocks"][cell.y / 2][cell.x / 2])
-	return int(placed[0]["ts"]["blockset"][bid][SUB[cell.y % 2][cell.x % 2]])
+	return _pm_feet_tile(placed[0], cell.x, cell.y)
 
 
 ## Use the POKé FLUTE: wakes a SNORLAX you're facing (-> battle), else cures party sleep.
@@ -3334,12 +3392,11 @@ func _is_water(cell: Vector2i) -> bool:
 	for pm in placed:
 		var lx: int = cell.x - pm["ox"] * 2
 		var ly: int = cell.y - pm["oy"] * 2
-		if lx < 0 or ly < 0 or lx >= pm["w"] * 2 or ly >= pm["h"] * 2:
+		if not _pm_contains(pm, lx, ly):
 			continue
 		if not (str(pm["data"]["tileset"]) in WATER_TILESETS):
 			return false
-		var bid := int(pm["data"]["blocks"][ly / 2][lx / 2])
-		return int(pm["ts"]["blockset"][bid][SUB[ly % 2][lx % 2]]) in WATER_TILES
+		return _pm_feet_tile(pm, lx, ly) in WATER_TILES
 	return false
 
 
@@ -3470,17 +3527,39 @@ func _cell_walkable(cell: Vector2i) -> bool:
 	for pm in placed:
 		var lx: int = cell.x - pm["ox"] * 2
 		var ly: int = cell.y - pm["oy"] * 2
-		var cw: int = pm["w"] * 2
-		if lx >= 0 and ly >= 0 and lx < cw and ly < pm["h"] * 2:
+		var cw: int = pm["cw"]
+		if _pm_contains(pm, lx, ly):
 			return pm["collision"][ly * cw + lx] == 1
 	return false
+
+
+func _pm_contains(pm: Dictionary, lx: int, ly: int) -> bool:
+	return lx >= 0 and ly >= 0 and lx < int(pm["cw"]) and ly < int(pm["ch"])
+
+
+func _pm_tile_id(pm: Dictionary, lx: int, ly: int) -> int:
+	if not _pm_contains(pm, lx, ly):
+		return -1
+	if bool(pm.get("native", false)):
+		return int(pm["data"]["tiles"][ly][lx])
+	var bid := int(pm["data"]["blocks"][ly / 2][lx / 2])
+	return int(pm["ts"]["blockset"][bid][SUB[ly % 2][lx % 2]])
+
+
+func _pm_feet_tile(pm: Dictionary, lx: int, ly: int) -> int:
+	if not _pm_contains(pm, lx, ly):
+		return -1
+	if bool(pm.get("native", false)):
+		return int(pm["data"]["cell_feet"][ly][lx])
+	var bid := int(pm["data"]["blocks"][ly / 2][lx / 2])
+	return int(pm["ts"]["blockset"][bid][SUB[ly % 2][lx % 2]])
 
 
 func _owner_of(cell: Vector2i) -> Variant:
 	for pm in placed:
 		var lx: int = cell.x - pm["ox"] * 2
 		var ly: int = cell.y - pm["oy"] * 2
-		if lx >= 0 and ly >= 0 and lx < pm["w"] * 2 and ly < pm["h"] * 2:
+		if _pm_contains(pm, lx, ly):
 			return pm
 	return null
 
@@ -3491,9 +3570,8 @@ func _feet_tile(cell: Vector2i) -> int:
 	for pm in placed:
 		var lx: int = cell.x - pm["ox"] * 2
 		var ly: int = cell.y - pm["oy"] * 2
-		if lx >= 0 and ly >= 0 and lx < pm["w"] * 2 and ly < pm["h"] * 2:
-			var bid := int(pm["data"]["blocks"][ly / 2][lx / 2])
-			return int(pm["ts"]["blockset"][bid][SUB[ly % 2][lx % 2]])
+		if _pm_contains(pm, lx, ly):
+			return _pm_feet_tile(pm, lx, ly)
 	return -1
 
 
@@ -3509,6 +3587,9 @@ func _feet_tile_or_border(cell: Vector2i) -> int:
 	if placed.is_empty():
 		return -1
 	var center: Dictionary = placed[0]
+	if bool(center.get("native", false)):
+		var props: Dictionary = center["ts"]["tile_properties"].get(border_block, {})
+		return int(props.get("pokeredpc:feet_tile", border_block))
 	return int(center["ts"]["blockset"][border_block][SUB[posmod(cell.y, 2)][posmod(cell.x, 2)]])
 
 
@@ -3536,8 +3617,7 @@ func tile_at_cell(cell: Vector2i) -> int:
 		return -1
 	var lx: int = cell.x - pm["ox"] * 2
 	var ly: int = cell.y - pm["oy"] * 2
-	var bid := int(pm["data"]["blocks"][ly / 2][lx / 2])
-	return int(pm["ts"]["blockset"][bid][SUB[ly % 2][lx % 2]])
+	return _pm_feet_tile(pm, lx, ly)
 
 
 func is_grass_cell(cell: Vector2i) -> bool:
@@ -3555,7 +3635,11 @@ func _bottom_right_tile(cell: Vector2i) -> int:
 	for pm in placed:
 		var lx: int = cell.x - pm["ox"] * 2
 		var ly: int = cell.y - pm["oy"] * 2
-		if lx >= 0 and ly >= 0 and lx < pm["w"] * 2 and ly < pm["h"] * 2:
+		if _pm_contains(pm, lx, ly):
+			if bool(pm.get("native", false)):
+				var tile_id := _pm_tile_id(pm, lx, ly)
+				var props: Dictionary = pm["ts"]["tile_properties"].get(tile_id, {})
+				return int(props.get("pokeredpc:bottom_right_tile", _pm_feet_tile(pm, lx, ly)))
 			var bid := int(pm["data"]["blocks"][ly / 2][lx / 2])
 			return int(pm["ts"]["blockset"][bid][SUB[ly % 2][lx % 2] + 1])
 	return -1
@@ -3590,6 +3674,16 @@ func tile_gfx_at(tx: int, ty: int) -> Dictionary:
 	var pm = _block_owner(tx >> 2, ty >> 2)
 	if pm == null:
 		return {}
+	if bool(pm.get("native", false)):
+		var lx := (tx >> 1) - int(pm["ox"] * 2)
+		var ly := (ty >> 1) - int(pm["oy"] * 2)
+		if not _pm_contains(pm, lx, ly):
+			return {}
+		var native_id := _pm_tile_id(pm, lx, ly)
+		var native_cols: int = pm["ts"]["cols"]
+		var sx := (native_id % native_cols) * 16 + (tx & 1) * 8
+		var sy := (native_id / native_cols) * 16 + (ty & 1) * 8
+		return {"tex": pm["ts"]["tex"], "src": Rect2(sx, sy, TILE, TILE)}
 	var bid := int(pm["data"]["blocks"][(ty >> 2) - pm["oy"]][(tx >> 2) - pm["ox"]])
 	var tid := int(pm["ts"]["blockset"][bid][(ty & 3) * 4 + (tx & 3)])
 	var cols: int = pm["ts"]["cols"]
@@ -3736,7 +3830,7 @@ func _neighbor_owning(cell: Vector2i) -> Variant:
 		var pm: Dictionary = placed[i]
 		var lx: int = cell.x - pm["ox"] * 2
 		var ly: int = cell.y - pm["oy"] * 2
-		if lx >= 0 and ly >= 0 and lx < pm["w"] * 2 and ly < pm["h"] * 2:
+		if _pm_contains(pm, lx, ly):
 			return pm
 	return null
 
@@ -4460,6 +4554,36 @@ func _draw_block(pm: Dictionary, bid: int, bx: int, by: int) -> void:
 				draw_texture_rect_region(ts["tex"], dst, Rect2((tid % cols) * TILE, (tid / cols) * TILE, TILE, TILE))
 
 
+## One format-2 TMX block-sized render batch. The runtime still culls in 32px
+## regions, but the authored unit is the 16px movement cell; odd-sized maps fill
+## the unused edge of their last batch with the declared border tile.
+func _draw_native_block(pm: Dictionary, bx: int, by: int, only_border := false) -> void:
+	for quad in _native_block_quads(pm, bx, by, only_border):
+		draw_texture_rect_region(pm["ts"]["tex"], quad["dst"], quad["src"])
+
+
+func _native_block_quads(pm: Dictionary, bx: int, by: int, only_border := false) -> Array:
+	var out: Array = []
+	var ts: Dictionary = pm["ts"]
+	var cols: int = ts["cols"]
+	var cell_size: int = ts["tile_size"]
+	var base_x: int = (bx - int(pm["ox"])) * 2
+	var base_y: int = (by - int(pm["oy"])) * 2
+	for cy in 2:
+		for cx in 2:
+			var lx := base_x + cx
+			var ly := base_y + cy
+			var tile_id: int = int(pm["border"])
+			if not only_border and _pm_contains(pm, lx, ly):
+				tile_id = _pm_tile_id(pm, lx, ly)
+			var dst := Rect2(bx * BLOCK + cx * cell_size, by * BLOCK + cy * cell_size,
+				cell_size, cell_size)
+			out.append({"dst": dst, "src": Rect2(
+				(tile_id % cols) * cell_size, (tile_id / cols) * cell_size,
+				cell_size, cell_size)})
+	return out
+
+
 func _block_owner(bx: int, by: int) -> Variant:
 	for pm in placed:
 		var cl: Array = pm["clip"]                     # [bx0, bx1, by0, by1] in center-block coords (gh #124)
@@ -4484,9 +4608,15 @@ func _draw() -> void:
 		for bx in range(bx0, bx0 + 9):
 			var pm = _block_owner(bx, by)
 			if pm != null:
-				_draw_block(pm, int(pm["data"]["blocks"][by - pm["oy"]][bx - pm["ox"]]), bx, by)
+				if bool(pm.get("native", false)):
+					_draw_native_block(pm, bx, by)
+				else:
+					_draw_block(pm, int(pm["data"]["blocks"][by - pm["oy"]][bx - pm["ox"]]), bx, by)
 			else:
-				_draw_block(center, center["border"], bx, by)
+				if bool(center.get("native", false)):
+					_draw_native_block(center, bx, by, true)
+				else:
+					_draw_block(center, center["border"], bx, by)
 	# CUT tree animation (gh #123): the cut-tree sprite shakes horizontally and flickers before the tree
 	# is gone (engine/overworld/cut2.asm AnimCut). Drawn over the already-swapped (treeless) cell.
 	if not _cut_fx.is_empty():
@@ -4516,6 +4646,84 @@ func _selftest() -> void:
 	assert(n_walk > 0 and n_walk < gw * gh, "collision grid looks degenerate")
 	print("[selftest] OK")
 	get_tree().quit()
+
+
+## Phase-5 tracer: drive the real Main placement, collision, and canvas renderer
+## from the tiny format-2 fixture. Kanto remains format 1 until gh #53, so this
+## focused leg proves the new adapter without making the tracer fixture pretend to
+## be a complete game project.
+func _tmxtest() -> void:
+	var ok := true
+	var opened := MapDocument.open("res://core/fixtures/valid_tmx", "TestTown")
+	ok = _tmx_check("Core opens the native tracer map", bool(opened.get("ok", false)),
+		str(opened.get("error", ""))) and ok
+	if not bool(opened.get("ok", false)):
+		print("[tmxtest] FAIL")
+		get_tree().quit(1)
+		return
+	var document: MapDocument = opened["document"]
+	var data := document.runtime_map()
+	for npc in npcs:
+		npc.queue_free()
+	npcs.clear()
+	if player != null:
+		player.visible = false
+		player.placed = false
+		player.cam.enabled = false
+	if grass_overlay != null:
+		grass_overlay.visible = false
+	placed = [_make_placed(document.label, data, 0, 0)]
+	map = data
+	map_w = placed[0]["w"]
+	map_h = placed[0]["h"]
+	gw = placed[0]["cw"]
+	gh = placed[0]["ch"]
+	collision = placed[0]["collision"]
+	border_block = placed[0]["border"]
+	center_tileset = str(data.get("tileset", ""))
+	ok = _tmx_check("Engine adapter keeps 16px cell dimensions",
+		gw == 4 and gh == 3 and map_w == 2 and map_h == 2,
+		"cells=%dx%d batches=%dx%d" % [gw, gh, map_w, map_h]) and ok
+	ok = _tmx_check("Engine adapter reads native tile and semantic feet ids",
+		_pm_tile_id(placed[0], 0, 0) == 0 and _pm_tile_id(placed[0], 1, 0) == 1
+		and _pm_feet_tile(placed[0], 0, 0) == 16,
+		"tile=%d/%d feet=%d" % [_pm_tile_id(placed[0], 0, 0),
+			_pm_tile_id(placed[0], 1, 0), _pm_feet_tile(placed[0], 0, 0)]) and ok
+	ok = _tmx_check("Engine collision consumes TSX walkability",
+		_cell_walkable(Vector2i(0, 0)) and not _cell_walkable(Vector2i(1, 0))
+		and _default_spawn() == Vector2i(1, 1),
+		"spawn=%s collision=%s" % [str(_default_spawn()), str(collision)]) and ok
+
+	var image_result := document.load_image()
+	var atlas: Image = image_result.get("image")
+	var rendered := Image.create(gw * MapDocument.CELL_SIZE, gh * MapDocument.CELL_SIZE,
+		false, Image.FORMAT_RGBA8)
+	if atlas != null:
+		for by in map_h:
+			for bx in map_w:
+				for quad in _native_block_quads(placed[0], bx, by):
+					var dst := Rect2i(quad["dst"])
+					if dst.position.x < rendered.get_width() and dst.position.y < rendered.get_height():
+						rendered.blit_rect(atlas, Rect2i(quad["src"]), dst.position)
+	var rendered_path := rendered.get_pixel(8, 8)
+	var rendered_wall := rendered.get_pixel(24, 8)
+	var render_ok := bool(image_result.get("ok", false)) and atlas != null \
+		and rendered_path.is_equal_approx(atlas.get_pixel(8, 8)) \
+		and rendered_wall.is_equal_approx(atlas.get_pixel(24, 8))
+	ok = _tmx_check("Engine renderer maps project-local TSX pixels", render_ok,
+		"image=%dx%d path=%s wall=%s" % [rendered.get_width(), rendered.get_height(),
+			str(rendered_path), str(rendered_wall)]) and ok
+	var shot_error := rendered.save_png("res://tmxtest.png")
+	ok = _tmx_check("Engine tracer screenshot writes", shot_error == OK,
+		error_string(shot_error)) and ok
+	print("[tmxtest] %s" % ("ALL GREEN" if ok else "FAIL"))
+	get_tree().quit(0 if ok else 1)
+
+
+func _tmx_check(name: String, good: bool, detail := "") -> bool:
+	print("[tmxtest] %s: %s%s" % [name, "PASS" if good else "FAIL",
+		"" if good or detail == "" else " — " + detail])
+	return good
 
 
 func _screenshot() -> void:
@@ -5214,13 +5422,20 @@ func _schematest() -> void:
 		and int(ids.get("map", 0)) == 1 and int(ids.get("type", 0)) == 2
 		and int(ids.get("event", 0)) == 1,
 		str(ids)) and ok
+	var tmx: Dictionary = ProjectValidator.validate_project("res://core/fixtures/valid_tmx")
+	ok = _schema_check("format 2: native TMX project validates and registers map/event ids",
+		bool(tmx.get("ok", false)) and int(tmx.get("files", 0)) == 5
+		and int((tmx.get("ids", {}) as Dictionary).get("map", 0)) == 1
+		and int((tmx.get("ids", {}) as Dictionary).get("event", 0)) == 1,
+		"; ".join(PackedStringArray(tmx.get("errors", [])))) and ok
+	ok = preload("res://core/MapDocumentSmoke.gd").new().run() and ok
 	var cases := [
 		["broken_unknown_field", "unknown field 'prise'"],
 		["broken_wrong_type", "expected integer"],
 		["broken_missing_required", "missing required field 'stats'"],
 		["broken_dangling_ref", "dangling reference 'type:fire'"],
 		["broken_unclaimed", "unclaimed file"],
-		["broken_newer_format", "supports format 1"],
+		["broken_newer_format", "supports format 2"],
 		["broken_id_mismatch", "does not match its filename"],
 		["broken_bad_command", "matches no anyOf branch"],
 		["broken_event_bad_object", "names object 'SPRITE_GHOST@0,0', which is not on map"],

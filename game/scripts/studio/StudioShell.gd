@@ -7,17 +7,23 @@ class_name StudioShell
 ## and edit their records through the schema-driven form engine. The four focused gh #50
 ## widgets register over that engine without creating parallel editor models.
 
-## The Phase-4 content types (ADR-020 d3): species/moves/items/trainers; maps stay
-## Tiled-external (Phase 5) and events get their own GUI (Phase 5).
+## The Phase-4 content types (ADR-020 d3): species/moves/items/trainers. Phase 5 adds
+## native Tiled maps as a specialized workspace; events get their own GUI later in it.
 const CONTENT_TYPES := ["species", "moves", "items", "trainers"]
+const WORKSPACES := ["species", "moves", "items", "trainers", "maps"]
 const RECENTS_CFG := "user://studio.cfg"
 const DEFAULT_WINDOW_SIZE := Vector2i(1280, 800)
 const MIN_WINDOW_SIZE := Vector2i(900, 600)
+const DEFAULT_UI_SCALE := 1.25
+const MIN_UI_SCALE := 0.80
+const MAX_UI_SCALE := 2.00
 
 var project_dir := ""
 var _path_label: Label
 var _status: Label
 var _playtest_button: Button
+var _ui_scale_slider: HSlider
+var _ui_scale_label: Label
 var _sidebar: ItemList
 var _records: ItemList
 var _editor_host: ScrollContainer
@@ -26,14 +32,23 @@ var _dialog: FileDialog
 var _record_names := {}          # kind -> sorted basenames (the sidebar's data)
 var _active_kind := ""
 var _active_form: Control = null
+var _ui_scale := DEFAULT_UI_SCALE
 
 
 func _ready() -> void:
 	_configure_window()
-	set_anchors_preset(Control.PRESET_FULL_RECT)
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	theme = preload("res://scripts/studio/StudioTheme.gd").build()
 	_build_ui()
 	if "--studiotest" in OS.get_cmdline_user_args():
 		_studiotest()
+		return
+	if "--studio-map-fixture" in OS.get_cmdline_user_args():
+		_sidebar.add_item("Maps  1")
+		_sidebar.select(0)
+		_records.add_item("TestTown")
+		_records.select(0)
+		preview_map("res://core/fixtures/valid_tmx", "TestTown")
 		return
 	var want := _project_arg()
 	if want != "":
@@ -55,8 +70,11 @@ func _ready() -> void:
 ## practical, resizable native window; game mode retains project.godot's faithful size.
 func _configure_window() -> void:
 	var window := get_window()
+	window.title = "pokeredpc Studio"
 	window.content_scale_mode = Window.CONTENT_SCALE_MODE_DISABLED
 	window.content_scale_size = Vector2i.ZERO
+	_ui_scale = _load_ui_scale()
+	window.content_scale_factor = _ui_scale
 	window.min_size = MIN_WINDOW_SIZE
 	if window.mode == Window.MODE_WINDOWED:
 		window.size = DEFAULT_WINDOW_SIZE
@@ -76,6 +94,7 @@ func open_project(dir_path: String) -> String:
 		var names := ProjectData.records(kind).keys()
 		names.sort()
 		_record_names[kind] = names
+	_record_names["maps"] = ProjectData.map_labels()
 	_refresh_sidebar()
 	_clear_editor()
 	_save_recent(dir_path)
@@ -86,11 +105,27 @@ func open_project(dir_path: String) -> String:
 
 
 func _build_ui() -> void:
+	var background := ColorRect.new()
+	background.color = StudioTheme.WINDOW
+	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(background)
+	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var root := VBoxContainer.new()
-	root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root.add_theme_constant_override("separation", 8)
 	add_child(root)
+	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var top_panel := PanelContainer.new()
+	root.add_child(top_panel)
 	var top := HBoxContainer.new()
-	root.add_child(top)
+	top_panel.add_child(top)
+	var brand := Label.new()
+	brand.text = "POKEREDPC  /  STUDIO"
+	brand.add_theme_font_size_override("font_size", 17)
+	brand.add_theme_color_override("font_color", StudioTheme.TEXT)
+	top.add_child(brand)
+	var brand_gap := Control.new()
+	brand_gap.custom_minimum_size.x = 10
+	top.add_child(brand_gap)
 	var open_btn := Button.new()
 	open_btn.text = "Open project…"
 	open_btn.pressed.connect(func() -> void: _dialog.popup_centered_ratio(0.7))
@@ -104,15 +139,27 @@ func _build_ui() -> void:
 	_path_label.text = "(no project)"
 	_path_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(_path_label)
+	_ui_scale_label = Label.new()
+	top.add_child(_ui_scale_label)
+	_ui_scale_slider = HSlider.new()
+	_ui_scale_slider.min_value = MIN_UI_SCALE
+	_ui_scale_slider.max_value = MAX_UI_SCALE
+	_ui_scale_slider.step = 0.05
+	_ui_scale_slider.value = _ui_scale
+	_ui_scale_slider.custom_minimum_size.x = 130
+	_ui_scale_slider.tooltip_text = "Studio interface scale"
+	_ui_scale_slider.value_changed.connect(_set_ui_scale)
+	top.add_child(_ui_scale_slider)
+	_refresh_ui_scale_label()
 	var split := HSplitContainer.new()
 	split.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	root.add_child(split)
 	_sidebar = ItemList.new()
-	_sidebar.custom_minimum_size = Vector2(180, 0)
+	_sidebar.custom_minimum_size = Vector2(160, 0)
 	_sidebar.item_selected.connect(_on_type_selected)
 	split.add_child(_sidebar)
 	_records = ItemList.new()
-	_records.custom_minimum_size = Vector2(180, 0)
+	_records.custom_minimum_size = Vector2(190, 0)
 	_records.item_selected.connect(_on_record_selected)
 	split.add_child(_records)
 	_editor_host = ScrollContainer.new()
@@ -121,9 +168,11 @@ func _build_ui() -> void:
 	split.add_child(_editor_host)
 	_editor_panel = VBoxContainer.new()
 	_editor_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_editor_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_editor_host.add_child(_editor_panel)
 	_status = Label.new()
 	_status.text = "open a project folder"
+	_status.add_theme_color_override("font_color", StudioTheme.MUTED)
 	root.add_child(_status)
 	_dialog = FileDialog.new()
 	_dialog.file_mode = FileDialog.FILE_MODE_OPEN_DIR
@@ -138,15 +187,15 @@ func _build_ui() -> void:
 func _refresh_sidebar() -> void:
 	_sidebar.clear()
 	_records.clear()
-	for kind in CONTENT_TYPES:
-		_sidebar.add_item("%s (%d)" % [kind, (_record_names[kind] as Array).size()])
+	for kind in WORKSPACES:
+		_sidebar.add_item("%s  %d" % [kind.capitalize(), (_record_names[kind] as Array).size()])
 	if _sidebar.item_count > 0:
 		_sidebar.select(0)
 		_on_type_selected(0)
 
 
 func _on_type_selected(idx: int) -> void:
-	_active_kind = CONTENT_TYPES[idx]
+	_active_kind = WORKSPACES[idx]
 	_records.clear()
 	for n in _record_names[_active_kind]:
 		_records.add_item(str(n))
@@ -156,7 +205,50 @@ func _on_type_selected(idx: int) -> void:
 func _on_record_selected(idx: int) -> void:
 	if _active_kind == "" or idx < 0 or idx >= (_record_names[_active_kind] as Array).size():
 		return
-	edit_record(_active_kind, str((_record_names[_active_kind] as Array)[idx]))
+	var basename := str((_record_names[_active_kind] as Array)[idx])
+	if _active_kind == "maps":
+		edit_map(basename)
+	else:
+		edit_record(_active_kind, basename)
+
+
+## Open a map from the active project. Format-1 JSON remains playable but is kept
+## read-only here until the Kanto migration in gh #53; format-2 TMX crosses the same
+## MapDocument seam used by Engine and the validator.
+func edit_map(map_label: String):
+	if int(ProjectData.manifest.get("format", 1)) < 2:
+		_clear_editor()
+		var note := Label.new()
+		note.text = "%s is a legacy format-1 map.\n\nNative TMX preview becomes available when this project is migrated to format 2 (Phase 5.2)." % map_label
+		note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		note.add_theme_color_override("font_color", StudioTheme.MUTED)
+		_editor_panel.add_child(note)
+		_status.text = "legacy map selected — format-2 preview unavailable"
+		return null
+	return preview_map(project_dir, map_label)
+
+
+## Direct preview seam used by the fixture smoke as well as edit_map. It deliberately
+## accepts a project root so a focused native-map fixture need not masquerade as a
+## complete, engine-bootable game project.
+func preview_map(project_root: String, map_label: String):
+	var opened := MapDocument.open(project_root, map_label)
+	if not bool(opened.get("ok", false)):
+		_status.text = "REFUSED: " + str(opened.get("error", "cannot open map"))
+		return null
+	_clear_editor()
+	var workspace := preload("res://scripts/studio/StudioMapWorkspace.gd").new()
+	workspace.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	workspace.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_editor_panel.add_child(workspace)
+	var error: String = workspace.bind_document(opened["document"])
+	if error != "":
+		_status.text = "REFUSED: " + error
+		return null
+	workspace.document_saved.connect(func(saved_path: String) -> void:
+		_status.text = "saved " + saved_path)
+	_status.text = "previewing map/%s — native TMX" % map_label
+	return workspace
 
 
 ## Public shell seam used by record selection and the Studio smoke suite. Returns the
@@ -219,6 +311,25 @@ func playtest_control() -> Button:
 	return _playtest_button
 
 
+func ui_scale_control() -> HSlider:
+	return _ui_scale_slider
+
+
+func _set_ui_scale(value: float) -> void:
+	_ui_scale = snappedf(clampf(value, MIN_UI_SCALE, MAX_UI_SCALE), 0.05)
+	get_window().content_scale_factor = _ui_scale
+	_refresh_ui_scale_label()
+	var cfg := ConfigFile.new()
+	cfg.load(RECENTS_CFG)
+	cfg.set_value("studio", "ui_scale", _ui_scale)
+	cfg.save(RECENTS_CFG)
+
+
+func _refresh_ui_scale_label() -> void:
+	if _ui_scale_label != null:
+		_ui_scale_label.text = "UI %d%%" % roundi(_ui_scale * 100.0)
+
+
 ## Public launch seam used by the button and --studiotest. The Engine is always a child
 ## process; `probe` asks it to quit after proving readiness, and is test-only.
 func launch_playtest(probe := false, headless := false):
@@ -260,6 +371,14 @@ func _load_recents() -> Array:
 	return cfg.get_value("studio", "recent_projects", [])
 
 
+func _load_ui_scale() -> float:
+	var cfg := ConfigFile.new()
+	if cfg.load(RECENTS_CFG) != OK:
+		return DEFAULT_UI_SCALE
+	return clampf(float(cfg.get_value("studio", "ui_scale", DEFAULT_UI_SCALE)),
+		MIN_UI_SCALE, MAX_UI_SCALE)
+
+
 func _save_recent(dir_path: String) -> void:
 	var cfg := ConfigFile.new()
 	cfg.load(RECENTS_CFG)
@@ -286,15 +405,21 @@ func _project_arg() -> String:
 ## the four content types with the real counts. Later sub-issues grow this suite
 ## (write-through, refusal, play-test).
 func _studiotest() -> void:
+	await get_tree().process_frame
 	var ok := true
 	var window := get_window()
 	ok = _st_check("Studio uses a native resizable desktop window",
 		window.content_scale_mode == Window.CONTENT_SCALE_MODE_DISABLED
 		and window.content_scale_size == Vector2i.ZERO
 		and window.min_size == MIN_WINDOW_SIZE
-		and window.size.x >= MIN_WINDOW_SIZE.x and window.size.y >= MIN_WINDOW_SIZE.y,
-		"size=%s min=%s scale-mode=%d scale-size=%s" % [
-			str(window.size), str(window.min_size), window.content_scale_mode,
+		and window.size.x >= MIN_WINDOW_SIZE.x and window.size.y >= MIN_WINDOW_SIZE.y
+		and Vector2i(size) == Vector2i(window.get_visible_rect().size)
+		and is_equal_approx(window.content_scale_factor, _ui_scale)
+		and _ui_scale_slider != null and _ui_scale_slider.min_value == MIN_UI_SCALE
+		and _ui_scale_slider.max_value == MAX_UI_SCALE,
+		"size=%s visible=%s root=%s ui-scale=%.2f min=%s scale-mode=%d scale-size=%s" % [
+			str(window.size), str(window.get_visible_rect().size), str(size), _ui_scale,
+			str(window.min_size), window.content_scale_mode,
 			str(window.content_scale_size)]) and ok
 	var scratch := OS.get_user_data_dir().path_join("studio_scratch")
 	if DirAccess.dir_exists_absolute(scratch):
@@ -344,6 +469,7 @@ func _studiotest() -> void:
 		bad == "", bad) and ok
 	ok = preload("res://scripts/studio/StudioFormSmoke.gd").new().run(self, scratch) and ok
 	ok = preload("res://scripts/studio/StudioEditorSmoke.gd").new().run(self, scratch) and ok
+	ok = preload("res://scripts/studio/StudioMapSmoke.gd").new().run(self) and ok
 	ok = await preload("res://scripts/studio/StudioPlaytestSmoke.gd").new().run(self, scratch) and ok
 	print("[studiotest] %s" % ("ALL GREEN" if ok else "FAIL"))
 	get_tree().quit(0 if ok else 1)

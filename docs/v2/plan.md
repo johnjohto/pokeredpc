@@ -1,10 +1,12 @@
 # v2 — a monster-RPG creation toolkit (the "Studio" plan)
 
-**Status:** **active — the build-out is tracked as gh #14 (epic) with phase issues #15–#21**
-(kicked off 2026-07-20). The gates that guarded this start are closed: **1.0 shipped 2026-07-17**
-(its correctness is the spec and the test oracle for everything below) and **v1.1 multiplayer
-shipped 2026-07-20**, pinning the Core requirements §4.7 names. The four foundational decisions
-this plan is built on are recorded in **ADR-013**. Next: the Phase-1 design conversation (gh #15).
+**Status:** **active — Phase 5 (map + event editors, gh #19) began 2026-07-22.** The
+build-out is tracked as gh #14 with phase issues #15–#21. Phases 1–4 are complete:
+versioned Project/Core, ruleset seam, authored Event VM, and the Studio MVP. The first
+format-2 native TMX map now crosses the shared `MapDocument` seam into both Engine and
+Studio (ADR-021, gh #52); Kanto migration and editing tools follow. The gates that guarded
+the v2 start remain permanent oracles: 1.0 shipped 2026-07-17 and v1.1 multiplayer shipped
+2026-07-20. ADR-013 records the foundational product decisions.
 
 ---
 
@@ -197,6 +199,9 @@ data**.
   no-Godot-required experience).
 - **Shell:** project browser, dockable panels, a content-type sidebar, and **live play-test** — launch
   the Engine on the current project without leaving Studio (the fast iteration loop RPG Maker nails).
+- **Visual language:** the supplied reference boards and their durable shell/map-workspace
+  contract live in [studio-visual-direction.md](studio-visual-direction.md); new editor
+  surfaces extend the centralized theme rather than inventing local styling.
 - **Schema-driven forms** render most content editors (species/moves/items/trainers) automatically,
   with custom widgets where needed (sprite pickers, learnset tables, type selectors, party builders).
 - **Specialized editors** where forms aren't enough: the map view (TMX), the event editor (command

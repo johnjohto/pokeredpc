@@ -15,6 +15,10 @@ as development proceeds — when a format, rule, or decision is discovered, reco
   layout, schemas, manifest + identity, versioning.
 - **[v2/ruleset-seam.md](v2/ruleset-seam.md)** — the ruleset seam (Phase 2, ADR-018): the five
   Core interfaces, the registry, `gen1`, and the strangler-fig migration protocol.
+- **[v2/studio-visual-direction.md](v2/studio-visual-direction.md)** — the reference boards and
+  durable visual/layout contract for Studio, including the Phase-5 map workspace.
+- **[v2/tiled-map-bridge.md](v2/tiled-map-bridge.md)** — Project-format-2 TMX/TSX contract,
+  gameplay properties/objects, lossless round trips, and the Engine/Studio tracer.
 
 ### Data formats (`pokered/` → `game/assets/`)
 - **[data-formats/maps.md](data-formats/maps.md)** — `.blk`, headers, objects, warps, connections.

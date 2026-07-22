@@ -1,0 +1,14 @@
+{
+ "commands": [
+  {
+   "cmd": "say",
+   "text": "TMX and authored events share stable IDs."
+  }
+ ],
+ "id": "event:test_event",
+ "trigger": {
+  "kind": "interact",
+  "map": "map:TestTown",
+  "object": "guide"
+ }
+}

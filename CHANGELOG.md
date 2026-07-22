@@ -6,6 +6,45 @@ the disassembly), and **`1.0.0` requires a complete playthrough sign-off** on to
 systems in isolation; only a full run proves the game. `MINOR` bumps mark content/feature
 milestones, `PATCH` bumps are fixes/polish. See `docs/roadmap.md` for the live per-feature detail.
 
+## [Unreleased]
+
+### Added
+
+- **v2 Phase 5's native-map tracer** (gh #52, ADR-021): Project format 2 replaces
+  interim `maps/*.json` with a lossless Tiled bridge (`maps/*.tmx` plus external
+  `tilesets/*.tsx`) while format 1 stays loadable. The shared `MapDocument` boundary owns
+  TMX/TSX parsing, a canonical 16×16 movement-cell grid, per-cell collision, project-local
+  atlas loading, typed warp/NPC/sign/trigger objects, stable references, path containment,
+  malformed/newer refusal, and a byte-identical no-op save that preserves unknown Tiled
+  content. The focused format-2 fixture drives both Main's real placement/collision/atlas
+  renderer (`--tmxtest`) and Studio's real preview/save controls (`--studiotest`); their
+  64×48 PNG outputs are byte-identical.
+
+- **A durable Studio visual direction and shared theme**, based on the two supplied concept
+  boards. Studio now uses the reference's charcoal surfaces, muted type, mint/cyan selection
+  language, and centralized control styling. The native map preview establishes the Phase-5
+  tool rail + action bar + dominant canvas + inspector/layers composition, including grid,
+  collision, and typed-object overlays; painting remains the next slice (gh #54).
+
+- **Studio's root controls now explicitly fill the native client area.** The earlier gh #59
+  window fix removed the Game Boy stretch but retained offsets derived from the old game
+  viewport on high-DPI Windows, leaving part of a large native window unpainted. Shell,
+  background, and root layout now set both anchors and offsets after parenting; the Studio
+  gate asserts the root equals the scaled visible content rect after resize settles.
+
+- **Studio UI scale is now user-adjustable and persistent.** A top-bar slider spans
+  80–200% with a more readable 125% default, using Window content scaling so controls,
+  spacing, and text reflow together. Map zoom remains independent. The choice is stored in
+  `user://studio.cfg`, which avoids unreliable DPI guessing on Windows while keeping low-
+  and high-density displays user-controlled.
+
+### Changed
+
+- **README rewritten around both products:** the shipped native port and the active Studio
+  toolkit. Setup, current phase status, Studio launch/tracer commands, architecture,
+  verification, documentation routes, and the personal-use asset boundary are now visible
+  from the repository front page. The personal quotation remains at the end.
+
 ## [1.2.0] — 2026-07-20
 
 Link session resume — the headline — plus the endgame-unblocking engine/bot fixes that

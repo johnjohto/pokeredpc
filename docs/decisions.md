@@ -13,6 +13,45 @@ content. All docs/tooling references now point at `AGENTS.md`.
 **Consequences:** One source of truth for every agent; edits go to `AGENTS.md` only. If a
 future tool needs its own filename (e.g. `GEMINI.md`), add another one-line pointer, never a fork.
 
+## ADR-021 — Native maps use a lossless TMX bridge behind one MapDocument seam (2026-07-22)
+
+**Context:** v2 Phase 5 (gh #19) must make maps editable in both Tiled and Studio without
+creating two formats or two interpretations. The format-1 Project carries extractor-shaped
+JSON maps made of 32×32 Gen-1 blocks; creators need a general 16×16 movement-cell grid,
+per-cell collision, project-owned art, typed objects, and lossless coexistence with Tiled
+features pokeredpc does not understand. Engine, Studio, validation, and tests would drift if
+each learned XML independently. The tracer is gh #52.
+**Decision:** (1) **Project format 2 replaces `maps/*.json` with `maps/*.tmx` plus external
+`tilesets/*.tsx`; format 1 stays loadable.** Kanto migrates separately in gh #53. Each map
+also carries a `pokeredpc:format` bridge version, so a newer map convention refuses naming
+both sides even inside a supported Project. (2) **The canonical grid is the 16×16 movement
+cell.** A 32×32 Gen-1 block is optional `pokeredpc:block` authoring metadata, never the
+runtime geometry; odd cell dimensions are legal. (3) **One deep Core module,
+`MapDocument`, owns the boundary:** `open(project,label)`, normalized cell/object queries,
+`runtime_map()`, raw image loading, and `save()`. XMLParser trees, CSV GIDs, external-path
+resolution, containment, TSX properties, and refusal details remain private. Engine,
+Studio, ProjectData, ProjectValidator, and tests all call that interface. (4) The tracer
+accepts a finite conservative Tiled subset: finite orthogonal TMX, one external atlas TSX,
+one full CSV `Ground` layer, 16×16 tiles, and project-contained references. It refuses
+empty/flipped GIDs and unsupported pokeredpc object classes loudly rather than guessing.
+(5) **Gameplay metadata is namespaced.** Map properties define bridge version, border tile,
+and default spawn; TSX tile properties define walkability and optional semantic feet/block
+metadata; stable named point objects use `pokeredpc:warp|npc|sign|trigger` classes and
+prefixed map/event references. Unknown third-party objects/properties/layers are not runtime
+content. (6) **Lossless means source-preserving first:** `MapDocument` retains the original
+TMX and TSX bytes, and Phase 5.1's no-op `save()` emits the TMX bytes exactly. Phase 5.3's
+targeted writer must patch owned fields while preserving every unrelated node/property; it
+may not reserialize the whole XML tree canonically. (7) The tracer fixture is consumed by
+the real Engine adapter and the concept-shaped Studio map workspace. Their emitted 64×48
+PNG bytes must match, while malformed/newer/path-escaping documents refuse before callers
+receive partial state.
+**Consequences:** Tiled remains a first-class power-user editor and Studio can add richer
+domain controls over the same files. Project art loads from loose project paths rather than
+Godot's `res://` import cache. The strict subset leaves infinite maps, multiple tilesets,
+tile transforms, terrain painting, targeted XML edits, and world connections to later
+demand-driven increments. See [v2/tiled-map-bridge.md](v2/tiled-map-bridge.md) and
+[v2/studio-visual-direction.md](v2/studio-visual-direction.md).
+
 ## ADR-020 — Studio MVP: one project, canonical write-through, refuse-loud forms (2026-07-22)
 
 **Context:** v2 Phase 4 (gh #18, ADR-013, plan §4.5) builds the Studio MVP — the standalone

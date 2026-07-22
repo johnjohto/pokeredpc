@@ -1,18 +1,20 @@
-# The v2 project format (format 1)
+# The v2 project format (formats 1 and 2)
 
 The **Project** is v2's shareable artifact (ADR-013, ADR-017): a portable directory of
 data + maps + assets + a ruleset selection that `Engine(Project) → playable game` and
-`Studio(Project) → edits the same Project`. This doc describes **format 1** as pinned by
-**ADR-017** and implemented from gh #22 on. While the only consumer is this repo, the
-format may still evolve in place; the moment projects are shared (Studio-era), every
-change becomes a format bump + migration.
+`Studio(Project) → edits the same Project`. **Format 1** was pinned by ADR-017 and
+implemented from gh #22 on. **Format 2** (ADR-021, gh #52) replaces interim JSON maps with
+native Tiled TMX/TSX while retaining format-1 loading; Kanto's migration is gh #53. From
+format 2 onward, incompatible changes are format bumps plus linear migrations.
 
 ## Serialization
 
-**JSON, validated by JSON Schema** (draft 2020-12), in **canonical form**: pretty-printed
+Project records use **JSON, validated by JSON Schema** (draft 2020-12), in **canonical form**: pretty-printed
 (indent 1), sorted-key-stable where machine-emitted, UTF-8, LF, trailing newline. The
 canonical bytes double as the identity-hash input (gh #23). No comments — schemas carry
-`description`/`$comment`, and the editor is the primary authoring surface.
+`description`/`$comment`, and the editor is the primary authoring surface. Native maps are
+the exception: Tiled's XML TMX/TSX is source-preserving, and a no-op Studio save is byte
+identical rather than canonically reserialized. See [tiled-map-bridge.md](tiled-map-bridge.md).
 
 ## Layout (the contract lives in `core/schemas/format.json`)
 
@@ -54,9 +56,9 @@ project/
                          stat boosts, field-move badge gates, the two stat-stage
                          tables, the high-crit move list); absent keys fall back
                          to the ruleset's built-in faithful defaults
-  maps/<Label>.json      one record per file — INTERIM: v1's extracted map JSON
-                         carried as-is (name field = bare label); replaced by the
-                         Tiled TMX bridge in Phase 5 (a format bump, gh #19)
+  maps/<Label>.json      format 1 only — interim extracted map JSON (bare `name`)
+  maps/<Label>.tmx       format 2+ — native Tiled map (ADR-021)
+  tilesets/<name>.tsx    format 2+ — external Tiled atlas metadata
   presentation/*.json    opaque interim blobs (audio, move anims, title beats…)
   assets/**              binary assets (PNG/…), content-unchecked
 ```
@@ -65,6 +67,8 @@ Rules (enforced by `ProjectValidator`, `game/core/ProjectValidator.gd`):
 
 - **Every file must be claimed** by a layout entry — an unclaimed file is an error, so a
   typo'd path can't silently ship dead data.
+- Layout entries can declare `since_format`/`until_format`; format 1 claims JSON maps,
+  while format 2 claims TMX maps and their external TSX files.
 - **Records self-identify**: the `id` field must equal `<prefix>:<basename>` (interim maps:
   the `name` field holds the bare label). A record's filename *is* its identity.
 - **References are prefixed stable string IDs** (`"species:bulbasaur"`), declared in the
@@ -102,6 +106,12 @@ normalized-path-derived `--saveslot`. The child writes a tokened ready handshake
 the project has loaded and reports the resolved save path; separate creator projects therefore
 cannot share play-test progress (ADR-020 d5, gh #51).
 
+For format 2, `ProjectData.map_json(label)` opens `MapDocument` and returns its normalized
+runtime adapter: 16×16 tile/collision/semantic rows, typed object arrays, authored spawn,
+and project-local tileset metadata. Main renders those cells directly while format-1 maps
+continue through the blockset adapter. Both shapes cross the same placement/collision
+helpers; serialization details do not leak into gameplay call sites.
+
 ## Schemas + validator (gh #22)
 
 - `game/core/schemas/*.schema.json` — standard JSON Schema documents (external tools can
@@ -112,9 +122,9 @@ cannot share play-test progress (ADR-020 d5, gh #51).
 - `game/core/ProjectValidator.gd` — the project walk: manifest gate, claims, per-file
   schema validation, record-id registration, reference resolution. The seed of the
   Phase-5 lint engine and the same walk the gh #25 loader trusts.
-- Verified by **`--schematest`** (fixtures under `game/core/fixtures/`: the valid mini
-  project passes and registers ids; seven broken variants each produce exactly one error
-  naming file + path) and usable on any directory via **`--validate=<dir>`**.
+- Verified by **`--schematest`** (fixtures under `game/core/fixtures/`: both valid format-1
+  JSON and format-2 TMX projects register IDs; broken variants and malformed/native-newer
+  maps refuse naming file + path) and usable on any directory via **`--validate=<dir>`**.
 
 ## Provenance
 

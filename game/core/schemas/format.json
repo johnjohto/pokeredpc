@@ -1,6 +1,6 @@
 {
- "$comment": "The v2 project layout (ADR-017): which paths exist, which schema each file matches, and how records declare ids. Consumed by ProjectValidator (and, from gh #25, the runtime loader). kind=record: one entity per file, its id field must equal id_prefix:basename (bare_id: the field holds the bare basename, as v1's interim map JSON does). kind=table may declare ids via 'declares' (a JSON pointer to an array of full ids). kind=blob is opaque interim presentation data; kind=asset is binary, content-unchecked.",
- "format": 1,
+ "$comment": "The v2 project layout (ADR-017/ADR-021): which paths exist, which schema each file matches, and how records declare ids. since_format/until_format make linear project migrations explicit. kind=record: one JSON entity per file; kind=native_map: one TMX map validated by MapDocument; kind=native_asset: a referenced non-JSON authoring document (TSX validation happens through its owning map); kind=table may declare ids; kind=blob is opaque interim presentation data; kind=asset is binary, content-unchecked.",
+ "format": 2,
  "layout": [
   {
    "path": "manifest.json",
@@ -38,7 +38,19 @@
    "kind": "record",
    "id_prefix": "map",
    "id_field": "name",
-   "bare_id": true
+   "bare_id": true,
+   "until_format": 1
+  },
+  {
+   "path": "maps/*.tmx",
+   "kind": "native_map",
+   "id_prefix": "map",
+   "since_format": 2
+  },
+  {
+   "path": "tilesets/*.tsx",
+   "kind": "native_asset",
+   "since_format": 2
   },
   {
    "path": "data/events/*.json",

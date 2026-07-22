@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.11" tiledversion="1.11.2" orientation="orthogonal" renderorder="right-down" width="4" height="3" tilewidth="16" tileheight="16" infinite="0" nextlayerid="4" nextobjectid="4">
+ <properties>
+  <property name="pokeredpc:format" type="int" value="1"/>
+  <property name="pokeredpc:border_tile" type="int" value="0"/>
+  <property name="pokeredpc:default_spawn" value="1,1"/>
+  <property name="third-party:weather" value="rain"/>
+ </properties>
+ <tileset firstgid="1" source="../tilesets/tracer.tsx"/>
+ <layer id="1" name="Ground" width="4" height="3">
+  <data encoding="csv">
+1,2,1,2,
+1,1,1,1,
+2,1,2,1
+</data>
+ </layer>
+ <objectgroup id="2" name="Gameplay">
+  <object id="1" name="loop-door" class="pokeredpc:warp" x="16" y="16">
+   <point/>
+   <properties>
+    <property name="pokeredpc:dest_map" value="map:TestTown"/>
+    <property name="pokeredpc:dest_warp" type="int" value="1"/>
+   </properties>
+  </object>
+  <object id="2" name="guide" class="pokeredpc:npc" x="32" y="16">
+   <point/>
+   <properties>
+    <property name="pokeredpc:sprite" value="SPRITE_TESTER"/>
+    <property name="pokeredpc:movement" value="STAY"/>
+    <property name="pokeredpc:facing" value="DOWN"/>
+    <property name="pokeredpc:event" value="event:test_event"/>
+   </properties>
+  </object>
+ </objectgroup>
+ <objectgroup id="3" name="Third Party">
+  <object id="3" name="weather-volume" class="third-party:weather" x="0" y="0" width="64" height="48">
+   <properties>
+    <property name="third-party:intensity" type="float" value="0.5"/>
+   </properties>
+  </object>
+ </objectgroup>
+</map>

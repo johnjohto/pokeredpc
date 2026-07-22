@@ -6,13 +6,14 @@ class_name ProjectData
 ## ruleset seam migrates them. `open()` runs once at boot: the manifest gate (integer
 ## `format`, linear migrations, refuse-newer NAMING both versions), then every record
 ## collection is read and reconstructed. `legacy(name)` answers by the old asset filename
-## ("moves.json", "tilesets/gym.json", ...), `map_json`/`map_exists` serve the interim
-## maps. Reconstruction is the exact inverse of build_project() in tools/extract.py —
+## ("moves.json", "tilesets/gym.json", ...); `map_json`/`map_exists` serve format-1
+## JSON maps or format-2 MapDocument runtime views. Reconstruction is the exact inverse
+## of build_project() in tools/extract.py —
 ## verified field-for-field by `--projparitytest` against the legacy files, with two
 ## documented exceptions (emission filters dead pokered data: Mew's UNUSED TM padding,
 ## the UnusedMart/UnusedBikeShop stock).
 
-const SUPPORTED_FORMAT := 1
+const SUPPORTED_FORMAT := 2
 
 static var dir := ""                  # the opened project directory ("" = not opened)
 static var manifest: Dictionary = {}
@@ -74,13 +75,30 @@ static func records(kind: String) -> Dictionary:
 
 
 static func map_exists(label: String) -> bool:
-	return FileAccess.file_exists(dir.path_join("maps/%s.json" % label))
+	var extension := "tmx" if int(manifest.get("format", 1)) >= 2 else "json"
+	return FileAccess.file_exists(dir.path_join("maps/%s.%s" % [label, extension]))
 
 
 static func map_json(label: String):
 	## Fresh parse per call, exactly like the res://assets _load_json it replaces — a
 	## reload must reset any runtime mutation of the map dict (set_block doors etc.).
+	if int(manifest.get("format", 1)) >= 2:
+		var opened := MapDocument.open(dir, label)
+		if not bool(opened.get("ok", false)):
+			push_error("[project] " + str(opened.get("error", "cannot load map")))
+			return {}
+		return (opened["document"] as MapDocument).runtime_map()
 	return _read_json(dir.path_join("maps/%s.json" % label))
+
+
+static func map_labels() -> Array:
+	var out: Array = []
+	var extension := ".tmx" if int(manifest.get("format", 1)) >= 2 else ".json"
+	for file in DirAccess.get_files_at(dir.path_join("maps")):
+		if file.ends_with(extension):
+			out.append(file.get_basename())
+	out.sort()
+	return out
 
 
 # --- reconstruction (the inverse of build_project) ----------------------------------
