@@ -7,10 +7,10 @@ class_name StudioShell
 ## and edit their records through the schema-driven form engine. The four focused gh #50
 ## widgets register over that engine without creating parallel editor models.
 
-## The Phase-4 content types (ADR-020 d3): species/moves/items/trainers. Phase 5 adds
-## native Tiled maps as a specialized workspace; events get their own GUI later in it.
+## The Phase-4 content types (ADR-020 d3) retain SchemaForm; Phase 5 adds specialized
+## native-map and recursive event-command workspaces over their Core documents.
 const CONTENT_TYPES := ["species", "moves", "items", "trainers"]
-const WORKSPACES := ["species", "moves", "items", "trainers", "maps"]
+const WORKSPACES := ["species", "moves", "items", "trainers", "maps", "events"]
 const RECENTS_CFG := "user://studio.cfg"
 const DEFAULT_WINDOW_SIZE := Vector2i(1280, 800)
 const MIN_WINDOW_SIZE := Vector2i(900, 600)
@@ -35,10 +35,14 @@ var _new_map_name: LineEdit
 var _new_map_width: SpinBox
 var _new_map_height: SpinBox
 var _new_map_tileset: OptionButton
+var _new_event_dialog: ConfirmationDialog
+var _new_event_name: LineEdit
+var _new_event_map: OptionButton
 var _record_names := {}          # kind -> sorted basenames (the sidebar's data)
 var _active_kind := ""
 var _active_form: Control = null
 var _active_map_workspace = null
+var _active_event_workspace = null
 var _ui_scale := DEFAULT_UI_SCALE
 
 
@@ -105,6 +109,7 @@ func open_project(dir_path: String) -> String:
 		names.sort()
 		_record_names[kind] = names
 	_record_names["maps"] = ProjectData.map_labels()
+	_reload_event_names()
 	_refresh_sidebar()
 	_clear_editor()
 	_save_recent(dir_path)
@@ -202,6 +207,7 @@ func _build_ui() -> void:
 			_status.text = "REFUSED: " + err)
 	add_child(_dialog)
 	_build_new_map_dialog()
+	_build_new_event_dialog()
 
 
 func _refresh_sidebar() -> void:
@@ -216,8 +222,9 @@ func _refresh_sidebar() -> void:
 
 func _on_type_selected(idx: int) -> void:
 	_active_kind = WORKSPACES[idx]
-	_new_map_button.disabled = _active_kind != "maps" \
+	_new_map_button.disabled = _active_kind not in ["maps", "events"] \
 		or int(ProjectData.manifest.get("format", 1)) < 2
+	_new_map_button.text = "New event…" if _active_kind == "events" else "New map…"
 	_records.clear()
 	for n in _record_names[_active_kind]:
 		_records.add_item(str(n))
@@ -256,6 +263,9 @@ func _build_new_map_dialog() -> void:
 
 
 func _show_new_map_dialog() -> void:
+	if _active_kind == "events":
+		_show_new_event_dialog()
+		return
 	_new_map_tileset.clear()
 	var files := PackedStringArray()
 	for file in DirAccess.get_files_at(project_dir.path_join("tilesets")):
@@ -302,6 +312,56 @@ func new_map_fields() -> Dictionary:
 		"height": _new_map_height, "tileset": _new_map_tileset}
 
 
+func _build_new_event_dialog() -> void:
+	_new_event_dialog = ConfirmationDialog.new()
+	_new_event_dialog.title = "Create event"
+	_new_event_dialog.ok_button_text = "Create"
+	var fields := GridContainer.new()
+	fields.columns = 2
+	_new_event_dialog.add_child(fields)
+	fields.add_child(_dialog_label("Event name"))
+	_new_event_name = LineEdit.new()
+	_new_event_name.placeholder_text = "my_event"
+	fields.add_child(_new_event_name)
+	fields.add_child(_dialog_label("Map"))
+	_new_event_map = OptionButton.new()
+	fields.add_child(_new_event_map)
+	_new_event_dialog.confirmed.connect(_create_event_from_dialog)
+	add_child(_new_event_dialog)
+
+
+func _show_new_event_dialog() -> void:
+	_new_event_name.text = ""
+	_new_event_map.clear()
+	for map_label in ProjectData.map_labels(): _new_event_map.add_item(str(map_label))
+	if _new_event_map.item_count == 0:
+		_status.text = "REFUSED: project has no maps"
+		return
+	_new_event_dialog.popup_centered(Vector2i(450, 220))
+
+
+func _create_event_from_dialog():
+	if _new_event_map.item_count == 0: return null
+	var event_basename := _new_event_name.text.strip_edges()
+	var trigger := {"kind": "enter", "map": "map:" +
+		_new_event_map.get_item_text(_new_event_map.selected)}
+	var created := EventDocument.create(project_dir, event_basename, trigger)
+	if not bool(created.get("ok", false)):
+		_status.text = "REFUSED: " + str(created.get("error", "cannot create event"))
+		return null
+	var document: EventDocument = created["document"]
+	var error := document.save()
+	if error != "":
+		_status.text = "REFUSED: " + error
+		return null
+	_reload_event_names()
+	select_workspace("events")
+	var index := (_record_names["events"] as Array).find(event_basename)
+	if index >= 0:
+		_records.select(index)
+	return edit_event(event_basename)
+
+
 func select_workspace(kind: String) -> void:
 	var index := WORKSPACES.find(kind)
 	if index >= 0:
@@ -313,12 +373,18 @@ func active_map_workspace():
 	return _active_map_workspace
 
 
+func active_event_workspace():
+	return _active_event_workspace
+
+
 func _on_record_selected(idx: int) -> void:
 	if _active_kind == "" or idx < 0 or idx >= (_record_names[_active_kind] as Array).size():
 		return
 	var basename := str((_record_names[_active_kind] as Array)[idx])
 	if _active_kind == "maps":
 		edit_map(basename)
+	elif _active_kind == "events":
+		edit_event(basename)
 	else:
 		edit_record(_active_kind, basename)
 
@@ -379,9 +445,85 @@ func preview_map(project_root: String, map_label: String):
 	workspace.document_saved.connect(func(saved_path: String) -> void:
 		_status.text = "saved " + saved_path)
 	workspace.playtest_requested.connect(_on_map_playtest_requested)
+	workspace.event_requested.connect(_on_map_event_requested.bind(workspace))
 	_active_map_workspace = workspace
 	_status.text = "previewing map/%s — native TMX" % map_label
 	return workspace
+
+
+func edit_event(event_basename: String):
+	var opened := EventDocument.open(project_dir, event_basename)
+	if not bool(opened.get("ok", false)):
+		_status.text = "REFUSED: " + str(opened.get("error", "cannot open event"))
+		return null
+	_clear_editor()
+	var workspace := preload("res://scripts/studio/StudioEventWorkspace.gd").new()
+	workspace.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_editor_panel.add_child(workspace)
+	workspace.bind_document(opened["document"])
+	workspace.document_saved.connect(func(saved_path: String) -> void:
+		_status.text = "saved " + saved_path)
+	workspace.playtest_requested.connect(_on_map_playtest_requested)
+	_active_event_workspace = workspace
+	_status.text = "editing events/%s" % event_basename
+	return workspace
+
+
+func _on_map_event_requested(kind: String, object_id: String, event_id: String,
+		workspace) -> void:
+	if event_id != "":
+		edit_event(event_id.trim_prefix("event:"))
+		return
+	if workspace.is_dirty():
+		var map_error: String = workspace.save_to()
+		if map_error != "":
+			_status.text = "REFUSED: save the map before creating its event — " + map_error
+			return
+	var event_basename := _event_basename(workspace.document.label, object_id)
+	var record: Dictionary = {}
+	for candidate in workspace.document.records_for_kind(kind):
+		if str(candidate.get("id", "")) == object_id:
+			record = candidate
+			break
+	if record.is_empty():
+		_status.text = "REFUSED: selected map object no longer exists"
+		return
+	var trigger := {"kind": "interact", "map": "map:" + workspace.document.label,
+		"object": object_id}
+	if kind == "trigger":
+		trigger = {"kind": "step", "map": "map:" + workspace.document.label,
+			"region": [int(record.get("x", 0)), int(record.get("y", 0)),
+				int(record.get("x", 0)) + int(record.get("width", 1)) - 1,
+				int(record.get("y", 0)) + int(record.get("height", 1)) - 1]}
+	var created := EventDocument.create(project_dir, event_basename, trigger)
+	if not bool(created.get("ok", false)):
+		_status.text = "REFUSED: " + str(created.get("error", "cannot create event"))
+		return
+	var event_document: EventDocument = created["document"]
+	var error := event_document.save()
+	if error == "": error = workspace.link_selected_event("event:" + event_basename)
+	if error != "":
+		_status.text = "REFUSED: " + error
+		return
+	_reload_event_names()
+	edit_event(event_basename)
+
+
+func _reload_event_names() -> void:
+	var names: Array = []
+	var event_dir := project_dir.path_join("data/events")
+	if DirAccess.dir_exists_absolute(event_dir):
+		for file in DirAccess.get_files_at(event_dir):
+			if file.ends_with(".json"): names.append(file.get_basename())
+	names.sort()
+	_record_names["events"] = names
+
+
+static func _event_basename(map_label: String, object_id: String) -> String:
+	var source := (map_label + "_" + object_id).to_lower()
+	var regex := RegEx.new()
+	regex.compile("[^a-z0-9_]+")
+	return regex.sub(source, "_", true).strip_edges().trim_prefix("_").trim_suffix("_")
 
 
 func status_text() -> String:
@@ -439,6 +581,7 @@ func edit_record(content_type: String, basename: String):
 func _clear_editor() -> void:
 	_active_form = null
 	_active_map_workspace = null
+	_active_event_workspace = null
 	if _editor_panel == null:
 		return
 	for child in _editor_panel.get_children():
@@ -471,7 +614,7 @@ func _refresh_ui_scale_label() -> void:
 ## Public launch seam used by the button and --studiotest. The Engine is always a child
 ## process; `probe` asks it to quit after proving readiness, and is test-only.
 func launch_playtest(probe := false, headless := false, start_map := "", inspect_cells: Array = [],
-		traverse: Dictionary = {}):
+		traverse: Dictionary = {}, event_probe := ""):
 	if project_dir == "":
 		_status.text = "REFUSED: open a project before play-testing"
 		return null
@@ -481,12 +624,16 @@ func launch_playtest(probe := false, headless := false, start_map := "", inspect
 	if _active_map_workspace != null and _active_map_workspace.is_dirty():
 		_status.text = "REFUSED: save or revert the current map before play-testing"
 		return null
+	if _active_event_workspace != null and _active_event_workspace.is_dirty():
+		_status.text = "REFUSED: save or revert the current event before play-testing"
+		return null
 	var report := ProjectValidator.validate_project(project_dir)
 	if not bool(report.get("ok", false)):
 		_status.text = "REFUSED: " + "; ".join(PackedStringArray(report.get("errors", [])))
 		return null
 	var child := preload("res://scripts/studio/StudioPlaytest.gd").new()
-	var error: String = child.launch(project_dir, probe, headless, start_map, inspect_cells, traverse)
+	var error: String = child.launch(project_dir, probe, headless, start_map, inspect_cells,
+		traverse, event_probe)
 	if error != "":
 		_status.text = "REFUSED: " + error
 		return null
@@ -662,6 +809,7 @@ func _studiotest() -> void:
 	ok = preload("res://scripts/studio/StudioMapSmoke.gd").new().run(self) and ok
 	ok = await preload("res://scripts/studio/StudioMapAuthoringSmoke.gd").new().run(self, scratch) and ok
 	ok = await preload("res://scripts/studio/StudioWorldAuthoringSmoke.gd").new().run(self, scratch) and ok
+	ok = await preload("res://scripts/studio/StudioEventAuthoringSmoke.gd").new().run(self, scratch) and ok
 	ok = await preload("res://scripts/studio/StudioPlaytestSmoke.gd").new().run(self, scratch) and ok
 	print("[studiotest] %s" % ("ALL GREEN" if ok else "FAIL"))
 	get_tree().quit(0 if ok else 1)

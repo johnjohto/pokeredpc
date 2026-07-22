@@ -200,6 +200,18 @@ static func validate_editor_record(basename: String, record: Dictionary,
 	return errors
 
 
+## Event drafts need the generic schema/reference preflight plus the event semantic
+## pass used by the whole-project boot gate. Keeping this public seam here means Studio
+## cannot save a trigger that names a missing object or a cell outside its map.
+static func validate_event_editor_record(dir: String, basename: String, record: Dictionary,
+		context: Dictionary) -> Array:
+	var errors := validate_editor_record(basename, record, context)
+	if not errors.is_empty():
+		return errors
+	_check_events(dir, [{"rel": "data/events/%s.json" % basename, "inst": record}], errors)
+	return errors
+
+
 # ---- event semantics (gh #42, ADR-019 consequences) ---------------------------------
 
 ## Commands that name a map object.

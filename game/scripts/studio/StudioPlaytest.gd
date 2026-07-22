@@ -12,7 +12,7 @@ var token := ""
 
 
 func launch(open_project_dir: String, probe := false, headless := false, start_map := "",
-		inspect_cells: Array = [], traverse: Dictionary = {}) -> String:
+		inspect_cells: Array = [], traverse: Dictionary = {}, event_probe := "") -> String:
 	project_dir = _normalized_project_dir(open_project_dir)
 	if not FileAccess.file_exists(project_dir.path_join("manifest.json")):
 		return "no project at '%s'" % project_dir
@@ -50,6 +50,8 @@ func launch(open_project_dir: String, probe := false, headless := false, start_m
 		var edge_cell: Vector2i = traverse.get("edge_cell", Vector2i.ZERO)
 		args.append("--playtest-traverse=%d,%d;%d,%d;%s" % [warp_cell.x, warp_cell.y,
 			edge_cell.x, edge_cell.y, str(traverse.get("edge_direction", "left"))])
+	if event_probe != "":
+		args.append("--playtest-event=" + event_probe)
 	if probe:
 		args.append("--playtest-probe")
 	pid = OS.create_process(executable, args, false)

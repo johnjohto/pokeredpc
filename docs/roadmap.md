@@ -455,6 +455,25 @@ zero errors; all 223 maps mount in Studio and retain semantic parity; all four b
 hashes are unchanged; and the final no-resume `--playthrough --seed=1 --ptwatchdog=120`
 cleared all 21 checkpoints and entered the Hall of Fame with a level-71 lead. Next: gh #56 —
 the event command/trigger editor.
+**Landed: gh #56** (same day; ADR-026): Studio now lists, creates, edits, validates, saves,
+reverts, and play-tests authored events. `EventDocument` derives its complete command
+palette and default shapes from `event.schema.json`, owns canonical writes and recursive
+block-path mutations, and shares ProjectValidator's reference plus map-object/cell semantic
+preflight. The event workspace renders trigger fields and typed references from that schema;
+commands support add/delete/duplicate/reorder, while `if` and `ask` expose recursively nested
+`then`/`else` command lists under one exact undo/redo history. An authored map NPC or trigger
+can create/open its event directly; creation safely writes the valid event before linking
+the TMX object. `--studiotest` semantically round-trips all 283 Kanto event records and
+confirms every used command exists in the schema palette, authors a branched conversation
+on the original `StudioLinkTest/link_guide` NPC, rejects invalid drafts before disk, reopens
+the event/TMX link under whole-project validation, and has a separate Engine child execute
+the record through the real Event VM and prove the intended branch by its marker flag.
+Build/extraction, schema, project parity, TMX, self, warp, Cut, Event VM, and full Studio
+gates remain green; all 223 maps mount, Kanto validates 1,613 files with zero errors, and
+the four battle-determinism hashes are unchanged. The final no-resume
+`--playthrough --seed=1 --ptwatchdog=120` cleared all 21 checkpoints and entered the Hall
+of Fame with a level-72 lead (`validate_gate.py`: **GATE GREEN**).
+Next: gh #57 — shared Core/Studio/CI map and story softlock lints.
 **Landed: gh #34** (2026-07-20): Catch + Progression are behind the seam and the
 **config-first knobs are real** — `Gen1Catch` (`attempt` over the byte-exact kernel + the
 safari `bait_rate`/`rock_rate` transitions, which moved out of the host's input handler),

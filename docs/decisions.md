@@ -2,6 +2,38 @@
 
 Newest first. Each entry: context → decision → consequences.
 
+## ADR-026 — The event schema is Studio's command vocabulary (2026-07-22)
+
+**Context:** Phase 5.5 (gh #56) must expose every Event VM command, including recursive
+`if`/`ask` branches, without creating a second handwritten command model that drifts from
+the runtime grammar. Event records refer to maps, objects, items, moves, and species; an
+individually valid JSON record can still name a missing object or an out-of-bounds region.
+Creating an NPC event also changes two files, and saving the TMX link first would briefly
+leave the project with a dangling reference.
+**Decision:** (1) `event.schema.json` is the command palette and field authority. Studio
+resolves its local `$ref`s, derives one palette entry/default object per command `anyOf`,
+and renders scalar, enum, reference, object, array, `prefixItems`, and optional fields from
+the same Core-schema subset. No parallel command list or JSON text editor exists. (2)
+`EventDocument` owns event state, canonical serialization, dirty state, validation, and
+nested block-path mutations. `[]` addresses the root command list; alternating command
+index/branch-name paths address recursive `then`/`else` lists, keeping the view ignorant of
+VM vocabulary. (3) Studio renders branches as nested command lists and snapshots the whole
+document for every add/delete/duplicate/reorder or field edit, giving exact undo/redo.
+(4) Save preflights both generic schema/reference checks and ProjectValidator's existing
+event-to-map object/cell semantics. Invalid drafts remain visible but never reach disk.
+(5) Creating from a map object writes and validates the event first, then links and saves
+the NPC/trigger TMX. Failure can leave only an unreferenced event, never a dangling map
+link. Imported legacy objects retain ADR-025's read-only rule. (6) Event Play-test remains
+the ordinary separate Engine process; the acceptance probe asks the loaded Event VM to
+compile and execute the new record and reports only an observable story-flag result.
+**Consequences:** Adding a schema+VM command automatically makes it available to Studio;
+the schema, form, validator, and runtime cannot silently acquire different command enums.
+Existing Kanto JSON remains byte-exact on no-op Save, while an edited record is canonical
+JSON. Map and event files are not a filesystem transaction, but their write order preserves
+project validity at the only recoverable split point. The gate round-trips all 283 Kanto
+event shapes, authors a nested conversation on an original NPC, proves exact history and
+whole-project validation, then observes its selected branch in a child Engine process.
+
 ## ADR-025 — Object edits keep stable names; world links are reciprocal transactions (2026-07-22)
 
 **Context:** Phase 5.4 (gh #55) must let creators place local gameplay objects and connect

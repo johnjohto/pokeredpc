@@ -5,6 +5,7 @@ class_name StudioMapWorkspace
 
 signal document_saved(path: String)
 signal playtest_requested(map_label: String)
+signal event_requested(kind: String, object_id: String, event_id: String)
 
 var document: MapDocument
 var world_document = null
@@ -35,6 +36,7 @@ var _object_number_a: SpinBox
 var _object_number_b: SpinBox
 var _object_apply: Button
 var _object_delete: Button
+var _object_event_edit: Button
 var _selected_object_kind := ""
 var _selected_object_id := ""
 var _connection_list: OptionButton
@@ -401,6 +403,11 @@ func _build_object_inspector(parent: VBoxContainer) -> void:
 	_object_delete = _button("Delete", true)
 	_object_delete.pressed.connect(_delete_selected_object)
 	actions.add_child(_object_delete)
+	_object_event_edit = _button("Create / Edit Event", true)
+	_object_event_edit.pressed.connect(func() -> void:
+		event_requested.emit(_selected_object_kind, _selected_object_id,
+			_object_event.text.strip_edges()))
+	parent.add_child(_object_event_edit)
 
 
 func _refresh_object_list() -> void:
@@ -496,6 +503,8 @@ func _set_object_fields_enabled(enabled: bool) -> void:
 		_object_apply.disabled = not enabled
 	if _object_delete != null:
 		_object_delete.disabled = not enabled
+	if _object_event_edit != null:
+		_object_event_edit.disabled = not enabled or _selected_object_kind not in ["npc", "trigger"]
 
 
 func _apply_object_inspector() -> void:
@@ -620,7 +629,20 @@ func object_controls() -> Dictionary:
 	return {"list": _object_list, "id": _object_id, "x": _object_x, "y": _object_y,
 		"event": _object_event, "detail_a": _object_detail_a, "detail_b": _object_detail_b,
 		"detail_c": _object_detail_c, "number_a": _object_number_a,
-		"number_b": _object_number_b, "apply": _object_apply, "delete": _object_delete}
+		"number_b": _object_number_b, "apply": _object_apply, "delete": _object_delete,
+		"edit_event": _object_event_edit}
+
+
+## Shell transaction seam: an event file is written first, then its map object is linked.
+## If the TMX save fails the project has only an unreferenced event, never a dangling map link.
+func link_selected_event(event_id: String) -> String:
+	if _selected_object_kind not in ["npc", "trigger"] or _selected_object_id == "":
+		return "select an authored NPC or trigger first"
+	_object_event.text = event_id
+	_apply_object_inspector()
+	if str(_object_event.text) != event_id:
+		return "could not link selected object"
+	return save_to()
 
 
 func connection_controls() -> Dictionary:

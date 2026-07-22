@@ -650,6 +650,32 @@ func _ready() -> void:
 					traverse_error = "authored seamless edge did not change maps"
 				else:
 					traversed_maps.append(center_label)
+	# gh #56 acceptance: execute one Studio-authored record through the real loaded VM.
+	# The probe record uses only non-blocking commands; its marker flag makes the taken
+	# branch observable in the parent handshake without inventing an editor-only VM.
+	var event_probe_id := _arg_value(args, "--playtest-event=")
+	var event_probe_ok := true
+	var event_probe_error := ""
+	var event_probe_flag := false
+	if event_probe_id != "":
+		var probe_events := ProjectData.events()
+		if not probe_events.has(event_probe_id):
+			event_probe_ok = false
+			event_probe_error = "event probe record '%s' is missing" % event_probe_id
+		else:
+			# ProjectData returns fresh records; compile this fresh instance exactly as boot
+			# compiled its own indexed copy before asking the same VM to execute it.
+			var probe_record: Dictionary = probe_events[event_probe_id]
+			var probe_compile_error := event_vm.load_all({event_probe_id: probe_record})
+			if probe_compile_error != "":
+				event_probe_ok = false
+				event_probe_error = probe_compile_error
+			else:
+				await event_vm.run(probe_record, {})
+				event_probe_flag = has_event("STUDIO_EVENT_BRANCH_RAN")
+				if not event_probe_flag:
+					event_probe_ok = false
+					event_probe_error = "event ran without taking its authored branch"
 	var playtest_handshake := _arg_value(args, "--playtest-handshake=")
 	if playtest_handshake != "":
 		var inspected_cells := {}
@@ -673,6 +699,10 @@ func _ready() -> void:
 			"traverse_ok": traverse_ok,
 			"traverse_error": traverse_error,
 			"traversed_maps": traversed_maps,
+			"event_probe": event_probe_id,
+			"event_probe_ok": event_probe_ok,
+			"event_probe_error": event_probe_error,
+			"event_probe_flag": event_probe_flag,
 			"save_path": ProjectSettings.globalize_path(SAVE_PATH),
 			"save_slot": _arg_value(args, "--saveslot="),
 			"token": _arg_value(args, "--playtest-token="),

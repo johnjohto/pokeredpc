@@ -10,6 +10,15 @@ milestones, `PATCH` bumps are fixes/polish. See `docs/roadmap.md` for the live p
 
 ### Added
 
+- **Studio now authors working NPC and trigger events** (gh #56, ADR-026). Events have a
+  dedicated list/create workspace, schema-derived trigger and reference controls, and a
+  complete command palette generated from the Event VM schema. Commands can be added,
+  deleted, duplicated, reordered, and nested recursively under `if`/`ask` branches with
+  exact undo/redo, inline validation, canonical Save/Revert, and direct play-test. Authored
+  map NPCs/triggers create or open their linked event safely. The Studio gate round-trips
+  all 283 Kanto event shapes, authors a branched original-NPC conversation, reopens its TMX
+  link under full validation, and observes the intended branch execute in an Engine child.
+
 - **Studio can place gameplay objects and connect authored maps** (gh #55, ADR-025).
   Warp, NPC, sign, and rectangular trigger tools share a typed inspector with stable IDs,
   cell coordinates, event links, and kind-specific fields. A world inspector edits cardinal

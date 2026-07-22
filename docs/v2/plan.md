@@ -8,8 +8,10 @@ format-2 native TMX map crosses the shared `MapDocument` seam into both Engine a
 Studio can now create maps and paint tiles, optional Gen-1 blocks, and per-cell collision
 with exact undo/redo, targeted source-preserving saves, and direct map play-test (ADR-024,
 gh #54). Typed warp/NPC/sign/trigger placement and reciprocal world-graph editing are live,
-with one undo history and a two-map Engine traversal gate (ADR-025, gh #55). Event editing
-follows. The gates that guarded
+with one undo history and a two-map Engine traversal gate (ADR-025, gh #55). The event
+workspace is also live: schema-derived trigger/reference controls, the complete VM command
+palette, recursive `if`/`ask` lists, exact history, map-object creation/linking, validation,
+and child-process execution (ADR-026, gh #56). Softlock lints are next. The gates that guarded
 the v2 start remain permanent oracles: 1.0 shipped 2026-07-17 and v1.1 multiplayer shipped
 2026-07-20. ADR-013 records the foundational product decisions.
 

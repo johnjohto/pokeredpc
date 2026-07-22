@@ -112,6 +112,15 @@ therefore keys its open-project cache by both directory string and exact manifes
 map selection performs this cheap check before consulting `format`. A changed manifest reloads
 Core, so a live format migration cannot keep presenting native maps as legacy (gh #63).
 
+Studio's event workspace treats `event.schema.json` as its command and field vocabulary
+(ADR-026, gh #56). `EventDocument` resolves local schema references, derives every command
+palette/default from `$defs.block.items.anyOf`, and addresses recursive `then`/`else` lists
+with nested block paths. Save runs the ordinary schema/reference pass plus the same
+map-object and cell/region semantic checks used by whole-project validation. A no-op save
+leaves source bytes alone; an actual edit writes canonical JSON. Creating an event from an
+authored NPC or trigger writes that valid record before adding its `pokeredpc:event` TMX
+link, so an interrupted two-file operation cannot leave a dangling reference.
+
 For format 2, `ProjectData.map_json(label)` opens `MapDocument` and returns its normalized
 runtime adapter: 16×16 tile/collision/semantic rows, typed object arrays, authored spawn,
 project-local tileset metadata, and the selected map's `data/world.json` connections. Main
