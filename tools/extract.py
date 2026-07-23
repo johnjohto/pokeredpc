@@ -11,12 +11,20 @@ Docs: docs/data-formats/ and docs/guides/extending-the-extractor.md
 """
 import json
 import re
+import argparse
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "pokered"
 OUT = ROOT / "game" / "assets"
 PREVIEW = ROOT / "build" / "preview"
+VERSION = "red"
+VERSION_META = {
+    "red": {"project_id": "kanto", "project_name": "Pokémon Red (Kanto)",
+            "title_version": "red", "intro_stem": "red_nidorino", "oak_intro_mon": "nidorino"},
+    "blue": {"project_id": "kanto-blue", "project_name": "Pokémon Blue (Kanto)",
+             "title_version": "blue", "intro_stem": "blue_jigglypuff", "oak_intro_mon": "jigglypuff"},
+}
 
 # pokered's sprite filenames are the species key, with one exception: Mr. Mime's are `mr.mime.png` /
 # `mr.mimeb.png`. Keyed by base_stats species key -> the stem to read from gfx/pokemon/. (gh #81)
@@ -32,6 +40,34 @@ GB_PALETTE = [(0xEA, 0xFB, 0xCE), (0xB5, 0xD2, 0x95), (0x65, 0x8A, 0x72), (0x22,
 
 def read(rel):
     return (SRC / rel).read_text(encoding="utf-8")
+
+
+def select_version(text):
+    """Keep only the active pokered `_RED`/`_BLUE` conditional blocks."""
+    out = []
+    stack = [{"parent": True, "matched": True, "include": True, "version_if": False}]
+    for line in text.splitlines():
+        s = line.strip()
+        m = re.match(r"IF DEF\(_(RED|BLUE)\)\s*$", s)
+        if m:
+            parent = stack[-1]["include"]
+            matched = m.group(1).lower() == VERSION
+            stack.append({"parent": parent, "matched": matched,
+                          "include": parent and matched, "version_if": True})
+            continue
+        if s == "ELSE" and stack[-1]["version_if"]:
+            stack[-1]["include"] = stack[-1]["parent"] and not stack[-1]["matched"]
+            continue
+        if s == "ENDC" and stack[-1]["version_if"]:
+            stack.pop()
+            continue
+        if stack[-1]["include"]:
+            out.append(line)
+    return "\n".join(out)
+
+
+def version_meta(key):
+    return VERSION_META[VERSION][key]
 
 
 def slug(camel):
@@ -624,9 +660,7 @@ def build_credits():
     next CreditsMons silhouette as the transition; CRED_COPYRIGHT ($FB) marks the © page;
     CRED_THE_END ($FA) is the final THE END screen (handled by the runner). Each credit string
     carries a leading signed byte = its column offset from base column 9 (hlcoord 9, 6)."""
-    txt = read("data/credits/credits_text.asm")
-    txt = re.sub(r"IF DEF\(_BLUE\).*?ENDC", "", txt, flags=re.S)          # Red version strings
-    txt = txt.replace("IF DEF(_RED)", "").replace("ENDC", "")
+    txt = select_version(read("data/credits/credits_text.asm"))
     label_text, cur = {}, None
     for line in txt.splitlines():
         m = re.match(r"(Cred\w+):", line)
@@ -898,7 +932,7 @@ def build_sfx():
     chan_cmds = {}
     for p in (SRC / "audio" / "sfx").glob("*.asm"):
         cur = None
-        for line in p.read_text(encoding="utf-8").splitlines():
+        for line in select_version(p.read_text(encoding="utf-8")).splitlines():
             ml = re.match(r"(SFX_[A-Za-z0-9_]+):", line)
             if ml and not line.startswith(" ") and not line.startswith("\t"):
                 cur = ml.group(1).rstrip(":"); chan_cmds[cur] = []
@@ -1037,6 +1071,71 @@ def build_marts():
     print(f"marts: {len(marts)} inventories")
 
 
+def build_prizes():
+    """Game Corner prize counters, including Red/Blue differences.
+
+    Source: pokered data/events/prizes.asm + prize_mon_levels.asm.
+    """
+    items = json.load(open(OUT / "items.json", encoding="utf-8"))
+    levels = {}
+    for sp, lv in re.findall(r"db\s+(\w+),\s*(\d+)",
+                             select_version(read("data/events/prize_mon_levels.asm"))):
+        levels[_mon_species(sp)] = int(lv)
+
+    text = select_version(read("data/events/prizes.asm"))
+    entries = {}
+    costs = {}
+    cur = None
+    for line in text.splitlines():
+        s = strip_comment(line).strip()
+        m = re.match(r"(PrizeMenu\w+Entries):", s)
+        if m:
+            cur = ("entries", m.group(1))
+            entries[cur[1]] = []
+            continue
+        m = re.match(r"(PrizeMenu\w+Cost):", s)
+        if m:
+            cur = ("costs", m.group(1))
+            costs[cur[1]] = []
+            continue
+        if cur is None:
+            continue
+        if s == 'db "@"':
+            cur = None
+            continue
+        md = re.match(r"db\s+(\w+)", s)
+        mb = re.match(r"bcd2\s+(\d+)", s)
+        if cur[0] == "entries" and md:
+            entries[cur[1]].append(md.group(1))
+        elif cur[0] == "costs" and mb:
+            costs[cur[1]].append(int(mb.group(1)))
+
+    def mon_prizes(entry_key, cost_key):
+        out = []
+        for const, cost in zip(entries[entry_key], costs[cost_key]):
+            mon = _mon_species(const)
+            out.append({"name": _species_display_name(mon), "mon": mon,
+                        "lv": levels[mon], "cost": cost})
+        return out
+
+    def tm_prizes(entry_key, cost_key):
+        out = []
+        for const, cost in zip(entries[entry_key], costs[cost_key]):
+            tm = items[const]
+            out.append({"name": const.removeprefix("TM_").replace("_", " "),
+                        "tm": tm, "cost": cost})
+        return out
+
+    prizes = [
+        mon_prizes("PrizeMenuMon1Entries", "PrizeMenuMon1Cost"),
+        mon_prizes("PrizeMenuMon2Entries", "PrizeMenuMon2Cost"),
+        tm_prizes("PrizeMenuTMsEntries", "PrizeMenuTMsCost"),
+    ]
+    json.dump(prizes, open(OUT / "prizes.json", "w", encoding="utf-8"),
+              ensure_ascii=False, indent=1)
+    print(f"prizes: {sum(len(p) for p in prizes)} Game Corner entries ({VERSION})")
+
+
 def build_cries():
     """species -> {cry sfx key, pitch, length} from CryData (added to freq / sfx tempo)."""
     cries = {}
@@ -1072,13 +1171,19 @@ def build_title():
     ptrain = ptrain.copy()
     ImageDraw.Draw(ptrain).rectangle((0, 16, 7, 23), fill=255)
     _gb_rgba(ptrain).save(OUT / "title" / "player.png")
-    # Version_GFX (red_version.png) packs "RedGreenVersion"; the retail Red title reads
-    # "Red Version", so compose it from the graphic's own letters (Red=[0:21], Version=[46:77]).
-    rv = Image.open(SRC / "gfx" / "title" / "red_version.png").convert("L")
-    red, vsn = rv.crop((0, 0, 16, 8)), rv.crop((40, 0, 80, 8))   # "Version" starts at the V (col 40)
-    ver = Image.new("L", (16 + 4 + 40, 8), 255)
-    ver.paste(red, (0, 0))
-    ver.paste(vsn, (20, 0))
+    if version_meta("title_version") == "blue":
+        # The renderer still loads this path; in a Blue extraction it contains Blue's
+        # eight-tile Version_GFX verbatim.
+        ver = Image.open(SRC / "gfx" / "title" / "blue_version.png").convert("L")
+    else:
+        # Version_GFX (red_version.png) packs "RedGreenVersion"; the retail Red title reads
+        # "Red Version", so compose it from the graphic's own letters (Red=[0:21],
+        # Version=[46:77]).
+        rv = Image.open(SRC / "gfx" / "title" / "red_version.png").convert("L")
+        red, vsn = rv.crop((0, 0, 16, 8)), rv.crop((40, 0, 80, 8))   # "Version" starts at V
+        ver = Image.new("L", (16 + 4 + 40, 8), 255)
+        ver.paste(red, (0, 0))
+        ver.paste(vsn, (20, 0))
     _gb_rgba(ver).save(OUT / "title" / "red_version.png")
     _mon_sprite(SRC / "gfx" / "splash" / "gamefreak_logo.png", OUT / "title" / "gamefreak_logo.png")
     # "GAME FREAK" wordmark. This pokered clone's gamefreak_presents.png is a *condensed* variant
@@ -1116,9 +1221,11 @@ def build_title():
     _gb_rgba(big).save(OUT / "title" / "bigstar.png")
     # the condensed copyright tile strip ($60-$72: ©'95'96'98 + Nintendo + Creatures inc.)
     _mon_sprite(SRC / "gfx" / "splash" / "copyright.png", OUT / "title" / "copyright_strip.png")
-    # Nidorino (front mon, right side) faces left toward Gengar in its native orientation.
+    # The front intro mon (Nidorino in Red, Jigglypuff in Blue) faces left toward Gengar.
+    intro_stem = version_meta("intro_stem")
     for i in (1, 2, 3):
-        _mon_sprite(SRC / "gfx" / "intro" / f"red_nidorino_{i}.png", OUT / "title" / f"nidorino_{i}.png")
+        _mon_sprite(SRC / "gfx" / "intro" / f"{intro_stem}_{i}.png",
+                    OUT / "title" / f"nidorino_{i}.png")
     # Gengar (back mon, from behind): three 56x56 poses. The *silhouette* must be opaque (so it
     # hides Nidorino sliding behind it) including its dithered interior highlights, while only the
     # surrounding background is transparent — so flood-fill the white that is connected to the
@@ -1153,10 +1260,9 @@ def build_title():
             for x in range(56):
                 dp[x, y] = (0, 0, 0, 0) if outside[y][x] else GB_PALETTE[round((255 - px[x, y]) / 255 * 3)] + (255,)
         out.save(OUT / "title" / f"gengar_{f}.png")
-    # cycling title mons (Red set), starters resolved to species
+    # cycling title mons, starters resolved to species
     starters = {"STARTER1": "charmander", "STARTER2": "squirtle", "STARTER3": "bulbasaur"}
-    text = read("data/pokemon/title_mons.asm")
-    text = re.sub(r"IF DEF\(_BLUE\).*?ENDC", "", text, flags=re.S)
+    text = select_version(read("data/pokemon/title_mons.asm"))
     mons = []
     for m in re.finditer(r"db\s+(\w+)", text):
         c = m.group(1)
@@ -1170,7 +1276,36 @@ def build_title():
         rows = re.findall(r"db\s+(-?\d+),\s*(-?\d+)", m.group(1))
         anims.append([[int(a), int(b)] for a, b in rows])
     json.dump(anims, open(OUT / "title_intro.json", "w"), indent=1)
-    print(f"title: logo/figure/star/copyright-© + 3 nidorino + 3 gengar + {len(anims)} intro anims, {len(mons)} mons")
+    print(f"title: logo/figure/star/copyright-© + 3 {intro_stem} + 3 gengar + {len(anims)} intro anims, {len(mons)} mons")
+
+
+def build_version_meta():
+    """Version-specific UI metadata from constants/player_constants.asm."""
+    text = select_version(read("constants/player_constants.asm"))
+    meta = {"variant": VERSION, "oak_intro_mon": version_meta("oak_intro_mon"),
+            "player_names": [], "rival_names": []}
+    for key, value in re.findall(r'DEF\s+(PLAYERNAME\d+|RIVALNAME\d+)\s+EQUS\s+"([^"]+)"', text):
+        if key.startswith("PLAYER"):
+            meta["player_names"].append(value)
+        else:
+            meta["rival_names"].append(value)
+    json.dump(meta, open(OUT / "version.json", "w", encoding="utf-8"),
+              ensure_ascii=False, indent=1)
+    print(f"version meta: {VERSION}, player={meta['player_names'][0] if meta['player_names'] else '?'}")
+
+
+def build_slots_gfx():
+    """Selected Game Corner slot graphics.
+
+    Source: engine/slots/slot_machine.asm's SlotMachineTiles1 `_RED`/`_BLUE`
+    conditional plus the adjacent versioned tile sheet.
+    """
+    (OUT / "slots").mkdir(parents=True, exist_ok=True)
+    from PIL import Image
+    for n in (1, 2):
+        src = SRC / "gfx" / "slots" / f"{VERSION}_slots_{n}.png"
+        _gb_rgba(Image.open(src).convert("L")).save(OUT / "slots" / f"slots_{n}.png")
+    print(f"slots gfx: {VERSION}_slots_1/2")
 
 
 def build_wild():
@@ -1185,9 +1320,7 @@ def build_wild():
     # Parse each wild-data file once, keyed by its stem (== the <Stem>WildMons label).
     by_stem = {}
     for p in (SRC / "data" / "wild" / "maps").glob("*.asm"):
-        text = p.read_text()
-        text = re.sub(r"IF DEF\(_BLUE\).*?ENDC", "", text, flags=re.S)   # Red version
-        text = re.sub(r"IF DEF\(_RED\)", "", text).replace("ENDC", "")
+        text = select_version(p.read_text())
 
         def section(kind):
             mr = re.search(r"def_%s_wildmons\s+(\d+)(.*?)end_%s_wildmons" % (kind, kind), text, re.S)
@@ -2209,6 +2342,13 @@ def _type_id(t):
     return "type:" + t.removesuffix("_TYPE").lower()
 
 
+def _bare_item_from_display(display, items):
+    for key, value in items.items():
+        if value == display:
+            return key.lower()
+    raise KeyError("unknown item display name: " + str(display))
+
+
 def _pj_write(rel, obj):
     """Canonical project serialization (ADR-017): indent 1, sorted keys, LF, trailing
     newline — the exact bytes the gh #23 identity hash will consume."""
@@ -2539,6 +2679,12 @@ def build_project():
                for label, stock in J("marts.json").items()
                if label in map_labels})     # pokered ships UnusedMart/UnusedBikeShop
                                             # stock for maps that don't exist
+    _pj_write("data/prizes.json", [
+        [{"name": p["name"], "mon": "species:" + p["mon"], "lv": p["lv"], "cost": p["cost"]}
+         if "mon" in p else
+         {"name": p["name"], "tm": "item:" + _bare_item_from_display(p["tm"], items), "cost": p["cost"]}
+         for p in counter]
+        for counter in J("prizes.json")])
     _pj_write("data/hidden_items.json",
               {"map:" + label: [{"x": h["x"], "y": h["y"], "item": "item:" + h["item"].lower()}
                                 for h in spots]
@@ -2603,7 +2749,7 @@ def build_project():
     presentation = ["audio.json", "sfx.json", "charmap.json", "credits.json",
                     "dungeon_maps.json", "map_music.json", "move_anims.json",
                     "spinners.json", "title_intro.json", "title_mons.json",
-                    "town_map.json", "trade_gfx.json", "warp_rules.json",
+                    "town_map.json", "trade_gfx.json", "version.json", "warp_rules.json",
                     # subdir metadata the runtime also loads (kept at their v1
                     # relative paths): sprite sheet index, per-tileset collision
                     "sprites/index.json"] + \
@@ -2661,7 +2807,8 @@ def build_project():
     parts = {g: h.hexdigest() for g, h in groups.items()}
     content = hashlib.md5("".join(parts[k] for k in sorted(parts)).encode()).hexdigest()
     version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
-    _pj_write("manifest.json", {"format": 2, "id": "kanto", "name": "Pokémon Red (Kanto)",
+    _pj_write("manifest.json", {"format": 2, "id": version_meta("project_id"),
+                                "name": version_meta("project_name"),
                                 "version": version, "ruleset": "gen1",
                                 "identity": {"parts": parts, "content_hash": content}})
     print(f"project: {len(base)} species, {len(moves)} moves, {len(items)} items, "
@@ -2672,6 +2819,14 @@ def build_project():
 
 
 def main():
+    global VERSION
+    parser = argparse.ArgumentParser(description="Extract pokered assets for pokeredpc.")
+    parser.add_argument("--version", choices=("red", "blue"), default="red",
+                        help="retail version conditionals to extract (default: red)")
+    args = parser.parse_args()
+    VERSION = args.version
+    print(f"version: Pokémon {VERSION.capitalize()}")
+
     for d in ["tilesets", "maps", "sprites"]:
         (OUT / d).mkdir(parents=True, exist_ok=True)
     PREVIEW.mkdir(parents=True, exist_ok=True)
@@ -2689,10 +2844,13 @@ def main():
     build_items()
     build_dex()
     build_marts()
+    build_prizes()
     build_battle()
     build_trades()
     extract_trade_gfx()
     build_title()
+    build_version_meta()
+    build_slots_gfx()
     build_wild()
     build_move_sfx()
     build_move_anims()

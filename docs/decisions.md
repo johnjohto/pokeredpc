@@ -2,6 +2,28 @@
 
 Newest first. Each entry: context → decision → consequences.
 
+## ADR-029 — Red/Blue are build-time content variants; link identity stays battle-only (2026-07-23)
+
+**Context:** gh #26 adds Pokémon Blue as a build/extraction option. The pret/pokered tree
+builds both cartridges from `_RED`/`_BLUE` conditionals; the port now has the same
+selection at extraction time. Blue changes content that the single-player game reads
+(wild encounter tables, title presentation, credits, Game Corner prizes), while real Red
+and Blue cartridges could still trade and battle. The existing v1.1 link identity refuses
+when any hashed lockstep-relevant part differs.
+**Decision:** (1) `tools/extract.py --version red|blue` is a build-time content-variant
+switch. The emitted Project keeps one path layout; only the bytes and manifest id/name
+change. (2) Link identity remains the derived subset of Project identity that lockstep
+actually consumes: `species`, `moves`, and `types`. Wild tables, title art, credits,
+prize counters, maps, and presentation blobs are intentionally excluded, so a faithful
+Red↔Blue link session is allowed when battle/mon-record data matches. (3) The title
+renderer keeps its stable asset path; the extractor writes the selected version wordmark
+to that path.
+**Consequences:** Red remains the default build. Blue can be produced from the same
+source clone without runtime branching, and Project validation/Studio see Blue as a
+normal content pack. The compatibility rule is explicit: future version differences that
+affect battle simulation or mon-record interpretation must be added to the link identity
+parts, while single-player-only tables must not block Cable Club sessions.
+
 ## ADR-028 — The scripting hatch is a purpose-built DSL, events + formulas first (2026-07-23)
 
 **Context:** Phase 6 (gh #20) opens the §8 fork for the scripting hatch: sandboxed Lua

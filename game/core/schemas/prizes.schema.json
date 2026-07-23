@@ -1,0 +1,50 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "schema:prizes",
+ "type": "array",
+ "items": {
+  "type": "array",
+  "items": {
+   "type": "object",
+   "required": [
+    "name",
+    "cost"
+   ],
+   "properties": {
+    "name": {
+     "type": "string"
+    },
+    "mon": {
+     "type": "string",
+     "x-ref": "species"
+    },
+    "tm": {
+     "type": "string",
+     "x-ref": "item"
+    },
+    "lv": {
+     "type": "integer",
+     "minimum": 1
+    },
+    "cost": {
+     "type": "integer",
+     "minimum": 0
+    }
+   },
+   "anyOf": [
+    {
+     "required": [
+      "mon",
+      "lv"
+     ]
+    },
+    {
+     "required": [
+      "tm"
+     ]
+    }
+   ],
+   "additionalProperties": false
+  }
+ }
+}

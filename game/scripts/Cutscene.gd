@@ -455,6 +455,20 @@ func ask_name(title: String, presets: Array, prompt := "", skip_presets := false
 	return n
 
 
+func _version_presets(key: String, fallback: Array) -> Array:
+	var meta = ProjectData.legacy("version.json")
+	if meta is Dictionary and meta.get(key, []) is Array and not meta[key].is_empty():
+		return meta[key]
+	return fallback
+
+
+func _version_meta_string(key: String, fallback: String) -> String:
+	var meta = ProjectData.legacy("version.json")
+	if meta is Dictionary and str(meta.get(key, "")) != "":
+		return str(meta[key])
+	return fallback
+
+
 ## After receiving a POKéMON, offer to nickname it (engine/menus/naming_screen.asm DisplayNamingScreen).
 func offer_nickname(mon: Dictionary) -> void:
 	var sp: String = str(mon["name"])
@@ -477,15 +491,18 @@ func oak_speech() -> void:
 	pic(load("res://assets/title/oak.png"))
 	await say("Hello there!\nWelcome to the\nworld of POKéMON!\fMy name is OAK!\nPeople call me\nthe POKéMON PROF!")
 	await fade_out(); clear_pic()
-	pic(load("res://assets/pokemon/front/nidorino.png"), Vector2(48, 36), true); await fade_in()
+	pic(load("res://assets/pokemon/front/%s.png" % _version_meta_string("oak_intro_mon", "nidorino")),
+		Vector2(48, 36), true); await fade_in()
 	await say("This world is\ninhabited by\ncreatures called\nPOKéMON!\fFor some people,\nPOKéMON are pets.\fOthers use them\nfor fights.\fMyself...\fI study POKéMON\nas a profession.")
 	await fade_out(); clear_pic()
 	pic(load("res://assets/title/redfront.png")); await fade_in()
-	main.player_name = await ask_name("YOUR", ["RED", "ASH", "JACK"], "First, what is\nyour name?")
+	main.player_name = await ask_name("YOUR", _version_presets("player_names", ["RED", "ASH", "JACK"]),
+		"First, what is\nyour name?")
 	await fade_out(); clear_pic()
 	pic(load("res://assets/title/rival.png")); await fade_in()
 	await say("This is my grand-\nson. He's been\nyour rival since\nyou were a baby.")
-	main.rival_name = await ask_name("RIVAL's", ["BLUE", "GARY", "JOHN"], "...Erm, what is\nhis name again?")
+	main.rival_name = await ask_name("RIVAL's", _version_presets("rival_names", ["BLUE", "GARY", "JOHN"]),
+		"...Erm, what is\nhis name again?")
 	await fade_out(); clear_pic()
 	pic(load("res://assets/title/redfront.png")); await fade_in()
 	await say("%s!\fYour very own\nPOKéMON legend is\nabout to unfold!\fA world of dreams\nand adventures\nwith POKéMON\nawaits! Let's go!" % main.player_name)
@@ -692,9 +709,9 @@ func daycare_man() -> void:
 	main.moneybox.hide_box()
 	main.cutscene_active = false
 
-## Game Corner prize room prizes (data/events/prizes.asm + prize_mon_levels.asm, RED). Three
-## vendors: two Pokémon counters and one TM counter. TM ids per game/assets/tm_moves.json.
-const _PRIZES := [
+## Game Corner prize room prizes. ProjectData loads the extracted table from
+## data/events/prizes.asm + prize_mon_levels.asm; this Red table is a fallback for older projects.
+const _RED_PRIZES := [
 	[{"name": "ABRA", "mon": "abra", "lv": 9, "cost": 180},
 	 {"name": "CLEFAIRY", "mon": "clefairy", "lv": 8, "cost": 500},
 	 {"name": "NIDORINA", "mon": "nidorina", "lv": 17, "cost": 1200}],
@@ -705,6 +722,11 @@ const _PRIZES := [
 	 {"name": "HYPER BEAM", "tm": "TM15", "cost": 5500},
 	 {"name": "SUBSTITUTE", "tm": "TM50", "cost": 7700}],
 ]
+
+var _PRIZES: Array:
+	get:
+		var extracted = ProjectData.legacy("prizes.json")
+		return extracted if extracted is Array and extracted.size() >= 3 else _RED_PRIZES
 
 
 # ---- the Cable Club (gh #5, ADR-014) ---------------------------------------

@@ -13,7 +13,7 @@ if (-not $godot) {
 }
 
 Write-Host "==> Extracting assets..." -ForegroundColor Cyan
-python (Join-Path $PSScriptRoot "extract.py")
+python (Join-Path $PSScriptRoot "extract.py") @args
 
 Write-Host "==> Importing into Godot..." -ForegroundColor Cyan
 # Editor pass generates .import files; it may exit non-zero on headless shutdown.

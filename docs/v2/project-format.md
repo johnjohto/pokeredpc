@@ -30,6 +30,7 @@ project/
     encounters.json      table — slots + per-map grass/water
     text.json            table — text id -> string
     marts.json           table — map ref -> item list
+    prizes.json          table — Celadon Game Corner prize counters
     hidden_items.json    table — map ref -> placements
     trades.json          table — the in-game trades
     events/<key>.json    one record per file  (id: "event:<key>") — an AUTHORED
@@ -172,6 +173,12 @@ Emission is **deterministic**: two extractions produce byte-identical trees (the
 gate), which is what makes the gh #23 identity hash meaningful. The project root carries
 a `.gdignore` so Godot never imports the tree — the runtime reads it via raw
 `FileAccess`/`Image.load_from_file` (gh #25).
+
+The extractor's `--version red|blue` switch selects pokered's retail `_RED`/`_BLUE`
+conditionals before Project emission. The selected variant is ordinary Project data:
+encounters, title presentation blobs, version metadata (`presentation/version.json`),
+credits, Game Corner prizes, slot graphics, and SFX conditionals are emitted in the same
+paths, while the manifest `id`/`name` identify the content pack.
 
 Dead data pokered ships is filtered at emission, not schema'd around: the
 `UnusedMart`/`UnusedBikeShop` stock (maps that don't exist) and the `UNUSED` padding in

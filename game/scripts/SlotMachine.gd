@@ -30,6 +30,7 @@ const PAYOUT := {"SEVEN": 300, "BAR": 100, "CHERRY": 8, "FISH": 15, "BIRD": 15, 
 const SYM2 := {"SEVEN": "7", "BAR": "BR", "CHERRY": "CH", "FISH": "FS", "BIRD": "BD", "MOUSE": "MS"}
 
 var font_tex: Texture2D
+var slot_tex: Texture2D
 var font_cols: int
 var charmap: Dictionary
 var main                              # back-ref to Main (coins, audio)
@@ -58,6 +59,7 @@ func setup(ftex: Texture2D, cols: int, cmap: Dictionary, main_ref) -> void:
 	font_cols = cols
 	charmap = cmap
 	main = main_ref
+	slot_tex = _asset_texture("slots/slots_1.png")
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	visible = false
@@ -287,6 +289,8 @@ func _process(delta: float) -> void:
 
 func _draw() -> void:
 	draw_rect(Rect2(0, 0, 160, 144), LIGHT)
+	if slot_tex:
+		draw_texture_rect_region(slot_tex, Rect2(8, 24, 128, 24), Rect2(0, 0, 128, 24))
 	_str("COIN%4d" % main.player_coins, 8, 8)
 	if phase == "result" and win_sym != "":
 		_str("WIN%5d" % payout, 96, 8)
@@ -350,3 +354,11 @@ func _str(s: String, x0: float, y: float) -> void:
 			var src := Rect2((t % font_cols) * GLYPH, (t / font_cols) * GLYPH, GLYPH, GLYPH)
 			draw_texture_rect_region(font_tex, Rect2(x, y, GLYPH, GLYPH), src)
 		x += GLYPH
+
+
+func _asset_texture(rel: String) -> Texture2D:
+	var img := Image.new()
+	var path := ProjectSettings.globalize_path("res://assets/" + rel)
+	if img.load(path) != OK:
+		return null
+	return ImageTexture.create_from_image(img)

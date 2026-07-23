@@ -94,6 +94,11 @@
    "kind": "table"
   },
   {
+   "path": "data/prizes.json",
+   "schema": "prizes",
+   "kind": "table"
+  },
+  {
    "path": "data/hidden_items.json",
    "schema": "hidden_items",
    "kind": "table"

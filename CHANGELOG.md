@@ -10,6 +10,14 @@ milestones, `PATCH` bumps are fixes/polish. See `docs/roadmap.md` for the live p
 
 ### Added
 
+- **Pokémon Blue extraction/build option** (gh #26, ADR-029). `tools/extract.py
+  --version blue` and `pwsh tools/build.ps1 --version blue` now select pokered's
+  `_BLUE` conditionals for wild encounters, title mons/wordmark/intro mon, Oak-speech
+  default names, Game Corner prizes, slot graphics, credits, and the save jingle. The
+  emitted Project identifies itself as `kanto-blue`, while Red remains the default and
+  Red<->Blue Cable Club compatibility is preserved by keeping link identity scoped to
+  battle/mon-record data (`species`, `moves`, `types`).
+
 - **Studio data-editor presentation pass** (gh #61). Species, moves, items, and
   trainers no longer read as raw generated forms: fields group into curated section
   cards (presentation-only — the schema stays the field authority), required fields

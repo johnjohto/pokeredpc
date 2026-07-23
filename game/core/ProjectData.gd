@@ -258,6 +258,23 @@ static func _build_legacy() -> void:
 		marts[_bare(mref)] = _bare_upper_list(mrt[mref])
 	_legacy["marts.json"] = marts
 
+	var prizes_raw = _read_json(dir.path_join("data/prizes.json"))
+	var prizes_project: Array = prizes_raw if prizes_raw is Array else []
+	var prizes: Array = []
+	for counter in prizes_project:
+		var converted: Array = []
+		for p in counter:
+			var rec: Dictionary = {"name": p["name"], "cost": p["cost"]}
+			if p.has("mon"):
+				rec["mon"] = _bare(p["mon"])
+				rec["lv"] = p["lv"]
+			if p.has("tm"):
+				var item_key := _bare(p["tm"])
+				rec["tm"] = items[item_key]["name"] if items.has(item_key) else item_key
+			converted.append(rec)
+		prizes.append(converted)
+	_legacy["prizes.json"] = prizes
+
 	var hid: Dictionary = _read_json(dir.path_join("data/hidden_items.json"))
 	var hidden := {}
 	for mref in hid:
@@ -280,7 +297,7 @@ static func _build_legacy() -> void:
 	for name in ["audio.json", "sfx.json", "charmap.json", "credits.json",
 			"dungeon_maps.json", "map_music.json", "move_anims.json", "spinners.json",
 			"title_intro.json", "title_mons.json", "town_map.json", "trade_gfx.json",
-			"warp_rules.json", "sprites/index.json"]:
+			"version.json", "warp_rules.json", "sprites/index.json"]:
 		_legacy[name] = _read_json(dir.path_join("presentation").path_join(name))
 	var tsdir := DirAccess.open(dir.path_join("presentation/tilesets"))
 	if tsdir != null:

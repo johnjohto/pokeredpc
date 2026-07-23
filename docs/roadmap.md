@@ -2,6 +2,14 @@
 
 **Living document** — update the table when a milestone lands; add sub-tasks as discovered.
 
+**Landed 2026-07-23:** gh #26 adds Pokémon Blue as a build-time Project variant
+(`extract.py --version blue` / `build.ps1 --version blue`). The variant preprocessor now
+selects `_RED`/`_BLUE` conditionals for wild tables, title presentation, Oak-speech names,
+Game Corner prizes, slot graphics, credits, and the save jingle; Blue emits as
+`kanto-blue`. ADR-029 keeps Red↔Blue link sessions faithful by hashing only lockstep
+battle/mon-record parts (`species`, `moves`, `types`). Gates: Red and Blue extraction,
+`--schematest`, `--validate=res://project`, `--prizetest`, `--slottest`.
+
 **After 1.0 (direction):** **v1.1 = multiplayer** — the extended design conversation was **held
 2026-07-17** and its eight decisions are pinned in **ADR-014**: the faithful **Cable Club only**
 (link trades + link battles, trade evolutions included), trusted peers over direct connect,

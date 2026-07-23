@@ -66,6 +66,13 @@ This runs `tools/extract.py` (pokered → `game/assets/`) then a headless Godot 
 (re)generate `.import` files. **Note:** the headless import may exit with a Windows access
 violation on shutdown (`0xC0000005`) — this is harmless, the import still completes.
 
+Red is the default content variant. To extract Pokémon Blue's retail `_BLUE`
+conditionals instead:
+
+```powershell
+pwsh tools/build.ps1 --version blue
+```
+
 ## Run
 
 ```powershell
