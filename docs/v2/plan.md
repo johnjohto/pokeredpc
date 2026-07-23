@@ -399,8 +399,19 @@ the exact packaging mechanism waits until the v2 project and export formats are 
 
 Candidate demonstrations include widescreen/scalable presentation, modern input and accessibility
 options, multiple saves/autosave, richer battle animation, followers or visible encounters, enhanced
-weather/lighting, smoother map presentation, and additional creator/debug tooling. This list records
-possibilities, not commitments or v2 requirements.
+weather/lighting, smoother map presentation, and additional creator/debug tooling. Two classic
+player-facing modes belong in the same set:
+
+- **Nuzlocke** — a ruleset/profile option, not a fork: faint-is-death release (or permanent box),
+  first-encounter-per-map catch limits, and optional dupes/species clauses enforced by the engine
+  through the same ruleset-config seam (ADR-018) the faithful game already consults, with Studio
+  exposing the knobs per project.
+- **Randomizer** — a seeded content overlay over a complete project: shuffled wild encounters,
+  starters, static gifts/trades, items/TMs, and (optionally) trainer parties and learnsets,
+  generated as project data at export or profile-build time so the runtime itself stays faithful
+  and the seed is reproducible and shareable.
+
+This list records possibilities, not commitments or v2 requirements.
 
 The showcase is also distinct from Phase 7's deliberately different second sample: that sample proves
 the engine can support a game unlike Pokémon Red; modernized Kanto would instead prove that optional
