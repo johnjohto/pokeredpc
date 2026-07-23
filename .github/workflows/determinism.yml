@@ -62,6 +62,11 @@ jobs:
         # May exit non-zero on shutdown; harmless as long as the import completes.
         run: '"${{ matrix.godot_bin }}" --headless --editor --quit --path game || true'
 
+      - name: "Softlock lints (--validate, gh #57)"
+        # Exit code is the gate: 0 only when the extracted Kanto project has no
+        # unreviewed map/story softlock diagnostics.
+        run: '"${{ matrix.godot_bin }}" --headless --path game -- "--validate=res://project"'
+
       - name: "Suite A: battle determinism oracle (--battledettest)"
         # Judged by the [battledet] stream_md5 lines, not the exit code (headless
         # shutdown quirk) — they must equal the Windows baseline byte-for-byte.

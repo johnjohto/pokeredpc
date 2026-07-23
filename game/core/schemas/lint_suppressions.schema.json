@@ -1,0 +1,41 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "schema:lint_suppressions",
+ "$comment": "Reviewed ProjectLint warnings. Suppressions are exact rule+source pairs and require a durable human reason; errors are never suppressible.",
+ "type": "object",
+ "required": [
+  "suppressions"
+ ],
+ "properties": {
+  "suppressions": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "required": [
+     "rule",
+     "source",
+     "reason"
+    ],
+    "properties": {
+     "rule": {
+      "type": "string",
+      "minLength": 1
+     },
+     "source": {
+      "type": "string",
+      "minLength": 1
+     },
+     "reason": {
+      "type": "string",
+      "minLength": 1
+     }
+    },
+    "additionalProperties": false
+   }
+  },
+  "custom": {
+   "type": "object"
+  }
+ },
+ "additionalProperties": false
+}

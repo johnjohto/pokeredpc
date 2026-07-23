@@ -5603,6 +5603,7 @@ func _schematest() -> void:
 		"; ".join(PackedStringArray(tmx.get("errors", [])))) and ok
 	ok = preload("res://core/MapDocumentSmoke.gd").new().run() and ok
 	ok = preload("res://core/WorldDocumentSmoke.gd").new().run() and ok
+	ok = preload("res://core/ProjectLintSmoke.gd").new().run() and ok
 	var cases := [
 		["broken_unknown_field", "unknown field 'prise'"],
 		["broken_wrong_type", "expected integer"],
@@ -5984,23 +5985,31 @@ func _deep_diff(a, b, path: String) -> String:
 	return ""
 
 
-## gh #22: validate any project directory (res:// or an OS path) against the format.
+## gh #22 + gh #57: lint any project directory (res:// or an OS path) — schema/format
+## validation plus the map/story softlock lints, one diagnostic stream for CLI and CI.
 ## Run: `pwsh tools/run.ps1 --validate=<dir>`. Exit 0 only when the project is clean.
 func _validateproject(dir: String) -> void:
 	await get_tree().process_frame
-	var r: Dictionary = ProjectValidator.validate_project(dir)
-	for e in r["errors"]:
-		print("[validate] %s" % e)
-	print("[validate] %s — %d files, ids %s, %d errors" % [
-		"OK" if bool(r["ok"]) else "INVALID", int(r["files"]), str(r["ids"]),
-		(r["errors"] as Array).size()])
+	var r: Dictionary = ProjectLint.lint_project(dir)
+	for diagnostic in r["diagnostics"]:
+		if bool(diagnostic.get("suppressed", false)): continue
+		print("[lint] %s" % ProjectLint.format_line(diagnostic))
+	print("[validate] %s — %d errors, %d warnings, %d reviewed suppressions" % [
+		"OK" if bool(r["ok"]) else "INVALID", int(r["errors"]), int(r["warnings"]),
+		int(r["suppressed"])])
 	get_tree().quit(0 if bool(r["ok"]) else 1)
 
 
 func _validate_dir_arg(args) -> String:
-	for a in args:
-		if str(a).begins_with("--validate="):
-			return str(a).substr(11)
+	for i in args.size():
+		var a := str(args[i])
+		if a.begins_with("--validate="):
+			var value := a.substr(11)
+			# PowerShell mangles native args of the form `--validate=res://…` (or `C:/…`),
+			# splitting the value at the colon into a second token; reassemble it.
+			if i + 1 < args.size() and str(args[i + 1]).begins_with("/"):
+				value += ":" + str(args[i + 1])
+			return value
 	return ""
 
 

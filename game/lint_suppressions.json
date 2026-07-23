@@ -1,0 +1,109 @@
+{
+ "suppressions": [
+  {
+   "rule": "map.blocking_object",
+   "source": "map:GameCorner/object:SPRITE_ROCKET@9,5",
+   "reason": "gh #89: the ROCKET is the poster's door; the game_corner event records hide him once beaten"
+  },
+  {
+   "rule": "map.blocking_object",
+   "source": "map:SaffronCity/object:SPRITE_ROCKET@18,22",
+   "reason": "gh #79: ROCKET8 is Silph Co's door; the saffron visible records clear him on the Tower rescue"
+  },
+  {
+   "rule": "map.blocking_object",
+   "source": "map:SaffronCity/object:SPRITE_ROCKET@34,4",
+   "reason": "gh #79: ROCKET3 is Saffron Gym's door; the saffron records clear every grunt on Giovanni"
+  },
+  {
+   "rule": "map.blocking_object",
+   "source": "map:SaffronCity/object:SPRITE_ROCKET@7,6",
+   "reason": "a takeover ROCKET on Copycat's door; the saffron records clear every grunt on Giovanni"
+  },
+  {
+   "rule": "map.blocking_object",
+   "source": "map:SaffronCity/object:SPRITE_ROCKET@13,12",
+   "reason": "a takeover ROCKET on the Pidgey house door; cleared with the rest on Giovanni"
+  },
+  {
+   "rule": "map.blocking_object",
+   "source": "map:CeruleanCity/object:SPRITE_GUARD@27,12",
+   "reason": "GUARD2 blocks the trashed house until GOT_SS_TICKET (the cerulean guard-swap records)"
+  },
+  {
+   "rule": "map.blocking_object",
+   "source": "map:CeruleanCity/object:SPRITE_SUPER_NERD@4,12",
+   "reason": "gh #90: SUPER_NERD3 is Cerulean Cave's door; hidden once CHAMPION (cerulean_cave_guy_shown)"
+  },
+  {
+   "rule": "map.blocking_object",
+   "source": "map:MtMoonB2F/object:SPRITE_FOSSIL@12,6",
+   "reason": "a FOSSIL is the exit ladder's door: take either and MtMoonB2F.asm hides both"
+  },
+  {
+   "rule": "map.blocking_object",
+   "source": "map:MtMoonB2F/object:SPRITE_FOSSIL@13,6",
+   "reason": "the other FOSSIL of the same pair"
+  },
+  {
+   "rule": "map.blocking_object",
+   "source": "map:PokemonTower6F/object:SPRITE_POKE_BALL@6,8",
+   "reason": "the RARE CANDY ball is the passage's door — taking it is the key (faithful to pokered)"
+  },
+  {
+   "rule": "map.blocking_object",
+   "source": "map:Route12/object:SPRITE_SNORLAX@10,62",
+   "reason": "the SNORLAX *is* the road; the POKé FLUTE wakes it"
+  },
+  {
+   "rule": "event.blocker_unbacked",
+   "source": "map:Route12/object:SPRITE_SNORLAX@10,62",
+   "reason": "the POKé FLUTE battle is an engine map script, not a data event — it hides the SNORLAX (faithful to pokered)"
+  },
+  {
+   "rule": "map.blocking_object",
+   "source": "map:Route16/object:SPRITE_SNORLAX@26,10",
+   "reason": "the other SNORLAX, on the Cycling Road"
+  },
+  {
+   "rule": "event.blocker_unbacked",
+   "source": "map:Route16/object:SPRITE_SNORLAX@26,10",
+   "reason": "same engine map script as Route 12's SNORLAX — the POKé FLUTE battle hides it"
+  },
+  {
+   "rule": "map.blocking_object",
+   "source": "map:Route13/object:SPRITE_COOLTRAINER_M@12,4",
+   "reason": "a BIRD KEEPER (sight 2) faces RIGHT into the road, so he marches off his tile when spotted; the 12-cell pocket behind him is Route 13's west-edge seam with Route 14"
+  },
+  {
+   "rule": "map.blocking_object",
+   "source": "map:Route14/object:SPRITE_COOLTRAINER_M@15,6",
+   "reason": "a BIRD KEEPER (sight 2) faces DOWN into the road; the 4 cells behind him are a dead-end corridor you can only back out of — cross Route 13 at y=8 instead"
+  },
+  {
+   "rule": "map.blocking_object",
+   "source": "map:Route25/object:SPRITE_COOLTRAINER_M@24,4",
+   "reason": "a JR.TRAINER (sight 3) faces the road and marches when spotted; his pocket holds a ball"
+  },
+  {
+   "rule": "map.blocking_object",
+   "source": "map:SilphCo5F/object:SPRITE_ROCKET@28,4",
+   "reason": "the ROCKET is the CARD KEY corridor's east neck. You do not walk in — the 9F teleport pad lands you inside it, beside the ball at (21,16)"
+  },
+  {
+   "rule": "map.blocking_object",
+   "source": "map:VictoryRoad2F/object:SPRITE_BOULDER@5,5",
+   "reason": "a STRENGTH boulder; shoving it onto the floor switch is the puzzle"
+  },
+  {
+   "rule": "map.blocking_object",
+   "source": "map:VictoryRoad3F/object:SPRITE_BOULDER@24,10",
+   "reason": "the other STRENGTH boulder"
+  },
+  {
+   "rule": "map.blocking_object",
+   "source": "map:WardensHouse/object:SPRITE_BOULDER@8,4",
+   "reason": "the BOULDER is the RARE CANDY's door — STRENGTH shoves it aside (faithful to pokered)"
+  }
+ ]
+}

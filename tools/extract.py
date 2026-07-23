@@ -2591,6 +2591,12 @@ def build_project():
         for f in sorted(events_src.glob("*.json")):
             shutil.copyfile(f, PROJ / "data" / "events" / f.name)
 
+    # reviewed lint suppressions (ADR-027, gh #57): same authored-in-repo pattern as
+    # events — game/lint_suppressions.json is the tracked source, byte-copied in.
+    lint_src = ROOT / "game" / "lint_suppressions.json"
+    if lint_src.is_file():
+        shutil.copyfile(lint_src, PROJ / "data" / "lint_suppressions.json")
+
     # Format 2: native Tiled maps replace the interim project JSON copies. The legacy
     # files remain in game/assets as the parity oracle, not as project source.
     native_map_count, native_tileset_count = _emit_native_kanto()

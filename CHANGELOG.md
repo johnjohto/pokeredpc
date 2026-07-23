@@ -10,6 +10,19 @@ milestones, `PATCH` bumps are fixes/polish. See `docs/roadmap.md` for the live p
 
 ### Added
 
+- **Shared map/story softlock lints across Core, Studio, and CI** (gh #57, ADR-027).
+  `ProjectLint` wraps project validation and adds source-addressed diagnostics:
+  blocking objects that seal a warp/sign/item or split a map's useful regions,
+  event-backed door verification, NPC/spawn standability, original-map spawn
+  reachability, and object/event link mismatches. Warnings are review-required and
+  clear only through named, reasoned suppressions in `data/lint_suppressions.json`;
+  errors are never suppressible and stale suppressions warn. Studio's new Problems
+  panel lists the same stream and focuses the source map object or event on
+  selection. `--validate` prints one line per unreviewed diagnostic and exits
+  non-zero, and the determinism workflow gates on it. Clean Kanto lints at 0
+  errors / 0 warnings / 21 reviewed suppressions, and the Core smoke re-creates
+  the gh #79/#89/#90 softlocks by deleting their door-opening records.
+
 - **Studio now authors working NPC and trigger events** (gh #56, ADR-026). Events have a
   dedicated list/create workspace, schema-derived trigger and reference controls, and a
   complete command palette generated from the Event VM schema. Commands can be added,

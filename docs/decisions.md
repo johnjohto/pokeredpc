@@ -2,6 +2,38 @@
 
 Newest first. Each entry: context → decision → consequences.
 
+## ADR-027 — Softlock lints: one diagnostic stream, review-required warnings (2026-07-23)
+
+**Context:** v1 kept the map/story softlock checks in `tools/audit_chokepoints.py`, which
+reads the extracted `game/assets/` JSON — invisible to format-2 Studio projects and to
+the Core validator. gh #79/#89/#90 showed the failure shape: a door whose "opens" claim
+rests on an authored record nobody re-checks. Phase 5.6 (gh #57) needs the checks in
+Core so Studio, the CLI, and CI share them, plus a way to keep pokered's *intentional*
+gates (Snorlax, fossils, boulders) without weakening the gate.
+**Decision:** (1) `ProjectLint` is the single lint entry point: it wraps
+`ProjectValidator` errors and adds map/story rules as source-addressed diagnostics
+{rule, severity, message, source, suppressed, suppression_reason}; Studio's Problems
+panel, `--validate`, and the Core smoke all consume the same result. (2) Two severities.
+Errors (invalid schema, unstandable NPC/spawn, unreachable target on original maps,
+unbacked blockers on original maps, event/object link mismatches) are never
+suppressible. Warnings (`map.blocking_object`, legacy `event.blocker_unbacked`,
+`suppression.unused`) are review-required: an unsuppressed warning fails the gate, and
+the only way to clear one is a named entry in `data/lint_suppressions.json` with a
+human reason — v1's EXPECTED list, now data with a schema. Stale suppressions
+themselves warn. (3) Blockers the engine clears without authored events (item balls,
+STRENGTH boulders, sight-line trainers who march off their post) never require event
+backing; on imported maps the remaining unbacked STAY blockers (the POKé FLUTE's
+Snorlax, cleared by engine map scripts the data cannot see) downgrade to reviewable
+warnings. (4) Imported pokered maps are detected by the `_legacy_locked` marker on any
+record kind — not just NPCs — and opt out of original-map rules (default-spawn
+reachability), since faithful Kanto contains intentional warp/pad pockets.
+**Consequences:** A clean Kanto project lints at 0 errors / 0 warnings with 21 reviewed
+suppressions; deleting any of the four records behind gh #79/#89/#90 re-creates and
+identifies that blocker as an unsuppressed diagnostic (proved by `ProjectLintSmoke`).
+Studio shows the same stream in a Problems panel that focuses the source map object or
+event on selection, and `--validate` exits non-zero on any unreviewed diagnostic, which
+the determinism workflow gates on per release.
+
 ## ADR-026 — The event schema is Studio's command vocabulary (2026-07-22)
 
 **Context:** Phase 5.5 (gh #56) must expose every Event VM command, including recursive

@@ -57,6 +57,11 @@ project/
                          tables, the high-crit move list); absent keys fall back
                          to the ruleset's built-in faithful defaults
     world.json           format 2+ — cardinal map connections keyed by stable map id
+    lint_suppressions.json  table (ADR-027, gh #57) — reviewed ProjectLint warnings:
+                         exact rule+source pairs, each with a required human reason;
+                         errors are never suppressible and stale entries themselves warn.
+                         Authored in-repo (game/lint_suppressions.json), byte-copied in
+                         by the extractor — same pattern as events
   maps/<Label>.json      format 1 only — interim extracted map JSON (bare `name`)
   maps/<Label>.tmx       format 2+ — native Tiled map (ADR-021)
   tilesets/<name>.tsx    format 2+ — external Tiled atlas metadata

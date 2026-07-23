@@ -473,7 +473,23 @@ gates remain green; all 223 maps mount, Kanto validates 1,613 files with zero er
 the four battle-determinism hashes are unchanged. The final no-resume
 `--playthrough --seed=1 --ptwatchdog=120` cleared all 21 checkpoints and entered the Hall
 of Fame with a level-72 lead (`validate_gate.py`: **GATE GREEN**).
-Next: gh #57 — shared Core/Studio/CI map and story softlock lints.
+**Landed: gh #57** (2026-07-23, ADR-027): the v1 chokepoint audit is now a shared Core
+lint — `ProjectLint` wraps `ProjectValidator` and adds source-addressed map/story
+diagnostics (blocking objects sealing a warp/sign/item or a whole region, event-backed
+door verification, NPC/spawn standability, original-map spawn reachability, object/event
+link mismatches). Warnings are review-required and clear only through named, reasoned
+entries in the schema'd `data/lint_suppressions.json` (errors never suppress; stale
+entries warn); engine-cleared blockers (item balls, STRENGTH boulders, sight-line
+trainers) never need backing. Studio gained a **Problems panel** fed by the same stream
+— selecting a problem opens its map with the object selected, or its event workspace —
+and `--validate` prints one `[lint]` line per unreviewed diagnostic and gates CI
+(determinism workflow). Clean Kanto: 0 errors / 0 warnings / 21 reviewed suppressions;
+`ProjectLintSmoke` re-creates and identifies the gh #79/#89/#90 blockers by deleting
+their door-opening records. Gates: `--schematest` (incl. the new lint smoke) and
+`--studiotest` (incl. the Problems-panel smoke) ALL GREEN. One incidental fix:
+`_validate_dir_arg` now reassembles `--validate=res://…` values PowerShell splits at the
+colon.
+Next: gh #58 — original-map creator journey and the complete Phase 5 gate.
 **Landed: gh #34** (2026-07-20): Catch + Progression are behind the seam and the
 **config-first knobs are real** — `Gen1Catch` (`attempt` over the byte-exact kernel + the
 safari `bait_rate`/`rock_rate` transitions, which moved out of the host's input handler),

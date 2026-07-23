@@ -79,6 +79,11 @@
    "since_format": 2
   },
   {
+   "path": "data/lint_suppressions.json",
+   "schema": "lint_suppressions",
+   "kind": "table"
+  },
+  {
    "path": "data/text.json",
    "schema": "text",
    "kind": "table"

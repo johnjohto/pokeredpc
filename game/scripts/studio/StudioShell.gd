@@ -22,6 +22,9 @@ var project_dir := ""
 var _path_label: Label
 var _status: Label
 var _playtest_button: Button
+var _lint_button: Button
+var _problems_panel: PanelContainer
+var _problems: ItemList
 var _ui_scale_slider: HSlider
 var _ui_scale_label: Label
 var _sidebar: ItemList
@@ -114,6 +117,8 @@ func open_project(dir_path: String) -> String:
 	_clear_editor()
 	_save_recent(dir_path)
 	_playtest_button.disabled = false
+	_lint_button.disabled = false
+	call_deferred("refresh_problems")
 	_status.text = "project open — %s (%s)" % [
 		str(ProjectData.manifest.get("name", "?")), str(ProjectData.manifest.get("ruleset", "?"))]
 	return ""
@@ -150,6 +155,12 @@ func _build_ui() -> void:
 	_playtest_button.disabled = true
 	_playtest_button.pressed.connect(_on_playtest_pressed)
 	top.add_child(_playtest_button)
+	_lint_button = Button.new()
+	_lint_button.text = "Lint"
+	_lint_button.disabled = true
+	_lint_button.tooltip_text = "Run the map/story softlock lints into the Problems panel (gh #57)"
+	_lint_button.pressed.connect(refresh_problems)
+	top.add_child(_lint_button)
 	_path_label = Label.new()
 	_path_label.text = "(no project)"
 	_path_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -194,6 +205,19 @@ func _build_ui() -> void:
 	_editor_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_editor_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_editor_host.add_child(_editor_panel)
+	_problems_panel = PanelContainer.new()
+	_problems_panel.visible = false
+	root.add_child(_problems_panel)
+	var problems_box := VBoxContainer.new()
+	_problems_panel.add_child(problems_box)
+	var problems_title := Label.new()
+	problems_title.text = "PROBLEMS"
+	problems_title.add_theme_color_override("font_color", StudioTheme.MUTED)
+	problems_box.add_child(problems_title)
+	_problems = ItemList.new()
+	_problems.custom_minimum_size = Vector2(0, 140)
+	_problems.item_selected.connect(_on_problem_selected)
+	problems_box.add_child(_problems)
 	_status = Label.new()
 	_status.text = "open a project folder"
 	_status.add_theme_color_override("font_color", StudioTheme.MUTED)
@@ -530,6 +554,61 @@ func status_text() -> String:
 	return _status.text
 
 
+# ---- the gh #57 Problems panel -------------------------------------------------------
+
+## Run the shared Core softlock lints over the open project and fill the Problems
+## panel. The same ProjectLint result feeds `--validate` (CLI/CI) and the Core smoke,
+## so Studio, CI, and tests always agree on the diagnostic stream.
+func refresh_problems() -> void:
+	if project_dir == "" or _problems == null:
+		return
+	var report: Dictionary = ProjectLint.lint_project(project_dir)
+	_problems.clear()
+	for diagnostic in report.get("diagnostics", []):
+		var suppressed := bool(diagnostic.get("suppressed", false))
+		var severity := str(diagnostic.get("severity", "error"))
+		var text := ProjectLint.format_line(diagnostic)
+		if suppressed:
+			text += "  (reviewed: %s)" % str(diagnostic.get("suppression_reason", ""))
+		_problems.add_item(text)
+		var index := _problems.item_count - 1
+		_problems.set_item_metadata(index, diagnostic)
+		var color := StudioTheme.TEXT
+		if suppressed:
+			color = StudioTheme.MUTED
+		elif severity == "error":
+			color = StudioTheme.DANGER
+		_problems.set_item_custom_fg_color(index, color)
+	_problems_panel.visible = _problems.item_count > 0
+	_status.text = "lint %s — %d errors, %d warnings, %d reviewed suppressions" % [
+		"OK" if bool(report.get("ok", false)) else "ISSUES",
+		int(report.get("errors", 0)), int(report.get("warnings", 0)),
+		int(report.get("suppressed", 0))]
+
+
+func problems_control() -> ItemList:
+	return _problems
+
+
+## Selecting a problem focuses its source: a map object opens its map with the object
+## selected, a map cell opens its map, an event opens the event workspace.
+func _on_problem_selected(index: int) -> void:
+	var diagnostic: Dictionary = _problems.get_item_metadata(index)
+	var source: Dictionary = diagnostic.get("source", {})
+	match str(source.get("kind", "project")):
+		"map_object":
+			var workspace = edit_map(str(source.get("map", "")))
+			if workspace != null and not workspace.focus_object(
+					str(source.get("object_kind", "npc")), str(source.get("object", ""))):
+				_status.text = "problem source is gone from map/%s" % str(source.get("map", ""))
+		"map_cell":
+			edit_map(str(source.get("map", "")))
+		"event":
+			edit_event(str(source.get("event", "")))
+		_:
+			_status.text = str(diagnostic.get("message", ""))
+
+
 ## Public shell seam used by record selection and the Studio smoke suite. Returns the
 ## mounted SchemaForm, or null after a loud non-fatal refusal.
 func edit_record(content_type: String, basename: String):
@@ -811,6 +890,7 @@ func _studiotest() -> void:
 	ok = await preload("res://scripts/studio/StudioWorldAuthoringSmoke.gd").new().run(self, scratch) and ok
 	ok = await preload("res://scripts/studio/StudioEventAuthoringSmoke.gd").new().run(self, scratch) and ok
 	ok = await preload("res://scripts/studio/StudioPlaytestSmoke.gd").new().run(self, scratch) and ok
+	ok = preload("res://scripts/studio/StudioLintSmoke.gd").new().run(self, scratch) and ok
 	print("[studiotest] %s" % ("ALL GREEN" if ok else "FAIL"))
 	get_tree().quit(0 if ok else 1)
 

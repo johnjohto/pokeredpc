@@ -633,6 +633,20 @@ func object_controls() -> Dictionary:
 		"edit_event": _object_event_edit}
 
 
+## Problems-panel seam (gh #57): select an inspector object by kind + id, exactly as if
+## the creator had picked it from the object list. Returns false when it is not on the map.
+func focus_object(kind: String, object_id: String) -> bool:
+	if _object_list == null:
+		return false
+	for index in _object_list.item_count:
+		var metadata: Dictionary = _object_list.get_item_metadata(index)
+		if str(metadata.get("kind", "")) == kind and str(metadata.get("id", "")) == object_id:
+			_object_list.select(index)
+			_on_object_selected(index)
+			return true
+	return false
+
+
 ## Shell transaction seam: an event file is written first, then its map object is linked.
 ## If the TMX save fails the project has only an unreferenced event, never a dangling map link.
 func link_selected_event(event_id: String) -> String:
