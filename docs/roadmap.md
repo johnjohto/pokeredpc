@@ -504,6 +504,19 @@ plain tile fires only at the map edge (pokered's `ExtraWarpCheck` fn1, gh #80) �
 authored warp sits on JourneyTown's east edge. Explicit Tiled-origin fixture added
 (`core/fixtures/tiled_origin`) with Core round-trip checks in `MapDocumentSmoke`.
 Phase-5 ADRs (021, 023–027) reviewed and remain accurate; no new ADR.
+**Landed: gh #61** (2026-07-23): the schema-driven data editor gets the Phase-5
+presentation pass. Root fields group into curated section cards (`StudioFormLayout` —
+presentation-only; the schema stays the field authority and unlisted fields fall into
+"Other"), required fields carry a mint `*` marker beside muted optional labels, `$comment`
+becomes tooltips, invalid drafts get a danger border on the offending input next to the
+explaining label (no more hunt-the-red-text), and the record browser gains a filter box
+with an explicit "(no matches)" empty state. The theme family fills out: CheckBox,
+TextEdit, SpinBox, PopupMenu, scrollbars, and tooltips join the shared palette with
+visible focus rings; record titles take the display size. All gh #49/#50 contracts hold —
+field paths, per-path error labels, button seams, canonical saves — proven by the existing
+smokes plus `StudioPolishSmoke` (filter, section order per content type, markers, error
+mark/clear). New `--studio-shot=<file>` flag captures a windowed form for visual review;
+captures at 100% and 125% UI scale read cleanly at the 900×600 minimum's family.
 Next: Phase 6 (gh #20) — the sandboxed scripting hatch + ruleset config UI.
 **Landed: gh #34** (2026-07-20): Catch + Progression are behind the seam and the
 **config-first knobs are real** — `Gen1Catch` (`attempt` over the byte-exact kernel + the

@@ -10,6 +10,17 @@ milestones, `PATCH` bumps are fixes/polish. See `docs/roadmap.md` for the live p
 
 ### Added
 
+- **Studio data-editor presentation pass** (gh #61). Species, moves, items, and
+  trainers no longer read as raw generated forms: fields group into curated section
+  cards (presentation-only — the schema stays the field authority), required fields
+  carry a `*` marker beside muted optional labels, schema `$comment`s surface as
+  tooltips, and an invalid draft draws a danger border on the offending input beside
+  its error text. The record browser gains a filter box with an explicit empty state,
+  and the theme family now covers CheckBox, TextEdit, SpinBox, popup menus,
+  scrollbars, and tooltips with visible focus rings. All field-path, error-label,
+  widget, and canonical-save contracts from the schema-form engine are unchanged.
+  A `--studio-shot=<file>` flag captures a windowed form for visual review.
+
 - **The Phase-5 gate: a complete original-map creator journey in Studio** (gh #58).
   One automated flow, driven only through real Studio seams, creates an original 8x6
   map, paints art and collision, undoes/redoes and reverts, places a warp/NPC/sign,

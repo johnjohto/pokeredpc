@@ -18,6 +18,10 @@ var _array_remove_controls := {}
 var _optional_add_controls := {}
 var _optional_remove_controls := {}
 var _error_labels := {}
+var _field_labels := {}
+var _section_of_field := {}
+var _section_titles: Array[String] = []
+var _invalid_controls: Array[Control] = []
 var _current_errors: Array = []
 var _dirty := false
 
@@ -68,6 +72,35 @@ func is_dirty() -> bool:
 	return _dirty
 
 
+## gh #61 presentation seams: the curated section a root field renders under, and the
+## section titles in display order ("" / [] when the content type has no layout).
+func section_titles() -> Array[String]:
+	return _section_titles.duplicate()
+
+
+func section_for_field(path: String) -> String:
+	var segments := path.split("/", false)
+	if segments.is_empty():
+		return ""
+	return str(_section_of_field.get("/" + str(segments[0]), ""))
+
+
+func field_label(path: String) -> Label:
+	return _field_labels.get(path, null)
+
+
+## The required-field marker beside the label (gh #61); null for nested/ungenerated paths.
+func field_marker(path: String) -> Label:
+	var label: Label = _field_labels.get(path, null)
+	if label == null:
+		return null
+	var box := label.get_parent()
+	if box == null or not (box is HBoxContainer) or box.get_child_count() < 2 \
+			or not (box.get_child(1) is Label):
+		return null
+	return box.get_child(1)
+
+
 ## Validate before opening the file. Invalid drafts never reach CanonJSON, so refusal
 ## cannot truncate or otherwise disturb the last good bytes.
 func save_record(path: String) -> Array:
@@ -95,13 +128,49 @@ func _rebuild() -> void:
 	_optional_add_controls.clear()
 	_optional_remove_controls.clear()
 	_error_labels.clear()
+	_field_labels.clear()
+	_section_of_field.clear()
+	_section_titles.clear()
+	_invalid_controls.clear()
 	for child in get_children():
 		child.queue_free()
 	# Keep an explicit form-level target for schema/context failures that cannot be
 	# attached to a particular generated field.
 	_add_error_label(self, "")
-	_build_object(self, _schema, _draft, "")
+	var sections := StudioFormLayout.sections_for(_content_type, _schema.get("properties", {}))
+	if sections.is_empty():
+		_build_object(self, _schema, _draft, "")
+	else:
+		_build_root_sections(sections)
 	_validate_draft()
+
+
+## Root fields render as titled cards (gh #61). Only the grouping is curated; each
+## field still builds from its schema inside its card.
+func _build_root_sections(sections: Array) -> void:
+	var properties: Dictionary = _schema.get("properties", {})
+	for entry in sections:
+		var title := str(entry[0])
+		var fields: Array = entry[1]
+		_section_titles.append(title)
+		var card := PanelContainer.new()
+		card.add_theme_stylebox_override("panel", StudioTheme.card())
+		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		add_child(card)
+		var body := VBoxContainer.new()
+		card.add_child(body)
+		var header := Label.new()
+		header.text = title.to_upper()
+		header.add_theme_font_size_override("font_size", StudioTheme.FONT_SECTION)
+		header.add_theme_color_override("font_color", StudioTheme.MUTED)
+		body.add_child(header)
+		var subset := {}
+		for field in fields:
+			subset[field] = properties[field]
+		_build_object(body, {"properties": subset, "required": _schema.get("required", [])},
+			_draft, "")
+		for field in fields:
+			_section_of_field["/" + str(field)] = title
 
 
 func _build_object(parent: Control, schema: Dictionary, value: Dictionary, path: String) -> void:
@@ -110,23 +179,27 @@ func _build_object(parent: Control, schema: Dictionary, value: Dictionary, path:
 	for field in properties:
 		var field_schema: Dictionary = properties[field]
 		var field_path := path + "/" + str(field)
+		var is_required := required.has(field)
+		var comment := str(field_schema.get("$comment", ""))
 		if not value.has(field):
-			if required.has(field):
+			if is_required:
 				# A malformed record must remain repairable in Studio. Render the
 				# schema-shaped control without silently inserting data into the draft;
 				# its first edit creates the missing value.
 				_build_field(parent, str(field), field_schema,
-					_default_value(field_schema), field_path)
+					_default_value(field_schema), field_path, is_required)
 			else:
 				_build_missing_optional(parent, str(field), field_schema, field_path)
 			continue
-		_build_field(parent, str(field), field_schema, value[field], field_path)
-		if not required.has(field):
+		_build_field(parent, str(field), field_schema, value[field], field_path, is_required)
+		if not is_required:
 			var remove := Button.new()
 			remove.text = "Remove %s" % field
 			remove.pressed.connect(func() -> void: _remove_optional(field_path))
 			parent.add_child(remove)
 			_optional_remove_controls[field_path] = remove
+		if comment != "" and _field_labels.has(field_path):
+			(_field_labels[field_path] as Label).tooltip_text = comment
 
 
 func _build_missing_optional(parent: Control, field: String, schema: Dictionary,
@@ -135,8 +208,9 @@ func _build_missing_optional(parent: Control, field: String, schema: Dictionary,
 	parent.add_child(row)
 	var label := Label.new()
 	label.text = field + " (optional)"
-	label.custom_minimum_size.x = 120
+	label.custom_minimum_size.x = 160
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.add_theme_color_override("font_color", StudioTheme.MUTED)
 	row.add_child(label)
 	var add := Button.new()
 	add.text = "Add"
@@ -145,12 +219,13 @@ func _build_missing_optional(parent: Control, field: String, schema: Dictionary,
 	_optional_add_controls[path] = add
 
 
-func _build_field(parent: Control, field: String, schema: Dictionary, value, path: String) -> void:
+func _build_field(parent: Control, field: String, schema: Dictionary, value, path: String,
+		required := false) -> void:
 	if _widget_registry != null:
 		var custom: Control = _widget_registry.build(_content_type, path, schema, value,
 			func(next) -> void: _set_draft_value(path, next))
 		if custom != null:
-			_mount_input(parent, field, custom, path)
+			_mount_input(parent, field, custom, path, required)
 			return
 	var kind := str(schema.get("type", ""))
 	if kind == "object":
@@ -161,13 +236,16 @@ func _build_field(parent: Control, field: String, schema: Dictionary, value, pat
 			json_input.text_changed.connect(func() -> void:
 				var parsed = JSON.parse_string(json_input.text)
 				_set_draft_value(path, parsed if parsed is Dictionary else json_input.text))
-			_mount_input(parent, field, json_input, path)
+			_mount_input(parent, field, json_input, path, required)
 			return
 		var section := VBoxContainer.new()
 		parent.add_child(section)
 		var heading := Label.new()
 		heading.text = field
+		heading.add_theme_color_override("font_color",
+			StudioTheme.TEXT if required else StudioTheme.MUTED)
 		section.add_child(heading)
+		_field_labels[path] = heading
 		_add_error_label(section, path)
 		if value is Dictionary:
 			_build_object(section, schema, value, path)
@@ -178,7 +256,7 @@ func _build_field(parent: Control, field: String, schema: Dictionary, value, pat
 	var input := _make_input(schema, value, path)
 	if input == null:
 		return
-	_mount_input(parent, field, input, path)
+	_mount_input(parent, field, input, path, required)
 
 
 func _is_freeform_object(schema: Dictionary) -> bool:
@@ -186,15 +264,28 @@ func _is_freeform_object(schema: Dictionary) -> bool:
 		and schema.get("additionalProperties", true) != false
 
 
-func _mount_input(parent: Control, field: String, input: Control, path: String) -> void:
+func _mount_input(parent: Control, field: String, input: Control, path: String,
+		required := false) -> void:
 	var block := VBoxContainer.new()
 	parent.add_child(block)
 	var row := HBoxContainer.new()
 	block.add_child(row)
+	var label_box := HBoxContainer.new()
+	label_box.custom_minimum_size.x = 160
+	row.add_child(label_box)
 	var label := Label.new()
 	label.text = str(field)
-	label.custom_minimum_size.x = 120
-	row.add_child(label)
+	label.add_theme_color_override("font_color",
+		StudioTheme.TEXT if required else StudioTheme.MUTED)
+	label_box.add_child(label)
+	# Required marker: text explains, the mint tick locates (selection-glow rule from
+	# the visual-direction doc — a colour cue always pairs with a shape/text cue).
+	var marker := Label.new()
+	marker.text = "*"
+	marker.visible = required
+	marker.add_theme_color_override("font_color", StudioTheme.MINT)
+	label_box.add_child(marker)
+	_field_labels[path] = label
 	input.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(input)
 	_field_controls[path] = input
@@ -381,7 +472,7 @@ func _default_value(schema: Dictionary):
 
 func _add_error_label(parent: Control, path: String) -> void:
 	var error := Label.new()
-	error.modulate = Color(1.0, 0.35, 0.35)
+	error.modulate = StudioTheme.DANGER
 	error.visible = false
 	parent.add_child(error)
 	_error_labels[path] = error
@@ -435,6 +526,9 @@ func _validate_draft() -> Array:
 	for label in _error_labels.values():
 		(label as Label).text = ""
 		(label as Label).visible = false
+	for control in _invalid_controls:
+		_clear_invalid(control)
+	_invalid_controls.clear()
 	for error in _current_errors:
 		var message := str(error)
 		var split_at := message.find(" — ")
@@ -456,4 +550,20 @@ func _validate_draft() -> Array:
 			label.text += ("\n" if label.text != "" else "") + (
 				message.substr(split_at + 3) if split_at >= 0 else message)
 			label.visible = true
+			if _field_controls.has(target):
+				_mark_invalid(_field_controls[target])
 	return _current_errors.duplicate()
+
+
+## The error label explains; the danger border on the offending input locates (gh #61).
+func _mark_invalid(control: Control) -> void:
+	var target: Control = control
+	if control is SpinBox:
+		target = (control as SpinBox).get_line_edit()
+	if target.has_method("add_theme_stylebox_override"):
+		target.add_theme_stylebox_override("normal", StudioTheme.error_box())
+		_invalid_controls.append(target)
+
+
+func _clear_invalid(control: Control) -> void:
+	control.remove_theme_stylebox_override("normal")

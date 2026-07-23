@@ -29,6 +29,7 @@ var _ui_scale_slider: HSlider
 var _ui_scale_label: Label
 var _sidebar: ItemList
 var _records: ItemList
+var _records_filter: LineEdit
 var _new_map_button: Button
 var _editor_host: ScrollContainer
 var _editor_panel: VBoxContainer
@@ -66,6 +67,10 @@ func _ready() -> void:
 		_records.add_item("TestTown")
 		_records.select(0)
 		preview_map("res://core/fixtures/valid_tmx", "TestTown")
+		return
+	var shot := _shot_arg()
+	if shot != "":
+		_studio_shot(shot)
 		return
 	var want := _project_arg()
 	if want != "":
@@ -118,6 +123,8 @@ func open_project(dir_path: String) -> String:
 	_save_recent(dir_path)
 	_playtest_button.disabled = false
 	_lint_button.disabled = false
+	_records_filter.editable = true
+	_records_filter.text = ""
 	call_deferred("refresh_problems")
 	_status.text = "project open — %s (%s)" % [
 		str(ProjectData.manifest.get("name", "?")), str(ProjectData.manifest.get("ruleset", "?"))]
@@ -192,6 +199,12 @@ func _build_ui() -> void:
 	_new_map_button.disabled = true
 	_new_map_button.pressed.connect(_show_new_map_dialog)
 	records_column.add_child(_new_map_button)
+	_records_filter = LineEdit.new()
+	_records_filter.placeholder_text = "Filter records…"
+	_records_filter.clear_button_enabled = true
+	_records_filter.editable = false
+	_records_filter.text_changed.connect(_refresh_record_list)
+	records_column.add_child(_records_filter)
 	_records = ItemList.new()
 	_records.custom_minimum_size = Vector2(190, 0)
 	_records.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -249,10 +262,36 @@ func _on_type_selected(idx: int) -> void:
 	_new_map_button.disabled = _active_kind not in ["maps", "events"] \
 		or int(ProjectData.manifest.get("format", 1)) < 2
 	_new_map_button.text = "New event…" if _active_kind == "events" else "New map…"
-	_records.clear()
-	for n in _record_names[_active_kind]:
-		_records.add_item(str(n))
+	# A filter from another content type reads as a spurious "(no matches)" (gh #61).
+	if _records_filter != null:
+		_records_filter.text = ""
+	_refresh_record_list()
 	_clear_editor()
+
+
+## Repopulate the record list under the current filter (gh #61). A no-match filter gets
+## an explicit disabled empty state rather than a silently blank list.
+func _refresh_record_list(_unused := "") -> void:
+	if _records == null or _active_kind == "":
+		return
+	var selected_name := ""
+	if _records.get_selected_items().size() > 0:
+		selected_name = _records.get_item_text(_records.get_selected_items()[0])
+	var query := _records_filter.text.strip_edges().to_lower() if _records_filter != null else ""
+	_records.clear()
+	var reselect := -1
+	for n in _record_names.get(_active_kind, []):
+		if query != "" and not str(n).to_lower().contains(query):
+			continue
+		_records.add_item(str(n))
+		if str(n) == selected_name:
+			reselect = _records.item_count - 1
+	if _records.item_count == 0 and query != "":
+		_records.add_item("(no matches)")
+		_records.set_item_disabled(0, true)
+		_records.set_item_selectable(0, false)
+	elif reselect >= 0:
+		_records.select(reselect)
 
 
 func _build_new_map_dialog() -> void:
@@ -402,9 +441,10 @@ func active_event_workspace():
 
 
 func _on_record_selected(idx: int) -> void:
-	if _active_kind == "" or idx < 0 or idx >= (_record_names[_active_kind] as Array).size():
+	if _active_kind == "" or idx < 0 or idx >= _records.item_count:
 		return
-	var basename := str((_record_names[_active_kind] as Array)[idx])
+	# The list may be filtered (gh #61), so address records by text, never by index.
+	var basename := _records.get_item_text(idx)
 	if _active_kind == "maps":
 		edit_map(basename)
 	elif _active_kind == "events":
@@ -627,6 +667,7 @@ func edit_record(content_type: String, basename: String):
 	_clear_editor()
 	var title := Label.new()
 	title.text = "%s / %s" % [content_type, basename]
+	title.add_theme_font_size_override("font_size", StudioTheme.FONT_TITLE)
 	_editor_panel.add_child(title)
 	var actions := HBoxContainer.new()
 	_editor_panel.add_child(actions)
@@ -669,6 +710,14 @@ func _clear_editor() -> void:
 
 func playtest_control() -> Button:
 	return _playtest_button
+
+
+func records_control() -> ItemList:
+	return _records
+
+
+func records_filter_control() -> LineEdit:
+	return _records_filter
 
 
 func ui_scale_control() -> HSlider:
@@ -774,6 +823,32 @@ func _project_arg() -> String:
 	for a in OS.get_cmdline_user_args():
 		if str(a).begins_with("--studio-project="):
 			return str(a).substr(17)
+	return ""
+
+
+## gh #61: windowed visual capture for docs/review (`--studio-shot=<file>` with
+## `--studio-project=<dir>`). Mounts the species form of the first record and saves the
+## window. Not a gate — headless viewport readback is empty, so this is windowed-only.
+func _studio_shot(path: String) -> void:
+	var err := open_project(_project_arg())
+	if err != "":
+		print("[studio-shot] REFUSED: " + err)
+		get_tree().quit(1)
+		return
+	var names: Array = _record_names.get("species", [])
+	if not names.is_empty():
+		edit_record("species", str(names[0]))
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var save_error: int = get_viewport().get_texture().get_image().save_png(path)
+	print("[studio-shot] %s -> %s" % ["OK" if save_error == OK else "FAIL", path])
+	get_tree().quit(0 if save_error == OK else 1)
+
+
+func _shot_arg() -> String:
+	for a in OS.get_cmdline_user_args():
+		if str(a).begins_with("--studio-shot="):
+			return str(a).substr(14)
 	return ""
 
 
@@ -892,6 +967,7 @@ func _studiotest() -> void:
 	ok = await preload("res://scripts/studio/StudioCreatorJourneySmoke.gd").new().run(self, scratch) and ok
 	ok = await preload("res://scripts/studio/StudioPlaytestSmoke.gd").new().run(self, scratch) and ok
 	ok = preload("res://scripts/studio/StudioLintSmoke.gd").new().run(self, scratch) and ok
+	ok = preload("res://scripts/studio/StudioPolishSmoke.gd").new().run(self, scratch) and ok
 	print("[studiotest] %s" % ("ALL GREEN" if ok else "FAIL"))
 	get_tree().quit(0 if ok else 1)
 

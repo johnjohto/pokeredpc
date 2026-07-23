@@ -16,6 +16,9 @@ const CYAN := Color(0.12, 0.77, 0.93, 1.0)
 const MAGENTA := Color(0.86, 0.29, 0.94, 1.0)
 const DANGER := Color(0.95, 0.34, 0.31, 1.0)
 
+const FONT_TITLE := 17
+const FONT_SECTION := 13
+
 
 static func build() -> Theme:
 	var theme := Theme.new()
@@ -57,7 +60,39 @@ static func build() -> Theme:
 	theme.set_stylebox("grabber_area", "HSplitContainer", _box(WINDOW, 0, 0, BORDER, 0))
 	theme.set_constant("separation", "HSplitContainer", 8)
 	theme.set_constant("minimum_grab_thickness", "HSplitContainer", 8)
+	# gh #61: the form-engine control family — same surfaces/borders, explicit focus.
+	theme.set_color("font_color", "CheckBox", TEXT)
+	theme.set_stylebox("focus", "CheckBox", _outline(CYAN, 6, 2))
+	theme.set_color("font_color", "TextEdit", TEXT)
+	theme.set_color("caret_color", "TextEdit", MINT)
+	theme.set_stylebox("normal", "TextEdit", _box(SURFACE, 7, 1, BORDER, 7))
+	theme.set_stylebox("focus", "TextEdit", _box(SURFACE, 7, 2, CYAN, 7))
+	theme.set_stylebox("normal", "SpinBox", _box(SURFACE, 7, 1, BORDER, 7))
+	theme.set_stylebox("focus", "SpinBox", _box(SURFACE, 7, 2, CYAN, 7))
+	theme.set_color("font_color", "PopupMenu", TEXT)
+	theme.set_color("font_hover_color", "PopupMenu", Color.WHITE)
+	theme.set_stylebox("panel", "PopupMenu", _box(SURFACE_RAISED, 8, 1, BORDER, 8))
+	theme.set_stylebox("hover", "PopupMenu", _box(SURFACE_HOVER, 6, 1, CYAN, 6))
+	for bar in ["VScrollBar", "HScrollBar"]:
+		theme.set_stylebox("scroll", bar, _box(SURFACE, 6, 0, BORDER, 2))
+		theme.set_stylebox("grabber", bar, _box(SURFACE_HOVER, 6, 0, BORDER, 2))
+		theme.set_stylebox("grabber_highlight", bar, _box(SURFACE_HOVER.lightened(0.12), 6, 0, BORDER, 2))
+		theme.set_stylebox("grabber_pressed", bar, _box(SURFACE_HOVER, 6, 1, CYAN, 2))
+	theme.set_stylebox("panel", "TooltipPanel", _box(SURFACE_RAISED, 6, 1, BORDER, 6))
+	theme.set_color("font_color", "TooltipLabel", TEXT)
 	return theme
+
+
+## Card behind one form section (gh #61). A consumer-level override so generated
+## section containers and the theme's plain panels can differ without a type fork.
+static func card() -> StyleBoxFlat:
+	return _box(SURFACE, 10, 1, BORDER, 12)
+
+
+## Danger-bordered input stylebox a form applies to the invalid field's control
+## (gh #61) — the error text explains, the border locates.
+static func error_box() -> StyleBoxFlat:
+	return _box(SURFACE, 7, 2, DANGER, 7)
 
 
 static func _box(color: Color, radius: int, border_width: int,
