@@ -10,6 +10,14 @@ milestones, `PATCH` bumps are fixes/polish. See `docs/roadmap.md` for the live p
 
 ### Added
 
+- **HatchScript Core language** (gh #64, ADR-028). The sandboxed Phase-6 DSL now
+  supports locals and assignment, if/else, bounded while loops, return values,
+  integer-exact FormulaExpr-compatible arithmetic, strings/booleans, and only
+  explicitly registered host calls. Parse and runtime failures report line/column
+  positions, runaway loops stop at a deterministic step budget, and parsed scripts
+  can be reused safely across runs. `--exprtest` carries the Core semantics,
+  sandbox-refusal, budget, and determinism smoke.
+
 - **Pokémon Blue extraction/build option** (gh #26, ADR-029). `tools/extract.py
   --version blue` and `pwsh tools/build.ps1 --version blue` now select pokered's
   `_BLUE` conditionals for wild encounters, title mons/wordmark/intro mon, Oak-speech

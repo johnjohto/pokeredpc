@@ -2,6 +2,15 @@
 
 **Living document** — update the table when a milestone lands; add sub-tasks as discovered.
 
+**Landed 2026-07-23:** gh #64 implements the HatchScript Core from ADR-028: a
+statement-level FormulaExpr descendant with locals/assignment, if/else, bounded while,
+return, integer-exact arithmetic, strings/booleans, and explicitly registered host calls
+as its only capability surface. Parser and runtime failures report one-based line/column
+positions; a step budget terminates runaway loops; successfully parsed scripts are
+reusable after runtime errors. The `--exprtest` Core smoke covers semantics, FormulaExpr
+builtin compatibility, sandbox refusal probes, positioned diagnostics, budget
+termination, and repeated-run determinism. Language contract: `docs/v2/hatch-script.md`.
+
 **Landed 2026-07-23:** gh #26 adds Pokémon Blue as a build-time Project variant
 (`extract.py --version blue` / `build.ps1 --version blue`). The variant preprocessor now
 selects `_RED`/`_BLUE` conditionals for wild tables, title presentation, Oak-speech names,

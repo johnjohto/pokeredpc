@@ -5803,6 +5803,7 @@ func _exprtest() -> void:
 							mism += 1
 	ok = _ex_check("damage_core sweep (%d vectors, incl. the /4 overflow branch)" % checked,
 		mism == 0, "%d mismatches" % mism) and ok
+	ok = preload("res://core/ruleset/HatchScriptSmoke.gd").new().run() and ok
 	print("[expr] %s" % ("ALL GREEN" if ok else "FAIL"))
 	get_tree().quit(0 if ok else 1)
 
