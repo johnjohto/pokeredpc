@@ -1,0 +1,27 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "schema:script",
+ "$comment": "A sandboxed HatchScript source record (ADR-028, gh #64/#65). The runtime parses every project script at boot and refuses positioned syntax errors before any event can fire. External capabilities are supplied only by the host context; event scripts receive the curated EventVM API.",
+ "type": "object",
+ "required": [
+  "id",
+  "source"
+ ],
+ "properties": {
+  "$comment": {
+   "type": "string"
+  },
+  "id": {
+   "type": "string",
+   "pattern": "^script:[a-z0-9_]+$"
+  },
+  "source": {
+   "type": "string",
+   "minLength": 1
+  },
+  "custom": {
+   "type": "object"
+  }
+ },
+ "additionalProperties": false
+}

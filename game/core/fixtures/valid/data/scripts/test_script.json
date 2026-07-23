@@ -1,0 +1,4 @@
+{
+ "id": "script:test_script",
+ "source": "set_flag(\"TEST_SCRIPT_RAN\")\nreturn true"
+}

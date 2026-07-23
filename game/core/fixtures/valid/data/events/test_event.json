@@ -23,6 +23,11 @@
      "key": "get_item1"
     },
     {
+     "cmd": "run_script",
+     "script": "script:test_script",
+     "result": "test_script_ok"
+    },
+    {
      "cmd": "set_flag",
      "flag": "TEST_FLAG"
     }

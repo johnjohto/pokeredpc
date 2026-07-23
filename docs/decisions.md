@@ -48,7 +48,11 @@ formula, custom puzzle, no engine code). Whole-module swap authored in the DSL (
 §4.2 spectrum's far end) waits for a second sample to demand it, per the
 no-speculative-generality rule. (3) The curated API is the EventVM command library +
 flags/vars + read-only state queries — never engine internals; scripted battle math
-must preserve byte-identical replay streams (the determinism gate).
+must preserve byte-identical replay streams (the determinism gate). (4) Event scripts
+receive stable wrappers over the generic command subset; wrappers enqueue ordinary VM
+commands so existing await/abort semantics remain authoritative. Durable script variables
+carry additive scalar type tags in saves because JSON number parsing must not change
+HatchScript's integer-exact arithmetic after reload.
 **Consequences:** the toolkit grows ~1–2k lines of owned language (parser, evaluator,
 docs, Studio script field) instead of an external dependency; the §8 fork closes;
 sandbox escape tests are bounded because the grammar has no escape surface to probe.

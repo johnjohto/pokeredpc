@@ -1348,6 +1348,27 @@
       "type": "object",
       "required": [
        "cmd",
+       "script"
+      ],
+      "properties": {
+       "cmd": {
+        "const": "run_script"
+       },
+       "script": {
+        "type": "string",
+        "x-ref": "script"
+       },
+       "result": {
+        "type": "string",
+        "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+       }
+      },
+      "additionalProperties": false
+     },
+     {
+      "type": "object",
+      "required": [
+       "cmd",
        "floors"
       ],
       "properties": {

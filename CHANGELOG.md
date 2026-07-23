@@ -10,6 +10,17 @@ milestones, `PATCH` bumps are fixes/polish. See `docs/roadmap.md` for the live p
 
 ### Added
 
+- **HatchScript event integration** (gh #65, ADR-028). Projects can store validated
+  `data/scripts/*.json` sources and invoke them from the schema-derived event palette
+  with `run_script`. Scripts receive transactional story flag/variable operations,
+  read-only party/bag/map/currency/badge queries, and stable wrappers over the generic
+  EventVM command subset; queued commands retain the VM's existing await/abort behavior.
+  A scalar return can feed the next ordinary event branch, and additive save type tags
+  preserve integer-exact variables across reloads. Bad records/source/references, runtime
+  failures, and missing requested returns refuse explicitly. The Event VM smoke covers
+  the puzzle, command queue, and rollback paths, and the Studio gate saves/reopens the
+  event + script before observing its branch marker in a separate Engine child.
+
 - **HatchScript Core language** (gh #64, ADR-028). The sandboxed Phase-6 DSL now
   supports locals and assignment, if/else, bounded while loops, return values,
   integer-exact FormulaExpr-compatible arithmetic, strings/booleans, and only

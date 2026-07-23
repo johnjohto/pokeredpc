@@ -59,6 +59,12 @@
    "id_prefix": "event"
   },
   {
+   "path": "data/scripts/*.json",
+   "schema": "script",
+   "kind": "record",
+   "id_prefix": "script"
+  },
+  {
    "path": "data/types.json",
    "schema": "types",
    "kind": "table",

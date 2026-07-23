@@ -2737,6 +2737,14 @@ def build_project():
         for f in sorted(events_src.glob("*.json")):
             shutil.copyfile(f, PROJ / "data" / "events" / f.name)
 
+    # HatchScript sources are authored project records too (ADR-028, gh #65), kept
+    # separate from engine GDScript and copied byte-for-byte like authored events.
+    scripts_src = ROOT / "game" / "hatch_scripts"
+    if scripts_src.is_dir():
+        (PROJ / "data" / "scripts").mkdir(parents=True, exist_ok=True)
+        for f in sorted(scripts_src.glob("*.json")):
+            shutil.copyfile(f, PROJ / "data" / "scripts" / f.name)
+
     # reviewed lint suppressions (ADR-027, gh #57): same authored-in-repo pattern as
     # events — game/lint_suppressions.json is the tracked source, byte-copied in.
     lint_src = ROOT / "game" / "lint_suppressions.json"
@@ -2786,6 +2794,8 @@ def build_project():
             continue
         if rel.startswith("data/events/"):
             g = "events"
+        elif rel.startswith("data/scripts/"):
+            g = "scripts"
         elif rel.startswith("data/species/"):
             g = "species"
         elif rel.startswith("data/moves/"):

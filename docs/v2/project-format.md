@@ -51,6 +51,14 @@ project/
                          trigger-kind and command enums grow wave by wave with the
                          beats that demand them; the runtime VM refuses at boot any
                          record it cannot execute (see event.schema.json)
+    scripts/<key>.json   one record per file  (id: "script:<key>") — sandboxed
+                         HatchScript source (ADR-028, gh #64/#65). Every record is
+                         parsed at Project validation and Engine boot; syntax errors
+                         refuse with source line/column. An event's `run_script`
+                         command references one record and may store its scalar return
+                         in a saved event variable for an ordinary `if` branch. Event
+                         scripts receive only the documented curated API; they cannot
+                         access engine objects, IO, time, network, or ambient random.
     ruleset.json         table — the ruleset config record (ADR-018 §4, gh #34):
                          {base, config} — base must match the manifest's ruleset;
                          config carries ONLY knobs that were already data (badge
@@ -126,6 +134,15 @@ map-object and cell/region semantic checks used by whole-project validation. A n
 leaves source bytes alone; an actual edit writes canonical JSON. Creating an event from an
 authored NPC or trigger writes that valid record before adding its `pokeredpc:event` TMX
 link, so an interrupted two-file operation cannot leave a dangling reference.
+
+`run_script` is an ordinary schema-derived event command (ADR-028, gh #65). Its `script`
+field is a checked `script:` reference, and its optional `result` names a saved event
+variable. EventVM precompiles every `data/scripts/` record before indexing events, executes
+scripts with only the curated API in [hatch-script.md](hatch-script.md), and lets the
+script enqueue the stable generic EventVM command subset. The VM awaits those ordinary
+commands after a successful script return, retaining their normal asynchronous and refusal
+behavior; game-specific native beats and battle launchers remain unavailable. Script
+flag/variable writes roll back when script execution refuses.
 
 For format 2, `ProjectData.map_json(label)` opens `MapDocument` and returns its normalized
 runtime adapter: 16×16 tile/collision/semantic rows, typed object arrays, authored spawn,

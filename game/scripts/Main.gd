@@ -408,7 +408,7 @@ func _ready() -> void:
 	# the refuse-newer pattern applied to event semantics.
 	event_vm = EventVM.new()
 	event_vm.main = self
-	var everr := event_vm.load_all(ProjectData.events())
+	var everr := event_vm.load_all(ProjectData.events(), ProjectData.scripts())
 	if everr != "":
 		push_error("[events] " + everr)
 		print("[events] FATAL: " + everr)
@@ -666,7 +666,8 @@ func _ready() -> void:
 			# ProjectData returns fresh records; compile this fresh instance exactly as boot
 			# compiled its own indexed copy before asking the same VM to execute it.
 			var probe_record: Dictionary = probe_events[event_probe_id]
-			var probe_compile_error := event_vm.load_all({event_probe_id: probe_record})
+			var probe_compile_error := event_vm.load_all(
+				{event_probe_id: probe_record}, ProjectData.scripts())
 			if probe_compile_error != "":
 				event_probe_ok = false
 				event_probe_error = probe_compile_error
@@ -1178,6 +1179,8 @@ func save_game() -> bool:
 		"options": options,
 		"link_addr": link_last_addr,   # additive (gh #5): a 1.0 save loads unchanged
 		"event_vars": event_vars,      # additive (gh #39, ADR-019 §5): the Event VM's vars
+		# JSON preserves bool/string but not HatchScript's int/float distinction.
+		"event_var_types": _event_var_types(event_vars),
 	}
 	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if f == null:
@@ -1185,6 +1188,34 @@ func save_game() -> bool:
 	f.store_string(JSON.stringify(data, "\t"))   # indented: the save stays human-readable (gh #45)
 	f.close()
 	return true
+
+
+func _event_var_types(values: Dictionary) -> Dictionary:
+	var tags := {}
+	for key in values:
+		match typeof(values[key]):
+			TYPE_INT: tags[str(key)] = "int"
+			TYPE_FLOAT: tags[str(key)] = "float"
+			TYPE_BOOL: tags[str(key)] = "bool"
+			TYPE_STRING: tags[str(key)] = "string"
+	return tags
+
+
+func _restore_event_vars(values_v, tags_v) -> Dictionary:
+	var values: Dictionary = values_v if values_v is Dictionary else {}
+	var tags: Dictionary = tags_v if tags_v is Dictionary else {}
+	for key in values.keys():
+		match str(tags.get(str(key), "")):
+			"int": values[key] = int(values[key])
+			"float": values[key] = float(values[key])
+			"bool": values[key] = bool(values[key])
+			"string": values[key] = str(values[key])
+			_:
+				# Before gh #65 every schema-authored event variable was an integer.
+				# Untagged legacy JSON numbers therefore migrate back to int.
+				if values[key] is float:
+					values[key] = int(values[key])
+	return values
 
 
 ## Restore game state from the save slot (and load that map at the saved position).
@@ -1239,7 +1270,8 @@ func load_game() -> bool:
 	last_outside_map = str(data["last_outside_map"])
 	respawn_map = str(data.get("respawn_map", "PalletTown"))
 	story_events = data.get("events", {})
-	event_vars = data.get("event_vars", {})
+	event_vars = _restore_event_vars(
+		data.get("event_vars", {}), data.get("event_var_types", {}))
 	player_name = str(data.get("player_name", "RED"))
 	player_id = int(data.get("player_id", 0))
 	var op: Dictionary = data.get("options", {})
@@ -5589,11 +5621,11 @@ func _schematest() -> void:
 	ok = _schema_check("valid: no errors", (r["errors"] as Array).is_empty() and bool(r["ok"]),
 		"; ".join(PackedStringArray(r["errors"]))) and ok
 	var ids: Dictionary = r["ids"]
-	ok = _schema_check("valid: ids registered (2 species, 1 move, 2 items, 1 trainer, 1 map, 2 types, 1 event)",
+	ok = _schema_check("valid: ids registered (2 species, 1 move, 2 items, 1 trainer, 1 map, 2 types, 1 event, 1 script)",
 		int(ids.get("species", 0)) == 2 and int(ids.get("move", 0)) == 1
 		and int(ids.get("item", 0)) == 2 and int(ids.get("trainer", 0)) == 1
 		and int(ids.get("map", 0)) == 1 and int(ids.get("type", 0)) == 2
-		and int(ids.get("event", 0)) == 1,
+		and int(ids.get("event", 0)) == 1 and int(ids.get("script", 0)) == 1,
 		str(ids)) and ok
 	var tmx: Dictionary = ProjectValidator.validate_project("res://core/fixtures/valid_tmx")
 	ok = _schema_check("format 2: native TMX project validates and registers map/event ids",
@@ -5601,6 +5633,14 @@ func _schematest() -> void:
 		and int((tmx.get("ids", {}) as Dictionary).get("map", 0)) == 1
 		and int((tmx.get("ids", {}) as Dictionary).get("event", 0)) == 1,
 		"; ".join(PackedStringArray(tmx.get("errors", [])))) and ok
+	var script_context := ProjectValidator.editor_context(
+		"res://core/fixtures/valid", "scripts")
+	var bad_script_errors := ProjectValidator.validate_script_editor_record("broken", {
+		"id": "script:broken", "source": "let value =\nreturn value"}, script_context)
+	ok = _schema_check("script draft: syntax refusal names source line/column",
+		bad_script_errors.size() == 1 and str(bad_script_errors[0]).contains("/source")
+		and str(bad_script_errors[0]).contains("line 2, column 1"),
+		"; ".join(PackedStringArray(bad_script_errors))) and ok
 	ok = preload("res://core/MapDocumentSmoke.gd").new().run() and ok
 	ok = preload("res://core/WorldDocumentSmoke.gd").new().run() and ok
 	ok = preload("res://core/ProjectLintSmoke.gd").new().run() and ok
@@ -9394,13 +9434,24 @@ func _savetest() -> void:
 	defeated_trainers["map:1,1"] = true
 	player_party[0]["hp"] = 3
 	player_party[0]["level"] = 17
+	event_vars = {
+		"script_int": 3, "script_float": 3.5,
+		"script_bool": true, "script_string": "three"}
 	print("[savetest] saved=%s" % save_game())
 	player_money = 0; player_bag = {}; defeated_trainers = {}
+	event_vars = {}
 	player_party = [make_mon("rattata", 2, [])]
 	var ok := load_game()
 	print("[savetest] loaded=%s money=%d potions=%d party0=%s L%d hp=%d defeated=%s" % [
 		ok, player_money, int(player_bag.get("POTION", 0)), player_party[0]["name"],
 		int(player_party[0]["level"]), int(player_party[0]["hp"]), defeated_trainers.has("map:1,1")])
+	var persisted_int := HatchScript.parse("return value / 2")
+	var persisted_result = persisted_int.run({"value": event_vars.get("script_int")})
+	print("[savetest] HatchScript event-var scalar types survive reload=%s" % (
+		persisted_result is int and persisted_result == 1
+		and event_vars.get("script_float") is float
+		and event_vars.get("script_bool") is bool
+		and event_vars.get("script_string") is String))
 	# Overworld poison tick (every 4 steps -> -1 HP).
 	var pm := make_mon("charmander", 50, [])
 	pm["status"] = "psn"
@@ -15778,6 +15829,97 @@ func _eventtest() -> void:
 	await _drive_until(func() -> bool: return has_event("EVT_CASE_FULL"), 200)
 	ok = _ev_check("wave C coins condition: the full case took the guard branch",
 		has_event("EVT_CASE_FULL") and player_coins == 9999) and ok
+
+	# 16 — Phase 6 event hatch (gh #65): a project script runs only through the
+	# curated event API, returns into the saved vars store, and the next ordinary
+	# EventVM branch observes that result. Bad source and dangling script refs refuse
+	# at load, before the event can fire.
+	var vm3 := EventVM.new()
+	vm3.main = self
+	var puzzle_source := """let code = 2 * 100 + 4 * 10 + 1
+set_var("dial", code)
+if get_var("dial") == 241 and map_id() == "PuzzleRoom" and item_count("item:potion") == 3 and party_count() == 1 and party_has("species:bulbasaur") {
+  set_flag("SCRIPT_PUZZLE_SOLVED")
+  give_item("item:potion", 2)
+  return true
+}
+return false"""
+	e = vm3.load_all({"script_gate": {
+		"trigger": {"kind": "step", "map": "map:PuzzleRoom", "cells": [[1, 1]]},
+		"commands": [
+			{"cmd": "run_script", "script": "script:combination_lock", "result": "script_ok"},
+			{"cmd": "if", "cond": "script_ok",
+				"then": [{"cmd": "set_flag", "flag": "STUDIO_EVENT_BRANCH_RAN"}]}]}},
+		{"combination_lock": {"id": "script:combination_lock", "source": puzzle_source}})
+	ok = _ev_check("event script and result branch compile clean", e == "", e) and ok
+	story_events = {}
+	event_vars = {}
+	player_bag = {"POTION": 3}
+	player_party = [{"species": "bulbasaur"}]
+	vm3.step_fire("PuzzleRoom", Vector2i(1, 1))
+	await _drive_until(func() -> bool: return has_event("STUDIO_EVENT_BRANCH_RAN"), 120)
+	ok = _ev_check("event script: queries + command queue + result drive the authored branch",
+		int(event_vars.get("dial", 0)) == 241 and event_vars.get("script_ok", false) == true
+		and int(player_bag.get("POTION", 0)) == 5
+		and has_event("SCRIPT_PUZZLE_SOLVED")
+		and has_event("STUDIO_EVENT_BRANCH_RAN")) and ok
+	e = vm3.load_all({}, {"broken": {"id": "script:broken", "source": "let x ="}})
+	ok = _ev_check("event script: bad source refuses at load with its position",
+		e.contains("script 'broken'") and e.contains("line 1"), e) and ok
+	e = vm3.load_all({"missing_script": {
+		"trigger": {"kind": "step", "map": "map:PuzzleRoom", "cells": [[2, 2]]},
+		"commands": [{"cmd": "run_script", "script": "script:no_such_script"}]}})
+	ok = _ev_check("event script: missing script reference refuses at load",
+		e.contains("unknown script 'no_such_script'"), e) and ok
+	var bad_id := vm3.load_all({}, {
+		"wrong": {"id": "script:not_wrong", "source": "return true"}})
+	var bad_field := vm3.load_all({}, {
+		"extra": {"id": "script:extra", "source": "return true", "engine": "Main"}})
+	var empty_source := vm3.load_all({}, {
+		"empty": {"id": "script:empty", "source": ""}})
+	ok = _ev_check("event script: direct boot enforces record id/fields/non-empty source",
+		bad_id.contains("id must be 'script:wrong'")
+		and bad_field.contains("unknown field 'engine'")
+		and empty_source.contains("non-empty string"),
+		"id=%s; field=%s; source=%s" % [bad_id, bad_field, empty_source]) and ok
+	var vm4 := EventVM.new()
+	vm4.main = self
+	e = vm4.load_all({"runtime_refusal": {
+		"trigger": {"kind": "step", "map": "map:PuzzleRoom", "cells": [[3, 3]]},
+		"commands": [
+			{"cmd": "run_script", "script": "script:runtime_failure"},
+			{"cmd": "set_flag", "flag": "SCRIPT_CONTINUED_AFTER_FAILURE"}]}},
+		{"runtime_failure": {"id": "script:runtime_failure",
+			"source": "set_flag(\"SCRIPT_RUNTIME_WRITE\")\nset_var(\"runtime_write\", 9)\ngive_item(\"item:potion\", 1)\nreturn missing"}})
+	ok = _ev_check("event script: runtime-refusal fixture compiles", e == "", e) and ok
+	story_events = {}
+	event_vars = {}
+	player_bag = {"POTION": 3}
+	vm4.step_fire("PuzzleRoom", Vector2i(3, 3))
+	await get_tree().process_frame
+	ok = _ev_check("event script: runtime refusal rolls back writes, drops commands, aborts event",
+		not has_event("SCRIPT_RUNTIME_WRITE")
+		and not has_event("SCRIPT_CONTINUED_AFTER_FAILURE")
+		and not event_vars.has("runtime_write")
+		and int(player_bag.get("POTION", 0)) == 3) and ok
+	var vm5 := EventVM.new()
+	vm5.main = self
+	e = vm5.load_all({"missing_return": {
+		"trigger": {"kind": "step", "map": "map:PuzzleRoom", "cells": [[4, 4]]},
+		"commands": [
+			{"cmd": "run_script", "script": "script:no_return", "result": "required_result"},
+			{"cmd": "set_flag", "flag": "SCRIPT_CONTINUED_AFTER_NO_RETURN"}]}},
+		{"no_return": {"id": "script:no_return",
+			"source": "set_flag(\"SCRIPT_NO_RETURN_WRITE\")"}})
+	ok = _ev_check("event script: missing-return fixture compiles", e == "", e) and ok
+	story_events = {}
+	event_vars = {}
+	vm5.step_fire("PuzzleRoom", Vector2i(4, 4))
+	await get_tree().process_frame
+	ok = _ev_check("event script: missing requested return rolls back and aborts event",
+		not has_event("SCRIPT_NO_RETURN_WRITE")
+		and not has_event("SCRIPT_CONTINUED_AFTER_NO_RETURN")
+		and not event_vars.has("required_result")) and ok
 
 	print("[eventtest] %s" % ("ALL GREEN" if ok else "FAIL"))
 	get_tree().quit(0 if ok else 1)

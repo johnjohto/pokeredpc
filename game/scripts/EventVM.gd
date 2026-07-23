@@ -28,6 +28,7 @@ var _by_bhole := {}      # "<label>|<x>,<y>"      -> true (a boulder may be shov
 var _by_boulder := {}    # "<label>|<x>,<y>"      -> [records] (a boulder landed here)
 var _by_at := {}         # "<label>|<x>,<y>"      -> [records] (player-cell interactions: slot seats)
 var _by_warp := {}       # "<label>"              -> [records] (warp gates/replacements)
+var _scripts := {}       # script basename -> parsed HatchScript (compiled at project load)
 
 const KINDS := ["interact", "visible", "enter", "step", "battle_end", "boulder_hole", "boulder", "warp"]
 const CMDS := ["say", "notice", "if", "give_item", "take_item", "set_flag", "clear_flag", "sfx",
@@ -43,7 +44,7 @@ const CMDS := ["say", "notice", "if", "give_item", "take_item", "set_flag", "cle
 	"place_object", "play_map_music", "give_badge", "defeat_gym_trainers",
 	"fade_out", "fade_in", "refresh_objects",
 	"offer_nickname", "show_money", "hide_money", "take_money",
-	"wild_battle", "give_coins", "walk_both_to"]
+	"wild_battle", "give_coins", "walk_both_to", "run_script"]
 
 ## Player facing indices (Player.facing) by direction word.
 const DIRS := {"down": 0, "up": 1, "left": 2, "right": 3}
@@ -59,11 +60,21 @@ static var _beat_names := {}
 ## Index every record (basename -> record, from ProjectData.events()). Returns "" or the
 ## boot-fatal error naming the record — a project asking for semantics this build lacks
 ## must refuse loudly at load, the ADR-017 refuse-newer pattern applied to events.
-func load_all(records: Dictionary) -> String:
+func load_all(records: Dictionary, scripts: Dictionary = {}) -> String:
 	if _beat_names.is_empty():
 		var cs: Script = _CUTSCENE_SCRIPT
 		for m in cs.get_script_method_list():
 			_beat_names[str(m["name"])] = true
+	for script_key in scripts:
+		var script_record_v = scripts[script_key]
+		var record_error := _validate_script_record(str(script_key), script_record_v)
+		if record_error != "":
+			return record_error
+		var script_record: Dictionary = script_record_v
+		var parsed := HatchScript.parse(str(script_record.get("source", "")))
+		if parsed.error != "":
+			return "script '%s': %s" % [script_key, parsed.error]
+		_scripts[str(script_key)] = parsed
 	var keys := records.keys()
 	keys.sort()                              # record-id order is the dispatch order
 	for key in keys:
@@ -159,6 +170,32 @@ func load_all(records: Dictionary) -> String:
 					return "event '%s': warp trigger needs a dest map" % key
 				_push(_by_warp, label, r)
 		maps[label] = true
+	return ""
+
+
+## Main boots ProjectData directly rather than running the full Studio/CI validator.
+## Keep the small script-record contract at this execution boundary too, so malformed
+## source records cannot bypass their schema on a direct Engine launch.
+func _validate_script_record(key: String, record_v) -> String:
+	if not (record_v is Dictionary):
+		return "script '%s': record must be an object" % key
+	var key_pattern := RegEx.create_from_string("^[a-z0-9_]+$")
+	if key_pattern.search(key) == null:
+		return "script '%s': filename key must match [a-z0-9_]+" % key
+	var record: Dictionary = record_v
+	var allowed := ["id", "source", "$comment", "custom"]
+	for field in record:
+		if str(field) not in allowed:
+			return "script '%s': unknown field '%s'" % [key, str(field)]
+	var expected_id := "script:" + key
+	if str(record.get("id", "")) != expected_id:
+		return "script '%s': id must be '%s'" % [key, expected_id]
+	if not (record.get("source") is String) or str(record.get("source", "")).is_empty():
+		return "script '%s': source must be a non-empty string" % key
+	if record.has("$comment") and not (record["$comment"] is String):
+		return "script '%s': $comment must be a string" % key
+	if record.has("custom") and not (record["custom"] is Dictionary):
+		return "script '%s': custom must be an object" % key
 	return ""
 
 
@@ -456,6 +493,7 @@ func _run_block(cmds: Array, ctx: Dictionary) -> bool:
 			"warp_to":
 				# A scripted map change mid-event (the intercept walking you into the lab).
 				main.load_world(_bare(str(c["map"])), int(c.get("warp", -1)))
+				ctx["_map"] = main.center_label
 			"place_object":
 				# Teleport a map object somewhere and show it (the rival re-entering at the
 				# lab door for the Pokédex handout).
@@ -511,6 +549,38 @@ func _run_block(cmds: Array, ctx: Dictionary) -> bool:
 			"set_var":
 				# The saved vars store (ADR-019 §5): the first non-boolean durable state.
 				main.event_vars[str(c["name"])] = int(c["value"])
+			"run_script":
+				# Phase-6 hatch (ADR-028, gh #65): scripts are precompiled project
+				# records and can reach only the curated Callables below. Command calls
+				# queue ordinary VM commands, preserving their await/abort semantics.
+				var script_key := _bare(str(c["script"]))
+				var script := _scripts[script_key] as HatchScript
+				var flags_before: Dictionary = main.story_events.duplicate(true)
+				var vars_before: Dictionary = main.event_vars.duplicate(true)
+				var queued_commands: Array = []
+				var result = script.run({}, _event_script_functions(ctx, queued_commands))
+				if script.error != "":
+					main.story_events = flags_before
+					main.event_vars = vars_before
+					push_error("[events] script '%s': %s" % [script_key, script.error])
+					return false
+				var queue_error := _compile_block(queued_commands, "script:%s" % script_key)
+				if queue_error != "":
+					main.story_events = flags_before
+					main.event_vars = vars_before
+					push_error("[events] " + queue_error)
+					return false
+				if c.has("result"):
+					if result == null:
+						main.story_events = flags_before
+						main.event_vars = vars_before
+						push_error("[events] script '%s' returned no result for '%s'" % [
+							script_key, str(c["result"])])
+						return false
+				if not await _run_block(queued_commands, ctx):
+					return false
+				if c.has("result"):
+					main.event_vars[str(c["result"])] = result
 			"set_npc_text":
 				# Lines that live in a map script, not a trainer header (the Mt. Moon fossil
 				# nerd) — wire them onto the object so the forced fight reads right.
@@ -748,9 +818,21 @@ func _compile_block(cmds, key: String) -> String:
 			"beat":
 				if not _beat_names.has(str(c.get("name", ""))):
 					return "event '%s': unknown beat '%s' (not a Cutscene method)" % [key, str(c.get("name", ""))]
-			"walk_player":
+			"walk_player", "walk_forward", "walk_object", "face_player":
 				if not DIRS.has(str(c.get("dir", ""))):
-					return "event '%s': unknown walk_player dir '%s'" % [key, str(c.get("dir", ""))]
+					return "event '%s': unknown %s dir '%s'" % [
+						key, cmd, str(c.get("dir", ""))]
+			"face_object":
+				if str(c.get("dir", "")) != "player" and not DIRS.has(str(c.get("dir", ""))):
+					return "event '%s': unknown face_object dir '%s'" % [
+						key, str(c.get("dir", ""))]
+			"run_script":
+				var script_key := _bare(str(c.get("script", "")))
+				if not _scripts.has(script_key):
+					return "event '%s': unknown script '%s'" % [key, script_key]
+				if c.has("result") and not str(c["result"]).is_valid_identifier():
+					return "event '%s': script result '%s' is not a variable name" % [
+						key, str(c["result"])]
 	return ""
 
 
@@ -831,6 +913,104 @@ func _ident_value(ident: String, label: String):
 		if parts.size() == 2:
 			return 1 if main.defeated_trainers.has("%s:%d,%d" % [label, int(parts[0]), int(parts[1])]) else 0
 	return 1 if main.has_event(ident) else 0
+
+
+# ---- HatchScript event API ----------------------------------------------------------
+
+## The event hatch's complete external surface for gh #65. Durable flag/var mutations
+## happen immediately so script control flow can observe them. Curated command-library
+## equivalents enqueue ordinary EventVM commands; run_script awaits that queue after a
+## successful script run, reusing the VM's established coroutine and abort semantics.
+func _event_script_functions(ctx: Dictionary, commands: Array) -> Dictionary:
+	return {
+		"has_flag": func(name): return main.has_event(str(name)),
+		"set_flag": func(name): main.set_event(str(name)); return null,
+		"clear_flag": func(name): main.story_events.erase(str(name)); return null,
+		"get_var": func(name): return main.event_vars.get(str(name), 0),
+		"set_var": func(name, value): main.event_vars[str(name)] = value; return null,
+		"clear_var": func(name): main.event_vars.erase(str(name)); return null,
+		"item_count": func(item): return int(main.player_bag.get(_item_display(str(item)), 0)),
+		"party_count": func(): return main.player_party.size(),
+		"box_count": func(): return main.pc_box.size(),
+		"party_has": func(species):
+			var wanted := _bare(str(species)).to_lower()
+			for mon in main.player_party:
+				if str(mon.get("species", "")).to_lower() == wanted:
+					return true
+			return false,
+		"map_id": func(): return str(ctx.get("_map", main.center_label)),
+		"player_x": func(): return main.player.cell.x,
+		"player_y": func(): return main.player.cell.y,
+		"facing": func(): return main.player.facing,
+		"money": func(): return main.player_money,
+		"coins": func(): return main.player_coins,
+		"badge_count": func(): return main.badges.size(),
+		"has_badge": func(badge): return main.badges.has(str(badge).to_upper()),
+		"say": func(text): return _queue_script_command(commands, "say",
+			{"text": str(text)}),
+		"notice": func(text): return _queue_script_command(commands, "notice",
+			{"text": str(text)}),
+		"show_text": func(text): return _queue_script_command(commands, "show_text",
+			{"text": str(text)}),
+		"close_text": func(): return _queue_script_command(commands, "close_text", {}),
+		"sfx": func(key): return _queue_script_command(commands, "sfx",
+			{"key": str(key)}),
+		"play_song": func(key): return _queue_script_command(commands, "play_song",
+			{"key": str(key)}),
+		"play_map_music": func(): return _queue_script_command(
+			commands, "play_map_music", {}),
+		"wait_frames": func(frames): return _queue_script_command(commands, "wait",
+			{"frames": int(frames)}),
+		"give_item": func(item, count): return _queue_script_command(commands, "give_item",
+			{"item": str(item), "count": int(count)}),
+		"take_item": func(item): return _queue_script_command(commands, "take_item",
+			{"item": str(item)}),
+		"give_coins": func(count): return _queue_script_command(commands, "give_coins",
+			{"count": int(count)}),
+		"take_money": func(amount): return _queue_script_command(commands, "take_money",
+			{"amount": int(amount)}),
+		"give_badge": func(badge): return _queue_script_command(commands, "give_badge",
+			{"badge": str(badge)}),
+		"heal_party": func(): return _queue_script_command(commands, "heal_party", {}),
+		"set_last_map": func(map_id): return _queue_script_command(commands, "set_last_map",
+			{"map": str(map_id)}),
+		"set_force_bike": func(value): return _queue_script_command(commands, "set_force_bike",
+			{"value": bool(value)}),
+		"mount_bike": func(): return _queue_script_command(commands, "mount_bike", {}),
+		"block_cell": func(x, y): return _queue_script_command(commands, "block_cell",
+			{"x": int(x), "y": int(y)}),
+		"unblock_cell": func(x, y): return _queue_script_command(commands, "unblock_cell",
+			{"x": int(x), "y": int(y)}),
+		"walk_player": func(dir, count): return _queue_script_command(commands, "walk_player",
+			{"dir": str(dir), "count": int(count)}),
+		"walk_forward": func(dir, count): return _queue_script_command(commands, "walk_forward",
+			{"dir": str(dir), "count": int(count)}),
+		"walk_object": func(object, dir, count): return _queue_script_command(commands,
+			"walk_object", {"object": str(object), "dir": str(dir), "count": int(count)}),
+		"walk_player_to": func(x, y): return _queue_script_command(commands, "walk_player_to",
+			{"to": [int(x), int(y)]}),
+		"place_object": func(object, x, y): return _queue_script_command(commands, "place_object",
+			{"object": str(object), "at": [int(x), int(y)]}),
+		"face_object": func(object, dir): return _queue_script_command(commands, "face_object",
+			{"object": str(object), "dir": str(dir)}),
+		"face_player": func(dir): return _queue_script_command(commands, "face_player",
+			{"dir": str(dir)}),
+		"hide_object": func(object): return _queue_script_command(commands, "hide_object",
+			{"object": str(object)}),
+		"show_object": func(object): return _queue_script_command(commands, "show_object",
+			{"object": str(object)}),
+		"refresh_objects": func(): return _queue_script_command(
+			commands, "refresh_objects", {}),
+		"warp_to": func(map_id, warp): return _queue_script_command(commands, "warp_to",
+			{"map": str(map_id), "warp": int(warp)})
+	}
+
+
+func _queue_script_command(commands: Array, cmd: String, fields: Dictionary):
+	var command := fields.duplicate(true)
+	command["cmd"] = cmd
+	commands.append(command)
+	return null
 
 
 # ---- helpers ------------------------------------------------------------------------

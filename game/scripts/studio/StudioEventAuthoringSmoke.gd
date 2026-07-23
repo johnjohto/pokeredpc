@@ -37,6 +37,20 @@ func run(shell: StudioShell, scratch: String) -> bool:
 		mismatch == "" and missing.is_empty() and schema_vm_drift.is_empty(),
 		"mismatch=%s missing=%s schema/VM=%s" % [mismatch, str(missing), str(schema_vm_drift)]) and ok
 
+	var script_dir := scratch.path_join("data/scripts")
+	var script_record := {
+		"id": "script:studio_combination_lock",
+		"source": """let code = 2 * 100 + 4 * 10 + 1
+set_var("studio_dial", code)
+give_coins(1)
+return get_var("studio_dial") == 241 and map_id() == "StudioLinkTest" """
+	}
+	var script_dir_error := DirAccess.make_dir_recursive_absolute(script_dir)
+	var script_path := script_dir.path_join("studio_combination_lock.json")
+	var script_write_error := CanonJSON.write_file(script_path, script_record)
+	ok = _check("canonical HatchScript record enters the Studio scratch project",
+		script_dir_error == OK and script_write_error == "", script_write_error) and ok
+
 	var map_workspace = shell.edit_map("StudioLinkTest")
 	ok = _check("authored map reopens for event linking", map_workspace != null,
 		shell.status_text()) and ok
@@ -52,35 +66,40 @@ func run(shell: StudioShell, scratch: String) -> bool:
 		shell.status_text()) and ok
 	if workspace == null: return false
 
-	# Root true branch is non-blocking and observable in the child. The false branch is
-	# a nested ask with both answer branches, proving the recursive conversation editor.
+	# The script result drives an ordinary event branch. The true branch is non-blocking
+	# and observable in the child; the false branch is a nested ask with both answer
+	# branches, proving the recursive conversation editor remains intact.
+	workspace.add_command([], "run_script")
+	workspace.document.replace_command([0], {"cmd": "run_script",
+		"script": "script:studio_combination_lock", "result": "studio_script_ok"})
 	workspace.add_command([], "if")
-	workspace.document.replace_command([0], {"cmd": "if", "cond": "1", "then": [], "else": []})
+	workspace.document.replace_command([1], {"cmd": "if", "cond": "studio_script_ok",
+		"then": [], "else": []})
 	workspace._rebuild_content()
-	workspace.add_command([0, "then"], "notice")
-	workspace.document.replace_command([0, "then", 0],
+	workspace.add_command([1, "then"], "notice")
+	workspace.document.replace_command([1, "then", 0],
 		{"cmd": "notice", "text": "The Studio branch ran."})
-	workspace.add_command([0, "then"], "set_flag")
-	workspace.document.replace_command([0, "then", 1],
+	workspace.add_command([1, "then"], "set_flag")
+	workspace.document.replace_command([1, "then", 1],
 		{"cmd": "set_flag", "flag": "STUDIO_EVENT_BRANCH_RAN"})
-	workspace.add_command([0, "else"], "ask")
-	workspace.document.replace_command([0, "else", 0],
+	workspace.add_command([1, "else"], "ask")
+	workspace.document.replace_command([1, "else", 0],
 		{"cmd": "ask", "text": "Take the other branch?", "then": [], "else": []})
-	workspace.add_command([0, "else", 0, "then"], "say")
-	workspace.document.replace_command([0, "else", 0, "then", 0],
+	workspace.add_command([1, "else", 0, "then"], "say")
+	workspace.document.replace_command([1, "else", 0, "then", 0],
 		{"cmd": "say", "text": "Yes branch."})
-	workspace.add_command([0, "else", 0, "else"], "say")
-	workspace.document.replace_command([0, "else", 0, "else", 0],
+	workspace.add_command([1, "else", 0, "else"], "say")
+	workspace.document.replace_command([1, "else", 0, "else", 0],
 		{"cmd": "say", "text": "No branch."})
 	workspace._rebuild_content()
 	var before_undo: Dictionary = workspace.document.edit_state()
-	workspace.add_command([0, "then"], "clear_flag")
+	workspace.add_command([1, "then"], "clear_flag")
 	workspace.undo()
 	var undo_exact: bool = workspace.document.edit_state() == before_undo
 	workspace.redo()
 	workspace.undo()
 	ok = _check("nested if/ask blocks author through the schema palette with exact undo/redo",
-		undo_exact and workspace.command_palette([0, "else", 0, "then"]) != null
+		undo_exact and workspace.command_palette([1, "else", 0, "then"]) != null
 		and workspace.document.validate().is_empty(), workspace.status_text()) and ok
 	var valid_state: Dictionary = workspace.document.edit_state()
 	var disk_before := FileAccess.get_file_as_string(workspace.document.path)
@@ -105,8 +124,10 @@ func run(shell: StudioShell, scratch: String) -> bool:
 		for object in (map_opened["document"] as MapDocument).objects:
 			if str(object.get("id", "")) == "link_guide": linked_id = str(object.get("event", ""))
 	var report := ProjectValidator.validate_project(scratch)
-	ok = _check("event and TMX link save, reopen, and pass whole-project validation",
+	var reopened_script = JSON.parse_string(FileAccess.get_file_as_string(script_path))
+	ok = _check("event, script, and TMX link save/reopen and pass whole-project validation",
 		save_error == "" and bool(reopened.get("ok", false))
+		and reopened_script == script_record
 		and linked_id == "event:studiolinktest_link_guide" and bool(report.get("ok", false)),
 		save_error + "; " + "; ".join(PackedStringArray(report.get("errors", [])))) and ok
 
@@ -116,7 +137,7 @@ func run(shell: StudioShell, scratch: String) -> bool:
 		return _check("event play-test child launches", false, shell.status_text()) and ok
 	var ack: Dictionary = await child.wait_for_handshake(shell.get_tree(), 25000)
 	var exited: bool = await child.wait_for_exit(shell.get_tree(), 5000)
-	ok = _check("child Engine executes the authored event and takes the intended branch",
+	ok = _check("child Engine executes the authored script and takes its result branch",
 		bool(ack.get("ok", false)) and bool(ack.get("event_probe_ok", false))
 		and bool(ack.get("event_probe_flag", false)) and exited,
 		str(ack.get("event_probe_error", ack.get("error", "")))) and ok

@@ -20,6 +20,7 @@ The serialized fields:
 | `party` | `player_party` — full mon dicts (species, level, dvs, base, moves, hp, status, …) |
 | `defeated_trainers` / `traded_npcs` / `picked_items` / `found_hidden` | one-shot flags (keyed by map+cell / text id / map+cell) |
 | `events` | `story_events` (story EVENT flags) + `player_name`/`rival_name`/`*_starter` |
+| `event_vars` / `event_var_types` | EventVM's durable scalar variables plus additive HatchScript type tags; untagged legacy numeric values migrate as integers |
 | `badges` | gym badges earned, in order (e.g. `["BOULDERBADGE"]`) |
 | `pc_box` | Pokémon stored in the PC (full mon dicts) |
 | `link_addr` | v1.1 (additive): the last successfully joined Cable Club address — the joiner's ED default |
@@ -27,7 +28,10 @@ The serialized fields:
 
 The party mons are already plain dictionaries of primitives + arrays, so they serialize
 directly. JSON turns ints into floats on read, so bag counts are re-cast to `int` on load and
-mon fields are always read through `int(...)`/`str(...)` at the use site.
+mon fields are always read through `int(...)`/`str(...)` at the use site. HatchScript
+distinguishes integer from floating-point arithmetic, so `event_var_types` records each
+event variable's scalar type and restores it exactly; older untagged event variables came
+only from integer-valued schema commands and migrate back to integers.
 
 ## Title screen + continue
 

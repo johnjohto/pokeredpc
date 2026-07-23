@@ -2,6 +2,18 @@
 
 **Living document** — update the table when a milestone lands; add sub-tasks as discovered.
 
+**Landed 2026-07-23:** gh #65 attaches the HatchScript Core to authored events.
+`data/scripts/*.json` records are schema-validated and parsed at Project validation and
+Engine boot; `run_script` references one from the ordinary event command palette and can
+store its scalar return in a saved event variable for the next authored branch. The host
+surface is limited to transactional flag/variable writes, read-only party/bag/map/currency/
+badge queries, and wrappers that enqueue the stable generic EventVM command subset for
+execution with its existing await/abort semantics. Saved type tags preserve integer-exact
+variables across JSON reloads. `--eventtest` proves the puzzle, command-queue, result, and
+rollback/refusal paths, while `--studiotest`
+round-trips an authored command and canonical script through whole-project validation and
+observes its branch marker in a child Engine. Contract: `docs/v2/hatch-script.md`.
+
 **Landed 2026-07-23:** gh #64 implements the HatchScript Core from ADR-028: a
 statement-level FormulaExpr descendant with locals/assignment, if/else, bounded while,
 return, integer-exact arithmetic, strings/booleans, and explicitly registered host calls

@@ -73,6 +73,15 @@ static func events() -> Dictionary:
 	return _read_records("data/events")
 
 
+static func scripts() -> Dictionary:
+	## Sandboxed HatchScript source records (ADR-028, gh #65): data/scripts/*.json
+	## as {basename: record}. The directory is additive so pre-hatch projects remain
+	## loadable and simply expose no scripts.
+	if not DirAccess.dir_exists_absolute(dir.path_join("data/scripts")):
+		return {}
+	return _read_records("data/scripts")
+
+
 ## Per-record access for a content kind ("species"/"moves"/"items"/"trainers"/"events"…):
 ## {basename: record} straight off data/<kind>/. Studio's editors read and list through
 ## this (ADR-020, gh #47) — the legacy tables above stay the ENGINE's view.

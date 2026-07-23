@@ -1,4 +1,4 @@
-# HatchScript (v2 Phase 6 - gh #64, ADR-028)
+# HatchScript (v2 Phase 6 - gh #64/#65, ADR-028)
 
 HatchScript is the sandboxed scripting language for creator-authored event logic and
 formula kernels. It is a statement-level extension of `FormulaExpr`, implemented as a
@@ -80,14 +80,91 @@ Pure intrinsics match `FormulaExpr`: `min(a, b)`, `max(a, b)`, `floor(x)`, `ceil
 `sqrt(x)`, `int(x)`, `abs(x)`, and `if(condition, yes, no)`. The math intrinsics require
 numeric arguments. They do not expose host or engine capabilities.
 
+## Event integration
+
+Event scripts are Project records under `data/scripts/<key>.json`:
+
+```json
+{
+ "id": "script:combination_lock",
+ "source": "let code = 2 * 100 + 4 * 10 + 1\nset_var(\"dial\", code)\nreturn get_var(\"dial\") == 241"
+}
+```
+
+Every script is schema-validated and parsed when the Project loads. A malformed script
+refuses the Project before any event can fire, with the source line and column. Event
+records invoke a script with `run_script`:
+
+```json
+{
+ "cmd": "run_script",
+ "script": "script:combination_lock",
+ "result": "lock_open"
+}
+```
+
+`result` is optional. When present, the script must return a value; EventVM writes that
+scalar to the saved event-variable store, where the next ordinary `if` condition can read
+it. A runtime failure, or a missing requested return value, aborts the event and rolls back
+the script's flag and variable writes.
+
+Event scripts receive only this curated API:
+
+| Function | Result / effect |
+|---|---|
+| `has_flag(name)` | Whether a durable story flag is set. |
+| `set_flag(name)` / `clear_flag(name)` | Set or clear a durable story flag. |
+| `get_var(name)` | Read a durable event variable; missing names return `0`. |
+| `set_var(name, value)` / `clear_var(name)` | Set or clear a durable scalar event variable. |
+| `item_count(item_id)` | Read the player's bag count for an `item:` id. |
+| `party_count()` / `box_count()` | Read the current party or PC-box size. |
+| `party_has(species_id)` | Whether the party contains a `species:` id. |
+| `map_id()` | Read the current bare map label. |
+| `player_x()` / `player_y()` / `facing()` | Read the player's map cell and facing index. |
+| `money()` / `coins()` | Read the current money or Game Corner coin count. |
+| `badge_count()` / `has_badge(name)` | Read badge progress. |
+
+The following command-library equivalents enqueue ordinary EventVM commands in script
+branch/loop order. EventVM executes the queue after the script returns successfully and
+before it stores `result`, preserving the commands' established await and abort behavior:
+
+```text
+say(text)                    notice(text)
+show_text(text)              close_text()
+sfx(key)                     play_song(key)
+play_map_music()             wait_frames(frames)
+give_item(item_id, count)    take_item(item_id)
+give_coins(count)            take_money(amount)
+give_badge(name)             heal_party()
+set_last_map(map_id)         set_force_bike(value)
+mount_bike()
+block_cell(x, y)             unblock_cell(x, y)
+walk_player(dir, count)      walk_forward(dir, count)
+walk_object(id, dir, count)  walk_player_to(x, y)
+place_object(id, x, y)       face_object(id, dir)
+face_player(dir)             hide_object(id)
+show_object(id)              refresh_objects()
+warp_to(map_id, warp)
+```
+
+This is the stable, generic subset of the event command library. Native Cutscene beats,
+trainer/battle launchers, Kanto-specific mechanisms, recursive `run_script`, and GUI
+branches are intentionally absent: HatchScript supplies its own branches/loops, while
+game-specific native calls would expose internals rather than a portable creator API.
+These functions expose scalar arguments and stable IDs, never engine objects.
+
+Event variables preserve their scalar types across save/reload. Saves carry additive
+type tags beside the existing `event_vars` values so HatchScript integer division cannot
+silently become floating-point division after JSON parsing.
+
 ## Host boundary
 
 Host functions are a dictionary of name to `Callable`. An unregistered call is refused
 by name; fixed-arity callables are checked before invocation, and non-scalar results are
 refused. A `null` result is allowed for command-style calls whose value is ignored.
 Register only curated, deterministic operations for the context. Event and formula
-integrations own their separate APIs in gh #65 and gh #66; script project storage and
-Studio editing land in those integration issues, not in the Core language.
+integrations own separate APIs. The event surface above lands in gh #65; script-backed
+formula kernels land in gh #66, and Studio's dedicated source editor lands in gh #67.
 
 All parser and interpreter-owned failures set `script.error` with a one-based line and
 column. This includes malformed syntax/numbers, unknown variables/functions, undeclared

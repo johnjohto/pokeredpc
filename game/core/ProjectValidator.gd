@@ -45,6 +45,7 @@ static func validate_project(dir: String) -> Dictionary:
 	var ids := {}                       # prefix -> {full_id: true}
 	var refs: Array = []                # {prefix, value, path(file-qualified)}
 	var events: Array = []              # event records, for the semantic pass (gh #42)
+	var scripts: Array = []             # HatchScript records, parsed in the semantic pass
 	var native_maps := {}               # map id -> MapDocument, for destination-warp bounds
 	var native_warps: Array = []        # deferred until every destination map has loaded
 	var project_format := 0
@@ -113,10 +114,13 @@ static func validate_project(dir: String) -> Dictionary:
 			_register_record(entry, rel, inst, ids, errors)
 			if str(entry.get("id_prefix", "")) == "event":
 				events.append({"rel": rel, "inst": inst})
+			elif str(entry.get("id_prefix", "")) == "script":
+				scripts.append({"rel": rel, "inst": inst})
 		if kind == "table" and entry.has("declares") and inst is Dictionary:
 			_register_declared(entry["declares"], inst, ids)
 
 	_check_events(dir, events, errors)
+	_check_scripts(scripts, errors)
 	if project_format >= 2:
 		var world = _load_json_file(dir.path_join("data/world.json"), [])
 		if world is Dictionary:
@@ -210,6 +214,29 @@ static func validate_event_editor_record(dir: String, basename: String, record: 
 		return errors
 	_check_events(dir, [{"rel": "data/events/%s.json" % basename, "inst": record}], errors)
 	return errors
+
+
+## Script drafts get the generic schema/identity pass plus the same HatchScript parse
+## used by whole-project validation and EventVM boot. gh #67's live editor consumes
+## this seam; gh #65 establishes it for canonical saves and play-test refusal.
+static func validate_script_editor_record(basename: String, record: Dictionary,
+		context: Dictionary) -> Array:
+	var errors := validate_editor_record(basename, record, context)
+	if not errors.is_empty():
+		return errors
+	_check_scripts([{"rel": "data/scripts/%s.json" % basename, "inst": record}], errors)
+	return errors
+
+
+# ---- script semantics (gh #65, ADR-028) ---------------------------------------------
+
+static func _check_scripts(scripts: Array, errors: Array) -> void:
+	for entry in scripts:
+		var rel := str(entry["rel"])
+		var record: Dictionary = entry["inst"]
+		var parsed := HatchScript.parse(str(record.get("source", "")))
+		if parsed.error != "":
+			errors.append("%s: /source — %s" % [rel, parsed.error])
 
 
 # ---- event semantics (gh #42, ADR-019 consequences) ---------------------------------
