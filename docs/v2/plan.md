@@ -361,7 +361,10 @@ Each phase is independently shippable and testable; **the bot + the audits gate 
 
 ## 8. Open decisions (pin during design, not now)
 
-- **Scripting-hatch language** — sandboxed Lua vs a purpose-built DSL vs a sandboxed GDScript subset.
+- ~~**Scripting-hatch language** — sandboxed Lua vs a purpose-built DSL vs a sandboxed GDScript subset.~~
+  **Decided (ADR-028, 2026-07-23):** a purpose-built DSL extending the FormulaExpr lineage —
+  sandboxed by construction, portable to every Godot target. First increment: event hatch +
+  script-backed formula kernels; module-swap deferred until a second sample demands it.
 - **Serialization** — JSON + JSON Schema vs a friendlier superset (JSON5/YAML/TOML).
 - **Tiled** — how much to embed vs launch externally; whether to ship a Tiled extension.
 - **Save/versioning** — the concrete migration strategy for creator updates.

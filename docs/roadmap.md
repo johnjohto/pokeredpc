@@ -517,7 +517,12 @@ field paths, per-path error labels, button seams, canonical saves — proven by 
 smokes plus `StudioPolishSmoke` (filter, section order per content type, markers, error
 mark/clear). New `--studio-shot=<file>` flag captures a windowed form for visual review;
 captures at 100% and 125% UI scale read cleanly at the 900×600 minimum's family.
-Next: Phase 6 (gh #20) — the sandboxed scripting hatch + ruleset config UI.
+**Decided: ADR-028** (2026-07-23): the Phase-6 scripting hatch is a **purpose-built
+DSL** — a statement-level extension of the FormulaExpr lineage, tree-walked with a step
+budget, sandboxed by construction (the grammar cannot name IO/OS/engine internals), pure
+GDScript so every export target survives. First increment: event hatch + script-backed
+formula kernels; module-swap defers to a second sample. See docs/decisions.md.
+Next: Phase 6 (gh #20) implementation — hatch + ruleset config UI.
 **Landed: gh #34** (2026-07-20): Catch + Progression are behind the seam and the
 **config-first knobs are real** — `Gen1Catch` (`attempt` over the byte-exact kernel + the
 safari `bait_rate`/`rock_rate` transitions, which moved out of the host's input handler),

@@ -2,6 +2,37 @@
 
 Newest first. Each entry: context → decision → consequences.
 
+## ADR-028 — The scripting hatch is a purpose-built DSL, events + formulas first (2026-07-23)
+
+**Context:** Phase 6 (gh #20) opens the §8 fork for the scripting hatch: sandboxed Lua
+vs a purpose-built DSL vs a sandboxed GDScript subset, judged on sandbox strength
+(shared games must never run arbitrary code), web/mobile export survival, and API
+curation. The substrate is further along than "no scripting": EventVM already interprets
+a declarative story DSL, FormulaExpr (gh #35) is a proven integer-exact expression
+evaluator with a tokenizer/parser/AST walker and position-named errors, and the Ruleset
+module family already isolates battle/catch/formula/progression/types behind interfaces.
+**Decision:** (1) **A purpose-built DSL**, a statement-level extension of the
+FormulaExpr lineage (locals, if/else, bounded loops, calls into a curated API),
+tree-walked by the engine with a step budget. Sandbox strength is *by construction* —
+the grammar cannot name IO, OS, or engine internals — and pure GDScript keeps every
+export target. Sandboxed GDScript is eliminated (no real sandbox in Godot, no runtime
+source compilation in release exports, couples projects to engine internals); sandboxed
+Lua loses on the portability budget (native GDExtension kills web; a third-party
+GDScript interpreter is an uncontrolled engine-version-sensitive dependency). (2) The
+hatch lands **events + formulas first**: a `run_script`/`call_script` event command for
+custom puzzles/minigames, and script-backed formula kernels for exotic math beyond
+FormulaExpr — together delivering the issue's acceptance (new type via data, tweaked
+formula, custom puzzle, no engine code). Whole-module swap authored in the DSL (the
+§4.2 spectrum's far end) waits for a second sample to demand it, per the
+no-speculative-generality rule. (3) The curated API is the EventVM command library +
+flags/vars + read-only state queries — never engine internals; scripted battle math
+must preserve byte-identical replay streams (the determinism gate).
+**Consequences:** the toolkit grows ~1–2k lines of owned language (parser, evaluator,
+docs, Studio script field) instead of an external dependency; the §8 fork closes;
+sandbox escape tests are bounded because the grammar has no escape surface to probe.
+Phase 6's second workstream (ruleset config UI, custom fields/types) is unaffected by
+the language choice.
+
 ## ADR-027 — Softlock lints: one diagnostic stream, review-required warnings (2026-07-23)
 
 **Context:** v1 kept the map/story softlock checks in `tools/audit_chokepoints.py`, which
