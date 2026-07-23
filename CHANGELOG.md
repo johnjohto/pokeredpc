@@ -10,6 +10,17 @@ milestones, `PATCH` bumps are fixes/polish. See `docs/roadmap.md` for the live p
 
 ### Added
 
+- **The Phase-5 gate: a complete original-map creator journey in Studio** (gh #58).
+  One automated flow, driven only through real Studio seams, creates an original 8x6
+  map, paints art and collision, undoes/redoes and reverts, places a warp/NPC/sign,
+  sees the Problems panel flag a deliberately sealed warp and clears it with the fix,
+  links a companion map into the world graph, authors a branched NPC event, and
+  survives a Tiled-origin edit of the same TMX (editor settings, foreign properties
+  and object groups all preserved across Studio open + save). A live Engine child then
+  starts on the new map, warps into the companion map, returns across the authored
+  seamless edge, and executes the NPC's authored branch. An explicit Tiled-origin
+  fixture (`core/fixtures/tiled_origin`) locks the unknown-data round trip in Core.
+
 - **Shared map/story softlock lints across Core, Studio, and CI** (gh #57, ADR-027).
   `ProjectLint` wraps project validation and adds source-addressed diagnostics:
   blocking objects that seal a warp/sign/item or split a map's useful regions,

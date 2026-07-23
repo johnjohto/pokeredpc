@@ -134,6 +134,16 @@ renders those cells directly while format-1 maps continue through the blockset a
 dictionary without exposing native runtime fields. Both runtime shapes cross the same
 placement/collision helpers; serialization details do not leak into gameplay call sites.
 
+Tiled co-ownership (gh #58): a map TMX is edited by both Studio and the Tiled editor, so
+`MapDocument` owns only the Ground CSV, its optional Collision layer, and `pokeredpc:*`
+objects/properties. Everything Tiled or a third party writes — `<editorsettings>`, map
+`class`, extra layers and their attributes, foreign objectgroups (including `template`
+and `gid` objects), and unknown properties — parses losslessly and survives both no-op
+and targeted saves byte-for-byte where unedited; TSX files are never written by map
+saves. The `core/fixtures/tiled_origin` fixture locks this round trip in `--schematest`,
+and the Phase-5 journey smoke proves the same file returns from a Tiled-style external
+edit into Studio without corruption.
+
 ## Schemas + validator (gh #22)
 
 - `game/core/schemas/*.schema.json` — standard JSON Schema documents (external tools can

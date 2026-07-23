@@ -889,6 +889,7 @@ func _studiotest() -> void:
 	ok = await preload("res://scripts/studio/StudioMapAuthoringSmoke.gd").new().run(self, scratch) and ok
 	ok = await preload("res://scripts/studio/StudioWorldAuthoringSmoke.gd").new().run(self, scratch) and ok
 	ok = await preload("res://scripts/studio/StudioEventAuthoringSmoke.gd").new().run(self, scratch) and ok
+	ok = await preload("res://scripts/studio/StudioCreatorJourneySmoke.gd").new().run(self, scratch) and ok
 	ok = await preload("res://scripts/studio/StudioPlaytestSmoke.gd").new().run(self, scratch) and ok
 	ok = preload("res://scripts/studio/StudioLintSmoke.gd").new().run(self, scratch) and ok
 	print("[studiotest] %s" % ("ALL GREEN" if ok else "FAIL"))

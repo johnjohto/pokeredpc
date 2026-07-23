@@ -1,7 +1,7 @@
 # v2 — a monster-RPG creation toolkit (the "Studio" plan)
 
-**Status:** **active — Phase 5 (map + event editors, gh #19) began 2026-07-22.** The
-build-out is tracked as gh #14 with phase issues #15–#21. Phases 1–4 are complete:
+**Status:** **active — Phase 5 (map + event editors, gh #19) is complete as of 2026-07-23.**
+The build-out is tracked as gh #14 with phase issues #15–#21. Phases 1–4 are complete:
 versioned Project/Core, ruleset seam, authored Event VM, and the Studio MVP. The first
 format-2 native TMX map crosses the shared `MapDocument` seam into both Engine and Studio
 (ADR-021, gh #52), and all 223 Kanto maps now ship through that seam (ADR-023, gh #53).
@@ -11,9 +11,13 @@ gh #54). Typed warp/NPC/sign/trigger placement and reciprocal world-graph editin
 with one undo history and a two-map Engine traversal gate (ADR-025, gh #55). The event
 workspace is also live: schema-derived trigger/reference controls, the complete VM command
 palette, recursive `if`/`ask` lists, exact history, map-object creation/linking, validation,
-and child-process execution (ADR-026, gh #56). Softlock lints are next. The gates that guarded
-the v2 start remain permanent oracles: 1.0 shipped 2026-07-17 and v1.1 multiplayer shipped
-2026-07-20. ADR-013 records the foundational product decisions.
+and child-process execution (ADR-026, gh #56). Map/story softlock lints run as one shared
+diagnostic stream across Core, Studio's Problems panel, and the CI gate (ADR-027, gh #57).
+The Phase-5 gate closed with the complete creator journey: an original playable map with an
+NPC and a branched event authored entirely through Studio seams, lint feedback included,
+Tiled-origin round trips intact, proven in a live Engine child (gh #58). The gates that
+guarded the v2 start remain permanent oracles: 1.0 shipped 2026-07-17 and v1.1 multiplayer
+shipped 2026-07-20. ADR-013 records the foundational product decisions.
 
 ---
 

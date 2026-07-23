@@ -489,7 +489,22 @@ their door-opening records. Gates: `--schematest` (incl. the new lint smoke) and
 `--studiotest` (incl. the Problems-panel smoke) ALL GREEN. One incidental fix:
 `_validate_dir_arg` now reassembles `--validate=res://…` values PowerShell splits at the
 colon.
-Next: gh #58 — original-map creator journey and the complete Phase 5 gate.
+**Landed: gh #58** (2026-07-23): the Phase-5 gate — the complete original-map creator
+journey as one automated flow (`StudioCreatorJourneySmoke`, driven only through real
+Studio seams): create an 8x6 original map, paint art and a collision wall, exact
+undo/redo and Revert, place a warp/NPC/sign through the inspector, watch the Problems
+panel flag a deliberately sealed warp (`map.target_unreachable`) and clear it with the
+fix, link a companion map into the world graph reciprocally, author a branched NPC
+event through the map-object seam, survive a Tiled-origin edit of the same TMX
+(`<editorsettings>`, foreign map property, foreign objectgroup all preserved across
+Studio open + save), then prove the result live: a child Engine starts on the new map,
+warps into the companion map, crosses back over the authored seamless edge, and executes
+the NPC's authored branch. One engine rule the journey respects by design: a warp on a
+plain tile fires only at the map edge (pokered's `ExtraWarpCheck` fn1, gh #80) — the
+authored warp sits on JourneyTown's east edge. Explicit Tiled-origin fixture added
+(`core/fixtures/tiled_origin`) with Core round-trip checks in `MapDocumentSmoke`.
+Phase-5 ADRs (021, 023–027) reviewed and remain accurate; no new ADR.
+Next: Phase 6 (gh #20) — the sandboxed scripting hatch + ruleset config UI.
 **Landed: gh #34** (2026-07-20): Catch + Progression are behind the seam and the
 **config-first knobs are real** — `Gen1Catch` (`attempt` over the byte-exact kernel + the
 safari `bait_rate`/`rock_rate` transitions, which moved out of the host's input handler),

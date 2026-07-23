@@ -163,6 +163,36 @@ func run() -> bool:
 			not bool(escaped.get("ok", false))
 			and "tileset source escapes project" in str(escaped.get("error", "")),
 			str(escaped.get("error", ""))) and ok
+	# gh #58: explicit Tiled-origin fixture — a TMX carrying real Tiled editor artifacts
+	# (editorsettings, a map class, an extra decorated layer, a locked objectgroup,
+	# template/gid objects) opens and survives Studio-side saves where unedited.
+	var tiled_fixture := "res://core/fixtures/tiled_origin"
+	var tiled_opened := MapDocument.open(tiled_fixture, "TiledOrigin")
+	ok = _check("Tiled-origin TMX opens through the same MapDocument seam",
+		bool(tiled_opened.get("ok", false)), str(tiled_opened.get("error", ""))) and ok
+	if bool(tiled_opened.get("ok", false)):
+		var tiled: MapDocument = tiled_opened["document"]
+		var tiled_path := OS.get_user_data_dir().path_join("tiled_origin_roundtrip.tmx")
+		var tsx_before := FileAccess.get_file_as_bytes(
+			tiled_fixture.path_join("tilesets/tracer.tsx"))
+		var tiled_noop := tiled.save(tiled_path)
+		var tiled_identical: bool = FileAccess.get_file_as_bytes(tiled.path) == \
+			FileAccess.get_file_as_bytes(tiled_path)
+		tiled.set_tile(Vector2i(0, 0), 1)
+		var tiled_edit := tiled.save(tiled_path)
+		var tiled_source := FileAccess.get_file_as_string(tiled_path)
+		ok = _check("Tiled-origin artifacts survive no-op and targeted saves",
+			tiled_noop == "" and tiled_identical and tiled_edit == ""
+			and tsx_before == FileAccess.get_file_as_bytes(
+				tiled_fixture.path_join("tilesets/tracer.tsx"))
+			and tiled_source.contains("<editorsettings>")
+			and tiled_source.contains("class=\"town\"")
+			and tiled_source.contains("name=\"Fringe\"")
+			and tiled_source.contains("opacity=\"0.75\"")
+			and tiled_source.contains("locked=\"1\"")
+			and tiled_source.contains("template=\"templates/stamp.tx\"")
+			and tiled_source.contains("third-party:intensity"),
+			tiled_noop + tiled_edit) and ok
 	print("[mapdoc] %s" % ("ALL GREEN" if ok else "FAIL"))
 	return ok
 
