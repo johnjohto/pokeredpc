@@ -84,8 +84,12 @@ static func scripts() -> Dictionary:
 
 ## Per-record access for a content kind ("species"/"moves"/"items"/"trainers"/"events"…):
 ## {basename: record} straight off data/<kind>/. Studio's editors read and list through
-## this (ADR-020, gh #47) — the legacy tables above stay the ENGINE's view.
+## this (ADR-020, gh #47) — the legacy tables above stay the ENGINE's view. An absent
+## dir is an empty kind, not an error: additive dirs (events, scripts) may not exist,
+## and the validator — not the browser — is the authority on required layout.
 static func records(kind: String) -> Dictionary:
+	if not DirAccess.dir_exists_absolute(dir.path_join("data/" + kind)):
+		return {}
 	return _read_records("data/" + kind)
 
 

@@ -9,8 +9,8 @@ class_name StudioShell
 
 ## The Phase-4 content types (ADR-020 d3) retain SchemaForm; Phase 5 adds specialized
 ## native-map and recursive event-command workspaces over their Core documents.
-const CONTENT_TYPES := ["species", "moves", "items", "trainers"]
-const WORKSPACES := ["species", "moves", "items", "trainers", "maps", "events"]
+const CONTENT_TYPES := ["species", "moves", "items", "trainers", "scripts"]
+const WORKSPACES := ["species", "moves", "items", "trainers", "scripts", "maps", "events"]
 const RECENTS_CFG := "user://studio.cfg"
 const DEFAULT_WINDOW_SIZE := Vector2i(1280, 800)
 const MIN_WINDOW_SIZE := Vector2i(900, 600)
@@ -42,6 +42,8 @@ var _new_map_tileset: OptionButton
 var _new_event_dialog: ConfirmationDialog
 var _new_event_name: LineEdit
 var _new_event_map: OptionButton
+var _new_script_dialog: ConfirmationDialog
+var _new_script_name: LineEdit
 var _record_names := {}          # kind -> sorted basenames (the sidebar's data)
 var _active_kind := ""
 var _active_form: Control = null
@@ -113,9 +115,7 @@ func open_project(dir_path: String) -> String:
 	_path_label.text = dir_path
 	_record_names.clear()
 	for kind in CONTENT_TYPES:
-		var names := ProjectData.records(kind).keys()
-		names.sort()
-		_record_names[kind] = names
+		_reload_kind_names(kind)
 	_record_names["maps"] = ProjectData.map_labels()
 	_reload_event_names()
 	_refresh_sidebar()
@@ -245,6 +245,7 @@ func _build_ui() -> void:
 	add_child(_dialog)
 	_build_new_map_dialog()
 	_build_new_event_dialog()
+	_build_new_script_dialog()
 
 
 func _refresh_sidebar() -> void:
@@ -259,9 +260,14 @@ func _refresh_sidebar() -> void:
 
 func _on_type_selected(idx: int) -> void:
 	_active_kind = WORKSPACES[idx]
-	_new_map_button.disabled = _active_kind not in ["maps", "events"] \
-		or int(ProjectData.manifest.get("format", 1)) < 2
-	_new_map_button.text = "New event…" if _active_kind == "events" else "New map…"
+	# Scripts are format-agnostic (data/scripts is additive under format 1); native
+	# map/event authoring needs the format-2 layout.
+	_new_map_button.disabled = _active_kind not in ["maps", "events", "scripts"] \
+		or (_active_kind != "scripts" and int(ProjectData.manifest.get("format", 1)) < 2)
+	match _active_kind:
+		"events": _new_map_button.text = "New event…"
+		"scripts": _new_map_button.text = "New script…"
+		_: _new_map_button.text = "New map…"
 	# A filter from another content type reads as a spurious "(no matches)" (gh #61).
 	if _records_filter != null:
 		_records_filter.text = ""
@@ -328,6 +334,10 @@ func _build_new_map_dialog() -> void:
 func _show_new_map_dialog() -> void:
 	if _active_kind == "events":
 		_show_new_event_dialog()
+		return
+	if _active_kind == "scripts":
+		_new_script_name.text = ""
+		_new_script_dialog.popup_centered(Vector2i(450, 160))
 		return
 	_new_map_tileset.clear()
 	var files := PackedStringArray()
@@ -423,6 +433,60 @@ func _create_event_from_dialog():
 	if index >= 0:
 		_records.select(index)
 	return edit_event(event_basename)
+
+
+func _build_new_script_dialog() -> void:
+	_new_script_dialog = ConfirmationDialog.new()
+	_new_script_dialog.title = "Create HatchScript"
+	_new_script_dialog.ok_button_text = "Create"
+	var fields := GridContainer.new()
+	fields.columns = 2
+	_new_script_dialog.add_child(fields)
+	fields.add_child(_dialog_label("Script name"))
+	_new_script_name = LineEdit.new()
+	_new_script_name.placeholder_text = "my_script"
+	fields.add_child(_new_script_name)
+	_new_script_dialog.confirmed.connect(_create_script_from_dialog)
+	add_child(_new_script_dialog)
+
+
+## Create data/scripts/<name>.json through the SAME validation the editor and the boot
+## gate apply (gh #67): a name breaking the id pattern, a duplicate, or an unparseable
+## starter refuses loudly before any byte is written.
+func _create_script_from_dialog():
+	var script_basename := _new_script_name.text.strip_edges()
+	var record := {"id": "script:" + script_basename,
+		"source": "# New HatchScript (docs/v2/hatch-script.md).\nreturn 0"}
+	var context := ProjectValidator.editor_context(project_dir, "scripts")
+	if not bool(context.get("ok", false)):
+		_status.text = "REFUSED: " + "; ".join(PackedStringArray(context.get("errors", [])))
+		return null
+	var path := project_dir.path_join("data/scripts").path_join(script_basename + ".json")
+	if FileAccess.file_exists(path):
+		_status.text = "REFUSED: script '%s' already exists" % script_basename
+		return null
+	var errors := ProjectValidator.validate_script_editor_record(
+		script_basename, record, context)
+	if not errors.is_empty():
+		_status.text = "REFUSED: " + "; ".join(PackedStringArray(errors))
+		return null
+	DirAccess.make_dir_recursive_absolute(project_dir.path_join("data/scripts"))
+	var write_error := CanonJSON.write_file(path, record)
+	if write_error != "":
+		_status.text = "REFUSED: " + write_error
+		return null
+	_reload_kind_names("scripts")
+	select_workspace("scripts")
+	var index := (_record_names["scripts"] as Array).find(script_basename)
+	if index >= 0:
+		_records.select(index)
+	var form = edit_record("scripts", script_basename)
+	_status.text = "created scripts/%s" % script_basename
+	return form
+
+
+func new_script_fields() -> Dictionary:
+	return {"dialog": _new_script_dialog, "name": _new_script_name}
 
 
 func select_workspace(kind: String) -> void:
@@ -574,13 +638,15 @@ func _on_map_event_requested(kind: String, object_id: String, event_id: String,
 
 
 func _reload_event_names() -> void:
-	var names: Array = []
-	var event_dir := project_dir.path_join("data/events")
-	if DirAccess.dir_exists_absolute(event_dir):
-		for file in DirAccess.get_files_at(event_dir):
-			if file.ends_with(".json"): names.append(file.get_basename())
+	_reload_kind_names("events")
+
+
+## Refresh one kind's browser names from disk (ProjectData.records treats an absent
+## additive dir — events, scripts — as an empty kind).
+func _reload_kind_names(kind: String) -> void:
+	var names := ProjectData.records(kind).keys()
 	names.sort()
-	_record_names["events"] = names
+	_record_names[kind] = names
 
 
 static func _event_basename(map_label: String, object_id: String) -> String:
@@ -919,7 +985,7 @@ func _studiotest() -> void:
 	ok = _st_check("scratch copy of the Kanto project", cerr == "", cerr) and ok
 	var err := open_project(scratch)
 	ok = _st_check("shell opens the scratch project", err == "", err) and ok
-	var want := {"species": 151, "moves": 165, "items": 152, "trainers": 47}
+	var want := {"species": 151, "moves": 165, "items": 152, "trainers": 47, "scripts": 0}
 	for kind in CONTENT_TYPES:
 		var got: int = (_record_names.get(kind, []) as Array).size()
 		ok = _st_check("sidebar lists %s = %d" % [kind, want[kind]], got == int(want[kind]),
@@ -935,6 +1001,8 @@ func _studiotest() -> void:
 	var bad := ""
 	for kind in CONTENT_TYPES:
 		var kdir := scratch.path_join("data").path_join(kind)
+		if not DirAccess.dir_exists_absolute(kdir):
+			continue                       # Kanto ships no data/scripts (additive dir)
 		for f in DirAccess.get_files_at(kdir):
 			if not f.ends_with(".json"):
 				continue
@@ -960,6 +1028,7 @@ func _studiotest() -> void:
 		bad == "", bad) and ok
 	ok = preload("res://scripts/studio/StudioFormSmoke.gd").new().run(self, scratch) and ok
 	ok = preload("res://scripts/studio/StudioEditorSmoke.gd").new().run(self, scratch) and ok
+	ok = preload("res://scripts/studio/StudioScriptSmoke.gd").new().run(self, scratch) and ok
 	ok = preload("res://scripts/studio/StudioMapSmoke.gd").new().run(self) and ok
 	ok = await preload("res://scripts/studio/StudioMapAuthoringSmoke.gd").new().run(self, scratch) and ok
 	ok = await preload("res://scripts/studio/StudioWorldAuthoringSmoke.gd").new().run(self, scratch) and ok

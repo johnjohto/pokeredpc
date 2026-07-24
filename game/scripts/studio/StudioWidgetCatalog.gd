@@ -36,3 +36,17 @@ static func register_defaults(registry: RefCounted, project_dir: String,
 			var widget := PartyBuilder.new()
 			widget.setup(schema, value, species_ids, changed)
 			return widget)
+	# gh #67: HatchScript sources edit in a monospace multiline field. Diagnostics need
+	# no widget code — every keystroke re-runs the generic draft validation, whose
+	# /source-addressed parse error lands in the standard gh #61 label + danger border.
+	registry.register("scripts", "/source",
+		func(_schema: Dictionary, value, changed: Callable) -> Control:
+			var editor := TextEdit.new()
+			editor.text = str(value)
+			editor.custom_minimum_size.y = 240
+			var mono := SystemFont.new()
+			mono.font_names = PackedStringArray(["Consolas", "Menlo",
+				"DejaVu Sans Mono", "Liberation Mono", "monospace"])
+			editor.add_theme_font_override("font", mono)
+			editor.text_changed.connect(func() -> void: changed.call(editor.text))
+			return editor)

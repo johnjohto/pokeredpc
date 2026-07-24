@@ -28,6 +28,10 @@ const SECTIONS := {
 		["Battle", ["money", "ai", "ai_count", "ai_mods", "parties"]],
 		["Advanced", ["num", "custom"]],
 	],
+	"scripts": [
+		["Script", ["id", "source"]],
+		["Advanced", ["custom"]],
+	],
 }
 
 

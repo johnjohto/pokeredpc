@@ -2,6 +2,20 @@
 
 **Living document** — update the table when a milestone lands; add sub-tasks as discovered.
 
+**Landed 2026-07-24:** gh #67 — Studio's syntax-checked HatchScript editor. `scripts`
+joins the shell's browsable content kinds with a "New script…" dialog (creation
+validates through the shared seam before any byte lands; an id-pattern-breaking name
+refuses), and the `/source` field edits in a monospace multiline TextEdit registered
+through the ADR-020 widget seam. The HatchScript parse now rides
+`ProjectValidator.validate_editor_record` entry-driven, so the form's per-keystroke
+draft validation, the canonical-save preflight, `--validate`, and Engine boot share one
+refusal — a broken draft shows its one-based line/column inline in the gh #61 error
+styling and cannot be saved (bytes untouched, proven by the smoke). `ProjectData.records`
+treats absent additive dirs (events/scripts) as empty kinds. Gates: `--studiotest` grew
+`StudioScriptSmoke` (creation refusal/success through the real dialog, live positioned
+diagnostics, save refusal, fix-then-save + whole-project validation, Revert/dirty) —
+119 checks ALL GREEN; `--schematest`/`--eventtest`/`--validate` (0 errors) green.
+
 **Landed 2026-07-23:** gh #66 — the formula hatch (ADR-030): `data/ruleset.json`'s new
 `formula_scripts` binds `RulesetFormulas` kernel names to `script:` records, and the Core
 `HatchFormulas` wrapper (attached by the generic `Ruleset.attach_formula_scripts()` boot

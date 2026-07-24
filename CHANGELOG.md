@@ -10,6 +10,14 @@ milestones, `PATCH` bumps are fixes/polish. See `docs/roadmap.md` for the live p
 
 ### Added
 
+- **Studio HatchScript editor** (gh #67). Scripts are a browsable Studio content kind
+  with a "New script…" dialog, and `source` edits in a monospace multiline field with
+  live, position-named syntax diagnostics — the parse rides the same validator seam the
+  boot gate uses, so an unparseable draft shows its line/column inline and cannot be
+  saved (the last good bytes stay untouched). Creation, Save, and Revert go through the
+  canonical writer; `--studiotest` grew the `StudioScriptSmoke` leg covering the whole
+  flow.
+
 - **HatchScript formula hatch** (gh #66, ADR-030). `data/ruleset.json` gained
   `formula_scripts`: kernel name → `script:` record, replacing that kernel's arithmetic
   behind the same `RulesetFormulas` interface gen1 uses — bound kernels run their

@@ -1,4 +1,4 @@
-# HatchScript (v2 Phase 6 - gh #64/#65/#66, ADR-028/ADR-030)
+# HatchScript (v2 Phase 6 - gh #64/#65/#66/#67, ADR-028/ADR-030)
 
 HatchScript is the sandboxed scripting language for creator-authored event logic and
 formula kernels. It is a statement-level extension of `FormulaExpr`, implemented as a
@@ -225,8 +225,20 @@ Host functions are a dictionary of name to `Callable`. An unregistered call is r
 by name; fixed-arity callables are checked before invocation, and non-scalar results are
 refused. A `null` result is allowed for command-style calls whose value is ignored.
 Register only curated, deterministic operations for the context. Event and formula
-integrations own separate APIs (gh #65 and gh #66 above); Studio's dedicated source
-editor lands in gh #67.
+integrations own separate APIs (gh #65 and gh #66 above).
+
+## Studio editing (gh #67)
+
+Studio lists `data/scripts/` as a browsable content kind with a "New script…"
+creation dialog, and edits a script's `source` in a monospace multiline field.
+Every keystroke re-runs the same draft validation the boot gate applies, so a
+syntax error appears immediately beside the field with its one-based line and
+column, in the standard error styling — and an invalid draft cannot be saved
+(refusal never disturbs the last good bytes). Creation, Save, and Revert all go
+through the canonical writer and the shared validator seam
+(`ProjectValidator.validate_editor_record`, which parses script sources
+entry-driven), so the editor, the CLI `--validate`, and Engine boot can never
+disagree about what parses.
 
 All parser and interpreter-owned failures set `script.error` with a one-based line and
 column. This includes malformed syntax/numbers, unknown variables/functions, undeclared

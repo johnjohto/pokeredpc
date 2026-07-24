@@ -52,7 +52,9 @@ project/
                          beats that demand them; the runtime VM refuses at boot any
                          record it cannot execute (see event.schema.json)
     scripts/<key>.json   one record per file  (id: "script:<key>") — sandboxed
-                         HatchScript source (ADR-028, gh #64/#65). Every record is
+                         HatchScript source (ADR-028, gh #64/#65). The directory is
+                         ADDITIVE (like data/events/): absent in pre-hatch projects,
+                         an empty kind, never an error. Every record is
                          parsed at Project validation and Engine boot; syntax errors
                          refuse with source line/column. An event's `run_script`
                          command references one record and may store its scalar return

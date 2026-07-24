@@ -201,6 +201,15 @@ static func validate_editor_record(basename: String, record: Dictionary,
 		if not have.has(str(ref["value"])):
 			errors.append("%s — dangling reference '%s' — no %s with that id"
 				% [ref["path"], ref["value"], ref_prefix])
+	# gh #67: a script draft's source parses in the SAME generic pass every editor
+	# consumer runs, so live draft validation, save preflight, and Studio's inline
+	# field diagnostics cannot disagree with the boot gate. The diagnostic addresses
+	# the /source field directly (SchemaForm routes it to that control) and is NOT
+	# gated on the other errors — a mixed-error draft keeps its position feedback.
+	if str(entry.get("id_prefix", "")) == "script":
+		var parsed := HatchScript.parse(str(record.get("source", "")))
+		if parsed.error != "":
+			errors.append("/source — " + parsed.error)
 	return errors
 
 
@@ -216,16 +225,13 @@ static func validate_event_editor_record(dir: String, basename: String, record: 
 	return errors
 
 
-## Script drafts get the generic schema/identity pass plus the same HatchScript parse
-## used by whole-project validation and EventVM boot. gh #67's live editor consumes
-## this seam; gh #65 establishes it for canonical saves and play-test refusal.
+## The explicit script-draft seam (gh #65). Since gh #67 the HatchScript parse rides
+## validate_editor_record itself (entry-driven), so every generic consumer — the live
+## SchemaForm draft validation, the canonical-save preflight, play-test refusal —
+## refuses a broken source with a /source-addressed, position-named diagnostic.
 static func validate_script_editor_record(basename: String, record: Dictionary,
 		context: Dictionary) -> Array:
-	var errors := validate_editor_record(basename, record, context)
-	if not errors.is_empty():
-		return errors
-	_check_scripts([{"rel": "data/scripts/%s.json" % basename, "inst": record}], errors)
-	return errors
+	return validate_editor_record(basename, record, context)
 
 
 # ---- script semantics (gh #65, ADR-028) ---------------------------------------------

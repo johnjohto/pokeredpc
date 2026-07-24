@@ -73,7 +73,8 @@ func run(shell: StudioShell, _scratch: String) -> bool:
 	# The layout map is curated: a typo must fail loudly here, not silently hide a
 	# field in "Other". Every layout name must resolve against its schema.
 	var drift: Array = []
-	var schema_files := {"species": "species", "moves": "move", "items": "item", "trainers": "trainer"}
+	var schema_files := {"species": "species", "moves": "move", "items": "item",
+		"trainers": "trainer", "scripts": "script"}
 	for content_type in StudioFormLayout.SECTIONS:
 		var schema = JSON.parse_string(FileAccess.get_file_as_string(
 			"res://core/schemas/%s.schema.json" % schema_files[content_type]))
