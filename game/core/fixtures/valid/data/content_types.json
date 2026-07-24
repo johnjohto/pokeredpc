@@ -1,0 +1,25 @@
+{
+ "relic": {
+  "id_prefix": "relic",
+  "schema": {
+   "type": "object",
+   "required": [
+    "id",
+    "name"
+   ],
+   "properties": {
+    "id": {
+     "type": "string"
+    },
+    "name": {
+     "type": "string"
+    },
+    "linked_species": {
+     "type": "string",
+     "x-ref": "species"
+    }
+   },
+   "additionalProperties": false
+  }
+ }
+}

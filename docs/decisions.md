@@ -2,6 +2,54 @@
 
 Newest first. Each entry: context → decision → consequences.
 
+## ADR-031 — Creator extensibility as data: map fields, singleton workspaces, declaration tables (2026-07-24)
+
+**Context:** gh #68 (Phase 6.5) wants ruleset knobs, custom fields on records, and
+creator-defined content types editable from Studio — no engine code, no hand-edited
+files. The substrate almost suffices: ADR-017 reserved the `custom` bag, ADR-018 §4
+made the config a schema'd record, ADR-020's form engine generates editors from
+schemas, and CoreSchema already validates schema'd `additionalProperties` maps. Three
+gaps: the form engine cannot render keyed maps (every knob table is one), singleton
+`kind: table` files have no editor path, and nothing declares bag shapes or new record
+families.
+**Decision:** (1) `SchemaForm` grows exactly ONE control: the **map field** — an object
+whose schema is `additionalProperties: <schema>` or a single `patternProperties` rule
+renders as key/value rows with add/remove; the raw-JSON control remains only for truly
+shapeless objects. One control serves the stage tables, badge maps, the type chart, and
+both declaration files. (2) **Singleton table workspaces**: layout `kind: table` files
+mount through the same SchemaForm + canonical save + validate-before-write path as
+records (no filename-id rule); the shell lists `types`, `ruleset`, `custom_fields`, and
+`content_types`, creating a missing declaration file with its schema-valid starter.
+(3) **`data/custom_fields.json`** (additive): content type → {field → CoreSchema
+fragment} narrows the reserved bag — declared fields validate and render as real
+controls (x-ref fragments get id pickers); the bag stays `additionalProperties: true`,
+so undeclared entries remain legal: ADR-017's bag is narrowed, never sealed.
+(4) **`data/content_types.json`** (additive): kind → {id_prefix, schema} declares a new
+record family. The validator extends the layout walk dynamically — collision with a
+built-in path or prefix refuses, fragment keywords check recursively at declaration
+time (a kind with zero records cannot hide a typo), the schema must declare `id`
+(the filename-identity rule is universal), and two creator kinds cannot share a prefix
+— and ids join the registry, so custom fields and creator kinds cross-reference
+freely. Declaration semantics run in BOTH the whole-project walk and the Studio
+table-draft preflight, so a semantically bad declaration can neither save nor
+validate; a declaration that newly narrows a bag some EXISTING record violates saves
+(it is itself valid) and the violation surfaces at the next whole-project pass — the
+Problems panel and `--validate` both carry it. (5) **Engine consumption is
+deliberately nil** this phase: creator
+data is authored, validated, browsed, and play-test-loadable; mechanics reach it only
+through future ruleset/script seams. Manifest `identity.parts` stays extractor
+provenance and link identity stays ADR-029's battle subset — lockstep never reads
+creator data, so it cannot desync it.
+**Consequences:** the acceptance runs live end to end (a turned stage knob proven at
+300% by a child Engine; a declared field with validation teeth; a creator kind
+browsed, created, saved, and x-ref'd — 141 studiotest checks). Declaration schema
+FRAGMENTS author as raw JSON inside the validated form this phase — a Studio-mediated,
+refuse-loud surface, but a schema-builder GUI stays deferred until a real creator
+demands one. Faithful defaults stay visible because the extractor emits the full
+faithful config values; a ruleset.json CREATED in Studio starts with `base` alone and
+added knobs begin empty — surfacing the ruleset module's built-in defaults in the
+form is a noted follow-up, not a data problem (absent keys still fall back in-engine).
+
 ## ADR-030 — Formula-hatch kernel contracts: fixed inputs, host draws, loud base fallback (2026-07-23)
 
 **Context:** gh #66 lands ADR-028's second hatch: script-backed `RulesetFormulas`

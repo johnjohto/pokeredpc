@@ -41,6 +41,26 @@ static func validate_project(dir: String) -> Dictionary:
 	if not errors.is_empty():
 		return {"ok": false, "errors": errors, "files": 0, "ids": {}, "id_registry": {}}
 
+	# ADR-031 (gh #68): creator declarations extend the walk BEFORE any file is
+	# claimed. Custom-field declarations narrow the reserved custom bag on the
+	# built-in record schemas; content-type declarations append record entries whose
+	# inline schemas validate exactly like built-ins (ids join the registry, x-refs
+	# resolve both ways). First-match-wins keeps a colliding declaration inert.
+	var custom_decls := _custom_field_decls(dir)
+	for declared_type in custom_decls:
+		_apply_custom_fields(layout, schemas, str(declared_type),
+			custom_decls[declared_type], errors)
+	var creator_types := _creator_types(dir)
+	_check_creator_types(creator_types, layout, errors)
+	for creator_kind in creator_types:
+		if not (creator_types[creator_kind] is Dictionary):
+			continue                     # the walk's schema pass reports the shape
+		var declaration: Dictionary = creator_types[creator_kind]
+		var entry := _creator_entry(str(creator_kind), declaration)
+		var fragment = declaration.get("schema", {})
+		schemas[str(entry["schema"])] = fragment if fragment is Dictionary else {}
+		layout.append(entry)
+
 	var files := _walk(dir, "")
 	var ids := {}                       # prefix -> {full_id: true}
 	var refs: Array = []                # {prefix, value, path(file-qualified)}
@@ -166,12 +186,85 @@ static func editor_context(dir: String, content_type: String) -> Dictionary:
 				entry = candidate
 				break
 	if entry.is_empty():
+		# ADR-031 (gh #68): creator-declared kinds serve their inline schema through
+		# the same context shape, so the form/editor machinery never special-cases.
+		var creator_types := _creator_types(dir)
+		if creator_types.get(content_type) is Dictionary:
+			var declaration: Dictionary = creator_types[content_type]
+			var fragment = declaration.get("schema", {})
+			return {"ok": errors.is_empty(), "errors": errors,
+				"schema": fragment if fragment is Dictionary else {},
+				"ids": report.get("id_registry", {}),
+				"entry": _creator_entry(content_type, declaration)}
 		errors.append("no record schema for content type '%s'" % content_type)
+		return {"ok": false, "errors": errors, "schema": {}, "ids": {}, "entry": {}}
+	var schema = _load_json_file(
+		SCHEMA_DIR + str(entry.get("schema", "")) + ".schema.json", errors)
+	# The custom bag narrows to its declared shape for the form and the draft pass
+	# alike (ADR-031) — the editor can never disagree with the whole-project walk.
+	var decls = _custom_field_decls(dir).get(content_type)
+	if schema is Dictionary and decls is Dictionary and not (decls as Dictionary).is_empty():
+		schema = _merged_custom(schema, decls)
+	return {"ok": errors.is_empty(), "errors": errors, "schema": schema,
+		"ids": report.get("id_registry", {}), "entry": entry}
+
+
+## Editor context for a SINGLETON table file (ADR-031, gh #68): the layout entry whose
+## exact path matches, plus the same schema and id registry the record editors consume.
+static func editor_table_context(dir: String, rel: String) -> Dictionary:
+	var report := validate_project(dir)
+	var errors: Array = (report.get("errors", []) as Array).duplicate()
+	var format = _load_json_file(SCHEMA_DIR + "format.json", errors)
+	var entry: Dictionary = {}
+	if format is Dictionary:
+		for candidate in format.get("layout", []):
+			if str(candidate.get("path", "")) == rel \
+					and str(candidate.get("kind", "")) == "table":
+				entry = candidate
+				break
+	if entry.is_empty():
+		errors.append("no table layout entry for '%s'" % rel)
 		return {"ok": false, "errors": errors, "schema": {}, "ids": {}, "entry": {}}
 	var schema = _load_json_file(
 		SCHEMA_DIR + str(entry.get("schema", "")) + ".schema.json", errors)
 	return {"ok": errors.is_empty(), "errors": errors, "schema": schema,
 		"ids": report.get("id_registry", {}), "entry": entry}
+
+
+## Validate one in-memory singleton-table draft: the full CoreSchema pass plus
+## reference resolution — no filename-id rule (a table carries no record id). The two
+## declaration tables also run their semantic refusals here, so a bad declaration can
+## neither save in Studio nor pass the whole-project walk (ADR-031).
+static func validate_editor_table(record: Dictionary, context: Dictionary) -> Array:
+	var errors: Array = []
+	if not bool(context.get("ok", false)):
+		errors.append_array(context.get("errors", []))
+		return errors
+	var schema: Dictionary = context.get("schema", {})
+	var refs: Array = []
+	CoreSchema.validate(record, schema, schema, "", errors, refs)
+	var registry: Dictionary = context.get("ids", {})
+	for ref in refs:
+		var ref_prefix := str(ref["prefix"])
+		var have: Dictionary = registry.get(ref_prefix, {})
+		if not have.has(str(ref["value"])):
+			errors.append("%s — dangling reference '%s' — no %s with that id"
+				% [ref["path"], ref["value"], ref_prefix])
+	match str((context.get("entry", {}) as Dictionary).get("path", "")):
+		"data/content_types.json":
+			var format = _load_json_file(SCHEMA_DIR + "format.json", errors)
+			if format is Dictionary:
+				# Draft-time diagnostics address the field path directly, so the
+				# form routes them to the offending declaration's controls.
+				_check_creator_types(record, format.get("layout", []), errors, "")
+		"data/custom_fields.json":
+			for content_type in record:
+				if record[content_type] is Dictionary:
+					for field in record[content_type]:
+						if record[content_type][field] is Dictionary:
+							CoreSchema.check_keywords(record[content_type][field],
+								"/%s/%s" % [content_type, field], errors)
+	return errors
 
 
 ## Validate one in-memory editor draft without touching disk. This is the save
@@ -232,6 +325,96 @@ static func validate_event_editor_record(dir: String, basename: String, record: 
 static func validate_script_editor_record(basename: String, record: Dictionary,
 		context: Dictionary) -> Array:
 	return validate_editor_record(basename, record, context)
+
+
+# ---- creator declarations (gh #68, ADR-031) -----------------------------------------
+
+static func _read_optional_table(dir: String, rel: String):
+	if not FileAccess.file_exists(dir.path_join(rel)):
+		return null
+	return JSON.parse_string(FileAccess.get_file_as_string(dir.path_join(rel)))
+
+
+## data/custom_fields.json: content type -> {field -> CoreSchema fragment}; {} if absent.
+static func _custom_field_decls(dir: String) -> Dictionary:
+	var parsed = _read_optional_table(dir, "data/custom_fields.json")
+	return parsed if parsed is Dictionary else {}
+
+
+## data/content_types.json: kind -> {id_prefix, schema}; {} if absent.
+static func _creator_types(dir: String) -> Dictionary:
+	var parsed = _read_optional_table(dir, "data/content_types.json")
+	return parsed if parsed is Dictionary else {}
+
+
+## The one place a creator kind's layout entry is minted, so validate_project's
+## dynamic walk and editor_context agree by construction.
+static func _creator_entry(kind: String, declaration: Dictionary) -> Dictionary:
+	return {"path": "data/%s/*.json" % kind, "schema": "@creator:" + kind,
+		"kind": "record", "id_prefix": str(declaration.get("id_prefix", ""))}
+
+
+## The reserved custom bag, narrowed by declarations (ADR-017 + ADR-031): declared
+## fields validate and render as real controls; undeclared entries stay legal.
+static func _merged_custom(schema: Dictionary, decls: Dictionary) -> Dictionary:
+	var merged := schema.duplicate(true)
+	var props: Dictionary = merged.get("properties", {})
+	props["custom"] = {"type": "object", "properties": decls, "additionalProperties": true}
+	merged["properties"] = props
+	return merged
+
+
+static func _apply_custom_fields(layout: Array, schemas: Dictionary, content_type: String,
+		decls, errors: Array) -> void:
+	if not (decls is Dictionary):
+		return                           # the walk's schema pass reports the shape
+	for field in decls:
+		if decls[field] is Dictionary:
+			CoreSchema.check_keywords(decls[field],
+				"data/custom_fields.json: /%s/%s" % [content_type, field], errors)
+	var wanted := "data/%s/*.json" % content_type
+	for entry in layout:
+		if str(entry.get("path", "")) != wanted:
+			continue
+		var sname := str(entry.get("schema", ""))
+		if schemas.has(sname):
+			schemas[sname] = _merged_custom(schemas[sname], decls)
+		return
+
+
+## Declaration-time refusals for creator content types (ADR-031): kind and prefix
+## collisions with the built-in layout, fragment keyword typos, and a schema that
+## forgets 'id' (every record kind carries the filename-identity rule). Shared by the
+## whole-project walk and the Studio table-draft preflight, so a bad declaration can
+## neither save nor validate.
+static func _check_creator_types(creator_types: Dictionary, layout: Array,
+		errors: Array, source_prefix := "data/content_types.json: ") -> void:
+	var taken_prefixes := {}
+	for entry in layout:
+		if entry.get("id_prefix") != null:
+			taken_prefixes[str(entry["id_prefix"])] = true
+		if entry.get("declares") is Dictionary and (entry["declares"] as Dictionary).has("prefix"):
+			taken_prefixes[str(entry["declares"]["prefix"])] = true
+	var kinds := creator_types.keys()
+	kinds.sort()                          # deterministic first-claim for prefix clashes
+	for kind in kinds:
+		var where := "%s/%s" % [source_prefix, kind]
+		var declaration = creator_types[kind]
+		if not (declaration is Dictionary):
+			continue                     # the walk's schema pass reports the shape
+		if not _match_layout(layout, "data/%s/probe.json" % kind, SUPPORTED_FORMAT).is_empty():
+			errors.append("%s — content type '%s' collides with the built-in layout" % [where, kind])
+		var prefix := str((declaration as Dictionary).get("id_prefix", ""))
+		if taken_prefixes.has(prefix):
+			# Built-in OR another creator kind: two families sharing a prefix would
+			# merge into one registry bucket and make x-refs ambiguous.
+			errors.append("%s — id_prefix '%s' collides with an existing prefix" % [where, prefix])
+		taken_prefixes[prefix] = true
+		var fragment = (declaration as Dictionary).get("schema", {})
+		if fragment is Dictionary:
+			CoreSchema.check_keywords(fragment, where + "/schema", errors)
+			if not (fragment.get("properties", {}) as Dictionary).has("id"):
+				errors.append("%s — the schema must declare an 'id' property (records carry '<id_prefix>:<basename>')" % where)
 
 
 # ---- script semantics (gh #65, ADR-028) ---------------------------------------------

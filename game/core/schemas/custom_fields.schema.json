@@ -1,0 +1,15 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "schema:custom_fields",
+ "$comment": "Creator-declared shapes for the reserved custom bag (ADR-031, gh #68): content type -> {field -> a CoreSchema fragment}. Declared fields validate and render as real form controls; the bag itself stays additionalProperties: true, so undeclared entries remain legal - ADR-017's bag is narrowed, never sealed. Fragment keywords are checked recursively at declaration time.",
+ "type": "object",
+ "patternProperties": {
+  "^(species|moves|items|trainers|scripts|events)$": {
+   "type": "object",
+   "additionalProperties": {
+    "type": "object"
+   }
+  }
+ },
+ "additionalProperties": false
+}

@@ -17,6 +17,9 @@ var _array_add_controls := {}
 var _array_remove_controls := {}
 var _optional_add_controls := {}
 var _optional_remove_controls := {}
+var _map_add_controls := {}
+var _map_key_inputs := {}
+var _map_remove_controls := {}
 var _error_labels := {}
 var _field_labels := {}
 var _section_of_field := {}
@@ -66,6 +69,20 @@ func optional_add_control(path: String) -> Button:
 
 func optional_remove_control(path: String) -> Button:
 	return _optional_remove_controls.get(path, null)
+
+
+## The map-control seams (ADR-031, gh #68): the add button and new-key input live on
+## the map's own path; each entry's remove button lives on the entry path.
+func map_add_control(path: String) -> Button:
+	return _map_add_controls.get(path, null)
+
+
+func map_key_control(path: String) -> LineEdit:
+	return _map_key_inputs.get(path, null)
+
+
+func map_remove_control(entry_path: String) -> Button:
+	return _map_remove_controls.get(entry_path, null)
 
 
 func is_dirty() -> bool:
@@ -127,6 +144,9 @@ func _rebuild() -> void:
 	_array_remove_controls.clear()
 	_optional_add_controls.clear()
 	_optional_remove_controls.clear()
+	_map_add_controls.clear()
+	_map_key_inputs.clear()
+	_map_remove_controls.clear()
 	_error_labels.clear()
 	_field_labels.clear()
 	_section_of_field.clear()
@@ -139,7 +159,13 @@ func _rebuild() -> void:
 	_add_error_label(self, "")
 	var sections := StudioFormLayout.sections_for(_content_type, _schema.get("properties", {}))
 	if sections.is_empty():
-		_build_object(self, _schema, _draft, "")
+		# The declaration tables are maps at the ROOT (ADR-031): patternProperties
+		# with no fixed properties. _build_object only walks properties, so the map
+		# shape must dispatch here too.
+		if _is_map_object(_schema):
+			_build_map(self, _content_type, _schema, _draft, "")
+		else:
+			_build_object(self, _schema, _draft, "")
 	else:
 		_build_root_sections(sections)
 	_validate_draft()
@@ -187,7 +213,7 @@ func _build_object(parent: Control, schema: Dictionary, value: Dictionary, path:
 				# schema-shaped control without silently inserting data into the draft;
 				# its first edit creates the missing value.
 				_build_field(parent, str(field), field_schema,
-					_default_value(field_schema), field_path, is_required)
+					default_value(field_schema, _id_registry), field_path, is_required)
 			else:
 				_build_missing_optional(parent, str(field), field_schema, field_path)
 			continue
@@ -229,6 +255,9 @@ func _build_field(parent: Control, field: String, schema: Dictionary, value, pat
 			return
 	var kind := str(schema.get("type", ""))
 	if kind == "object":
+		if _is_map_object(schema):
+			_build_map(parent, field, schema, value if value is Dictionary else {}, path)
+			return
 		if _is_freeform_object(schema):
 			var json_input := TextEdit.new()
 			json_input.custom_minimum_size.y = 96
@@ -262,6 +291,91 @@ func _build_field(parent: Control, field: String, schema: Dictionary, value, pat
 func _is_freeform_object(schema: Dictionary) -> bool:
 	return (schema.get("properties", {}) as Dictionary).is_empty() \
 		and schema.get("additionalProperties", true) != false
+
+
+## A schema'd MAP (ADR-031, gh #68): an object whose entries share one declared value
+## schema — additionalProperties as a schema, or exactly one patternProperties rule.
+## Distinct from the truly shapeless freeform object, which keeps the raw-JSON control.
+func _is_map_object(schema: Dictionary) -> bool:
+	if not (schema.get("properties", {}) as Dictionary).is_empty():
+		return false
+	if schema.get("additionalProperties") is Dictionary:
+		return true
+	return (schema.get("patternProperties", {}) as Dictionary).size() == 1
+
+
+func _map_entry_schema(schema: Dictionary) -> Dictionary:
+	if schema.get("additionalProperties") is Dictionary:
+		return schema["additionalProperties"]
+	var patterns: Dictionary = schema.get("patternProperties", {})
+	return patterns[patterns.keys()[0]] if patterns.size() == 1 else {}
+
+
+## Key/value rows with add/remove, mirroring the array control's shape. Keys sort for
+## a deterministic layout; a key that breaks the schema's pattern rule surfaces through
+## the standard validation labels, never a bespoke widget check.
+func _build_map(parent: Control, field: String, schema: Dictionary, value: Dictionary,
+		path: String) -> void:
+	var section := VBoxContainer.new()
+	parent.add_child(section)
+	var header := HBoxContainer.new()
+	section.add_child(header)
+	var label := Label.new()
+	label.text = field
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(label)
+	_field_labels[path] = label
+	var key_input := LineEdit.new()
+	key_input.placeholder_text = "new key"
+	key_input.custom_minimum_size.x = 120
+	header.add_child(key_input)
+	_map_key_inputs[path] = key_input
+	var entry_schema := _map_entry_schema(schema)
+	var add := Button.new()
+	add.text = "Add"
+	add.pressed.connect(func() -> void:
+		_add_map_key(path, key_input.text.strip_edges(), entry_schema))
+	header.add_child(add)
+	_map_add_controls[path] = add
+	_add_error_label(section, path)
+	var keys := value.keys()
+	keys.sort()
+	for key in keys:
+		var entry_path := "%s/%s" % [path, key]
+		var row := HBoxContainer.new()
+		section.add_child(row)
+		var content := VBoxContainer.new()
+		content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(content)
+		_build_field(content, str(key), entry_schema, value[key], entry_path)
+		var remove := Button.new()
+		remove.text = "Remove"
+		var map_key := str(key)
+		remove.pressed.connect(func() -> void: _remove_map_key(path, map_key))
+		row.add_child(remove)
+		_map_remove_controls[entry_path] = remove
+
+
+func _add_map_key(path: String, key: String, entry_schema: Dictionary) -> void:
+	if key == "":
+		return
+	var value = _draft_value(path)
+	if not (value is Dictionary):
+		_set_draft_value(path, {})
+		value = _draft_value(path)
+	if (value as Dictionary).has(key):
+		return
+	value[key] = default_value(entry_schema, _id_registry)
+	_set_dirty(CanonJSON.serialize(_draft) != CanonJSON.serialize(_saved))
+	_rebuild()
+
+
+func _remove_map_key(path: String, key: String) -> void:
+	var value = _draft_value(path)
+	if value is Dictionary:
+		(value as Dictionary).erase(key)
+	_set_dirty(CanonJSON.serialize(_draft) != CanonJSON.serialize(_saved))
+	_rebuild()
 
 
 func _mount_input(parent: Control, field: String, input: Control, path: String,
@@ -386,7 +500,7 @@ func _append_array(path: String, item_schema: Dictionary) -> void:
 	if not (value is Array):
 		_set_draft_value(path, [])
 		value = _draft_value(path)
-	(value as Array).append(_default_value(item_schema))
+	(value as Array).append(default_value(item_schema, _id_registry))
 	_set_dirty(CanonJSON.serialize(_draft) != CanonJSON.serialize(_saved))
 	_rebuild()
 
@@ -401,7 +515,7 @@ func _remove_array_item(path: String, index: int) -> void:
 
 
 func _add_optional(path: String, schema: Dictionary) -> void:
-	_set_draft_value(path, _default_value(schema))
+	_set_draft_value(path, default_value(schema, _id_registry))
 	_rebuild()
 
 
@@ -436,12 +550,14 @@ func _draft_value(path: String):
 	return node
 
 
-func _default_value(schema: Dictionary):
+## Public seam (ADR-031): the shell's New-record dialogs build the same minimal
+## draft the form itself would, including registry-backed x-ref defaults.
+static func default_value(schema: Dictionary, id_registry: Dictionary = {}):
 	if schema.has("default"):
 		var default_value = schema["default"]
 		return default_value.duplicate(true) if default_value is Array or default_value is Dictionary else default_value
 	if schema.has("x-ref"):
-		var ids := (_id_registry.get(str(schema["x-ref"]), {}) as Dictionary).keys()
+		var ids := (id_registry.get(str(schema["x-ref"]), {}) as Dictionary).keys()
 		ids.sort()
 		return str(ids[0]) if not ids.is_empty() else str(schema["x-ref"]) + ":"
 	if schema.has("enum") and not (schema["enum"] as Array).is_empty():
@@ -452,12 +568,12 @@ func _default_value(schema: Dictionary):
 			var properties: Dictionary = schema.get("properties", {})
 			for field in schema.get("required", []):
 				if properties.has(field):
-					object[field] = _default_value(properties[field])
+					object[field] = default_value(properties[field], id_registry)
 			return object
 		"array":
 			var array := []
 			for _i in int(schema.get("minItems", 0)):
-				array.append(_default_value(schema.get("items", {})))
+				array.append(default_value(schema.get("items", {}), id_registry))
 			return array
 		"string":
 			return ""
@@ -522,7 +638,12 @@ func _set_dirty(value: bool) -> void:
 
 
 func _validate_draft() -> Array:
-	_current_errors = ProjectValidator.validate_editor_record(_basename, _draft, _context)
+	# Singleton tables (ADR-031, gh #68) carry no record id, so the filename-id rule
+	# does not apply; everything else about the draft pass is shared.
+	if str((_context.get("entry", {}) as Dictionary).get("kind", "")) == "table":
+		_current_errors = ProjectValidator.validate_editor_table(_draft, _context)
+	else:
+		_current_errors = ProjectValidator.validate_editor_record(_basename, _draft, _context)
 	for label in _error_labels.values():
 		(label as Label).text = ""
 		(label as Label).visible = false

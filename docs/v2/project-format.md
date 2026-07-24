@@ -73,6 +73,20 @@ project/
                          arithmetic (contracts in docs/v2/hatch-script.md); an
                          unknown kernel name or dangling script ref refuses at
                          validation and at Engine boot
+    custom_fields.json   table, ADDITIVE (ADR-031, gh #68) — content type ->
+                         {field -> CoreSchema fragment}: declared shapes for the
+                         reserved custom bag. Declared fields validate and render as
+                         real form controls (x-ref fragments become id pickers); the
+                         bag stays additionalProperties: true, so undeclared entries
+                         remain legal. Fragment keywords check at declaration time
+    content_types.json   table, ADDITIVE (ADR-031, gh #68) — kind -> {id_prefix,
+                         schema}: creator-defined record families. Each kind claims
+                         data/<kind>/*.json in the layout walk, validates records
+                         against the inline schema (which must declare 'id'), and
+                         registers '<prefix>:<basename>' ids for x-refs. Kind/prefix
+                         collisions with the built-in layout refuse at validation AND
+                         at Studio save; the engine does not consume creator records
+                         this phase (ProjectData.records serves them generically)
     world.json           format 2+ — cardinal map connections keyed by stable map id
     lint_suppressions.json  table (ADR-027, gh #57) — reviewed ProjectLint warnings:
                          exact rule+source pairs, each with a required human reason;

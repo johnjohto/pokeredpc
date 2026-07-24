@@ -1,0 +1,26 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "schema:content_types",
+ "$comment": "Creator-defined record families (ADR-031, gh #68): kind -> {id_prefix, schema}. Each declared kind claims data/<kind>/*.json in the layout walk, validates records against the inline CoreSchema fragment (which must declare an 'id' property), and registers '<id_prefix>:<basename>' ids for x-ref resolution. Kind and prefix names must not collide with the built-in layout.",
+ "type": "object",
+ "patternProperties": {
+  "^[a-z][a-z0-9_]*$": {
+   "type": "object",
+   "required": [
+    "id_prefix",
+    "schema"
+   ],
+   "properties": {
+    "id_prefix": {
+     "type": "string",
+     "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "schema": {
+     "type": "object"
+    }
+   },
+   "additionalProperties": false
+  }
+ },
+ "additionalProperties": false
+}

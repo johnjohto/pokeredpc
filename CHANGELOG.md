@@ -10,6 +10,16 @@ milestones, `PATCH` bumps are fixes/polish. See `docs/roadmap.md` for the live p
 
 ### Added
 
+- **Ruleset config UI + creator extensibility** (gh #68, ADR-031). Studio's schema form
+  gained map fields (key/value rows for schema'd `additionalProperties` objects), and
+  singleton tables mount as workspaces: the type chart, `data/ruleset.json` (every knob
+  editable with the faithful values visible — a turned stage multiplier is proven live
+  by a child Engine), plus two new additive declaration tables. `data/custom_fields.json`
+  gives declared shape to the reserved custom bag (real controls, validation teeth,
+  x-ref pickers; undeclared entries stay legal), and `data/content_types.json` declares
+  creator record families that validate, browse, create, and cross-reference like
+  built-ins — collisions and keyword typos refuse at validation and at Studio save.
+
 - **Studio HatchScript editor** (gh #67). Scripts are a browsable Studio content kind
   with a "New script…" dialog, and `source` edits in a monospace multiline field with
   live, position-named syntax diagnostics — the parse rides the same validator seam the

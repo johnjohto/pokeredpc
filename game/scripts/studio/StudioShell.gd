@@ -10,7 +10,14 @@ class_name StudioShell
 ## The Phase-4 content types (ADR-020 d3) retain SchemaForm; Phase 5 adds specialized
 ## native-map and recursive event-command workspaces over their Core documents.
 const CONTENT_TYPES := ["species", "moves", "items", "trainers", "scripts"]
-const WORKSPACES := ["species", "moves", "items", "trainers", "scripts", "maps", "events"]
+const WORKSPACES := ["species", "moves", "items", "trainers", "scripts", "maps", "events",
+	"types", "ruleset", "custom_fields", "content_types"]
+## The singleton table workspaces (ADR-031, gh #68): sidebar kind -> the one file.
+## types = the data-defined type list + chart (a new elemental type is one map row).
+const TABLE_KINDS := {"types": "data/types.json",
+	"ruleset": "data/ruleset.json",
+	"custom_fields": "data/custom_fields.json",
+	"content_types": "data/content_types.json"}
 const RECENTS_CFG := "user://studio.cfg"
 const DEFAULT_WINDOW_SIZE := Vector2i(1280, 800)
 const MIN_WINDOW_SIZE := Vector2i(900, 600)
@@ -44,8 +51,12 @@ var _new_event_name: LineEdit
 var _new_event_map: OptionButton
 var _new_script_dialog: ConfirmationDialog
 var _new_script_name: LineEdit
+var _new_record_dialog: ConfirmationDialog
+var _new_record_name: LineEdit
 var _record_names := {}          # kind -> sorted basenames (the sidebar's data)
 var _active_kind := ""
+var _workspaces: Array = WORKSPACES.duplicate()   # + creator-declared kinds (ADR-031)
+var _creator_kinds: Array = []
 var _active_form: Control = null
 var _active_map_workspace = null
 var _active_event_workspace = null
@@ -118,6 +129,16 @@ func open_project(dir_path: String) -> String:
 		_reload_kind_names(kind)
 	_record_names["maps"] = ProjectData.map_labels()
 	_reload_event_names()
+	# Singleton tables list their one file when present (ADR-031, gh #68), and
+	# creator-declared kinds join the sidebar exactly like built-in record kinds.
+	for kind in TABLE_KINDS:
+		_record_names[kind] = [kind] \
+			if FileAccess.file_exists(dir_path.path_join(TABLE_KINDS[kind])) else []
+	_creator_kinds = ProjectData.content_types().keys()
+	_creator_kinds.sort()
+	_workspaces = WORKSPACES + _creator_kinds
+	for kind in _creator_kinds:
+		_reload_kind_names(str(kind))
 	_refresh_sidebar()
 	_clear_editor()
 	_save_recent(dir_path)
@@ -246,12 +267,13 @@ func _build_ui() -> void:
 	_build_new_map_dialog()
 	_build_new_event_dialog()
 	_build_new_script_dialog()
+	_build_new_record_dialog()
 
 
 func _refresh_sidebar() -> void:
 	_sidebar.clear()
 	_records.clear()
-	for kind in WORKSPACES:
+	for kind in _workspaces:
 		_sidebar.add_item("%s  %d" % [kind.capitalize(), (_record_names[kind] as Array).size()])
 	if _sidebar.item_count > 0:
 		_sidebar.select(0)
@@ -259,15 +281,23 @@ func _refresh_sidebar() -> void:
 
 
 func _on_type_selected(idx: int) -> void:
-	_active_kind = WORKSPACES[idx]
-	# Scripts are format-agnostic (data/scripts is additive under format 1); native
+	_active_kind = _workspaces[idx]
+	# Scripts/tables/creator kinds are format-agnostic (additive data); native
 	# map/event authoring needs the format-2 layout.
-	_new_map_button.disabled = _active_kind not in ["maps", "events", "scripts"] \
-		or (_active_kind != "scripts" and int(ProjectData.manifest.get("format", 1)) < 2)
-	match _active_kind:
-		"events": _new_map_button.text = "New event…"
-		"scripts": _new_map_button.text = "New script…"
-		_: _new_map_button.text = "New map…"
+	if TABLE_KINDS.has(_active_kind):
+		_new_map_button.text = "Create %s" % str(TABLE_KINDS[_active_kind]).get_file()
+		_new_map_button.disabled = FileAccess.file_exists(
+			project_dir.path_join(TABLE_KINDS[_active_kind]))
+	elif _creator_kinds.has(_active_kind):
+		_new_map_button.text = "New %s…" % _active_kind
+		_new_map_button.disabled = false
+	else:
+		_new_map_button.disabled = _active_kind not in ["maps", "events", "scripts"] \
+			or (_active_kind != "scripts" and int(ProjectData.manifest.get("format", 1)) < 2)
+		match _active_kind:
+			"events": _new_map_button.text = "New event…"
+			"scripts": _new_map_button.text = "New script…"
+			_: _new_map_button.text = "New map…"
 	# A filter from another content type reads as a spurious "(no matches)" (gh #61).
 	if _records_filter != null:
 		_records_filter.text = ""
@@ -339,6 +369,14 @@ func _show_new_map_dialog() -> void:
 		_new_script_name.text = ""
 		_new_script_dialog.popup_centered(Vector2i(450, 160))
 		return
+	if TABLE_KINDS.has(_active_kind):
+		_create_table_file(_active_kind)
+		return
+	if _creator_kinds.has(_active_kind):
+		_new_record_name.text = ""
+		_new_record_dialog.title = "Create %s" % _active_kind
+		_new_record_dialog.popup_centered(Vector2i(450, 160))
+		return
 	_new_map_tileset.clear()
 	var files := PackedStringArray()
 	for file in DirAccess.get_files_at(project_dir.path_join("tilesets")):
@@ -364,7 +402,7 @@ func _create_map_from_dialog():
 		_status.text = "REFUSED: " + str(created.get("error", "cannot create map"))
 		return null
 	_record_names["maps"] = ProjectData.map_labels()
-	var map_workspace_index := WORKSPACES.find("maps")
+	var map_workspace_index: int = _workspaces.find("maps")
 	_sidebar.select(map_workspace_index)
 	_on_type_selected(map_workspace_index)
 	var record_index := (_record_names["maps"] as Array).find(label)
@@ -489,8 +527,108 @@ func new_script_fields() -> Dictionary:
 	return {"dialog": _new_script_dialog, "name": _new_script_name}
 
 
+## Create a missing singleton table (ADR-031, gh #68) with its schema-valid starter,
+## through the same validate-before-write path every save uses.
+func _create_table_file(kind: String):
+	var rel := str(TABLE_KINDS[kind])
+	var path := project_dir.path_join(rel)
+	if FileAccess.file_exists(path):
+		_status.text = "REFUSED: %s already exists" % rel
+		return null
+	var starter := {}
+	if kind == "ruleset":
+		starter = {"base": str(ProjectData.manifest.get("ruleset", ""))}
+	elif kind == "types":
+		# The minimal VALID chart (types requires one entry): a fresh project's list.
+		starter = {"types": ["type:normal"], "chart": {}}
+	var context := ProjectValidator.editor_table_context(project_dir, rel)
+	if not bool(context.get("ok", false)):
+		_status.text = "REFUSED: " + "; ".join(PackedStringArray(context.get("errors", [])))
+		return null
+	var errors := ProjectValidator.validate_editor_table(starter, context)
+	if not errors.is_empty():
+		_status.text = "REFUSED: " + "; ".join(PackedStringArray(errors))
+		return null
+	var write_error := CanonJSON.write_file(path, starter)
+	if write_error != "":
+		_status.text = "REFUSED: " + write_error
+		return null
+	_record_names[kind] = [kind]
+	select_workspace(kind)
+	var index := (_record_names[kind] as Array).find(kind)
+	if index >= 0:
+		_records.select(index)
+	var form = edit_table(rel, kind)
+	_status.text = "created %s" % rel
+	return form
+
+
+func _build_new_record_dialog() -> void:
+	_new_record_dialog = ConfirmationDialog.new()
+	_new_record_dialog.title = "Create record"
+	_new_record_dialog.ok_button_text = "Create"
+	var fields := GridContainer.new()
+	fields.columns = 2
+	_new_record_dialog.add_child(fields)
+	fields.add_child(_dialog_label("Record name"))
+	_new_record_name = LineEdit.new()
+	_new_record_name.placeholder_text = "my_record"
+	fields.add_child(_new_record_name)
+	_new_record_dialog.confirmed.connect(_create_record_from_dialog)
+	add_child(_new_record_dialog)
+
+
+## Create a record of a creator-declared kind (ADR-031, gh #68): the draft is the
+## schema-shaped default plus its id, validated through the shared preflight before
+## any byte lands — a schema whose defaults cannot validate refuses loudly here.
+func _create_record_from_dialog():
+	# Like the sibling handlers, confirmation reads only live state: the active
+	# workspace names the kind (the dialog only opens on a creator kind).
+	var kind := _active_kind
+	if not _creator_kinds.has(kind):
+		_status.text = "REFUSED: '%s' is not a creator-declared kind" % kind
+		return null
+	var record_basename := _new_record_name.text.strip_edges()
+	var context := ProjectValidator.editor_context(project_dir, kind)
+	if not bool(context.get("ok", false)):
+		_status.text = "REFUSED: " + "; ".join(PackedStringArray(context.get("errors", [])))
+		return null
+	var entry: Dictionary = context.get("entry", {})
+	var prefix := str(entry.get("id_prefix", ""))
+	var record = SchemaForm.default_value(context.get("schema", {}), context.get("ids", {}))
+	if not (record is Dictionary):
+		record = {}
+	record["id"] = prefix + ":" + record_basename
+	var path := project_dir.path_join("data").path_join(kind).path_join(
+		record_basename + ".json")
+	if FileAccess.file_exists(path):
+		_status.text = "REFUSED: %s '%s' already exists" % [kind, record_basename]
+		return null
+	var errors := ProjectValidator.validate_editor_record(record_basename, record, context)
+	if not errors.is_empty():
+		_status.text = "REFUSED: " + "; ".join(PackedStringArray(errors))
+		return null
+	DirAccess.make_dir_recursive_absolute(project_dir.path_join("data").path_join(kind))
+	var write_error := CanonJSON.write_file(path, record)
+	if write_error != "":
+		_status.text = "REFUSED: " + write_error
+		return null
+	_reload_kind_names(kind)
+	select_workspace(kind)
+	var index := (_record_names[kind] as Array).find(record_basename)
+	if index >= 0:
+		_records.select(index)
+	var form = edit_record(kind, record_basename)
+	_status.text = "created %s/%s" % [kind, record_basename]
+	return form
+
+
+func new_record_fields() -> Dictionary:
+	return {"dialog": _new_record_dialog, "name": _new_record_name}
+
+
 func select_workspace(kind: String) -> void:
-	var index := WORKSPACES.find(kind)
+	var index: int = _workspaces.find(kind)
 	if index >= 0:
 		_sidebar.select(index)
 		_on_type_selected(index)
@@ -511,6 +649,8 @@ func _on_record_selected(idx: int) -> void:
 	var basename := _records.get_item_text(idx)
 	if _active_kind == "maps":
 		edit_map(basename)
+	elif TABLE_KINDS.has(_active_kind):
+		edit_table(str(TABLE_KINDS[_active_kind]), _active_kind)
 	elif _active_kind == "events":
 		edit_event(basename)
 	else:
@@ -718,7 +858,7 @@ func _on_problem_selected(index: int) -> void:
 ## Public shell seam used by record selection and the Studio smoke suite. Returns the
 ## mounted SchemaForm, or null after a loud non-fatal refusal.
 func edit_record(content_type: String, basename: String):
-	if not CONTENT_TYPES.has(content_type):
+	if not CONTENT_TYPES.has(content_type) and not _creator_kinds.has(content_type):
 		_status.text = "REFUSED: unknown content type " + content_type
 		return null
 	var context := ProjectValidator.editor_context(project_dir, content_type)
@@ -726,6 +866,24 @@ func edit_record(content_type: String, basename: String):
 		_status.text = "REFUSED: " + "; ".join(PackedStringArray(context.get("errors", [])))
 		return null
 	var path := project_dir.path_join("data").path_join(content_type).path_join(basename + ".json")
+	return _mount_record_form(content_type, basename, path, context)
+
+
+## Mount a singleton table file (ADR-031, gh #68) — data/ruleset.json et al — through
+## the SAME SchemaForm + canonical-save + validate-before-write path records use. The
+## table's kind label doubles as the form's content type (widget/layout keying).
+func edit_table(rel: String, kind_label: String):
+	var context := ProjectValidator.editor_table_context(project_dir, rel)
+	if not bool(context.get("ok", false)):
+		_status.text = "REFUSED: " + "; ".join(PackedStringArray(context.get("errors", [])))
+		return null
+	return _mount_record_form(kind_label, kind_label, project_dir.path_join(rel), context)
+
+
+## The one editor-pane mount both record and table editing share: title, Save/Revert,
+## the schema form with the default widget catalog, and the dirty-star title flow.
+func _mount_record_form(content_type: String, basename: String, path: String,
+		context: Dictionary):
 	var record = JSON.parse_string(FileAccess.get_file_as_string(path))
 	if not (record is Dictionary):
 		_status.text = "REFUSED: cannot parse " + path
@@ -1029,6 +1187,8 @@ func _studiotest() -> void:
 	ok = preload("res://scripts/studio/StudioFormSmoke.gd").new().run(self, scratch) and ok
 	ok = preload("res://scripts/studio/StudioEditorSmoke.gd").new().run(self, scratch) and ok
 	ok = preload("res://scripts/studio/StudioScriptSmoke.gd").new().run(self, scratch) and ok
+	ok = await preload("res://scripts/studio/StudioRulesetSmoke.gd").new().run(self, scratch) and ok
+	ok = preload("res://scripts/studio/StudioCreatorTypesSmoke.gd").new().run(self, scratch) and ok
 	ok = preload("res://scripts/studio/StudioMapSmoke.gd").new().run(self) and ok
 	ok = await preload("res://scripts/studio/StudioMapAuthoringSmoke.gd").new().run(self, scratch) and ok
 	ok = await preload("res://scripts/studio/StudioWorldAuthoringSmoke.gd").new().run(self, scratch) and ok

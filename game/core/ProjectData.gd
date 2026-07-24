@@ -82,6 +82,15 @@ static func scripts() -> Dictionary:
 	return _read_records("data/scripts")
 
 
+static func content_types() -> Dictionary:
+	## Creator-defined record families (ADR-031, gh #68): data/content_types.json as
+	## {kind: {id_prefix, schema}}. Absent file -> {} (the project declares no extra
+	## kinds); the validator owns every semantic check.
+	var parsed = _read_json(dir.path_join("data/content_types.json")) \
+		if FileAccess.file_exists(dir.path_join("data/content_types.json")) else null
+	return parsed if parsed is Dictionary else {}
+
+
 ## Per-record access for a content kind ("species"/"moves"/"items"/"trainers"/"events"…):
 ## {basename: record} straight off data/<kind>/. Studio's editors read and list through
 ## this (ADR-020, gh #47) — the legacy tables above stay the ENGINE's view. An absent

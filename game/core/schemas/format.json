@@ -120,6 +120,16 @@
    "kind": "table"
   },
   {
+   "path": "data/custom_fields.json",
+   "schema": "custom_fields",
+   "kind": "table"
+  },
+  {
+   "path": "data/content_types.json",
+   "schema": "content_types",
+   "kind": "table"
+  },
+  {
    "path": "presentation/**",
    "schema": "blob",
    "kind": "blob"

@@ -692,6 +692,7 @@ func _ready() -> void:
 	var formula_probe := "--playtest-formula" in args
 	var formula_kernels := ""
 	var formula_exp50 := -1
+	var formula_stage2 := -1
 	var formula_catch_caught := false
 	var formula_catch_shakes := -1
 	if formula_probe:
@@ -699,6 +700,9 @@ func _ready() -> void:
 			formula_kernels = ",".join(PackedStringArray(
 				(ruleset.formulas as HatchFormulas).bound_kernels()))
 		formula_exp50 = ruleset.formulas.exp_for_level(50, "GROWTH_MEDIUM_FAST")
+		# gh #68: the config knobs are part of the same probe — a turned
+		# stat_stage_multipliers entry must answer through the live seam.
+		formula_stage2 = ruleset.formulas.stage_apply(100, 2)
 		var probe_seq: Array = [100, 0]
 		var probe_i: Array = [0]
 		var probe_ri := func(n):
@@ -738,6 +742,7 @@ func _ready() -> void:
 			"event_probe_flag": event_probe_flag,
 			"formula_kernels": formula_kernels,
 			"formula_exp50": formula_exp50,
+			"formula_stage2": formula_stage2,
 			"formula_catch_caught": formula_catch_caught,
 			"formula_catch_shakes": formula_catch_shakes,
 			"save_path": ProjectSettings.globalize_path(SAVE_PATH),
@@ -5657,12 +5662,12 @@ func _schematest() -> void:
 	ok = _schema_check("valid: no errors", (r["errors"] as Array).is_empty() and bool(r["ok"]),
 		"; ".join(PackedStringArray(r["errors"]))) and ok
 	var ids: Dictionary = r["ids"]
-	ok = _schema_check("valid: ids registered (2 species, 1 move, 2 items, 1 trainer, 1 map, 2 types, 1 event, 2 scripts)",
+	ok = _schema_check("valid: ids registered (2 species, 1 move, 2 items, 1 trainer, 1 map, 2 types, 1 event, 2 scripts, 1 relic)",
 		int(ids.get("species", 0)) == 2 and int(ids.get("move", 0)) == 1
 		and int(ids.get("item", 0)) == 2 and int(ids.get("trainer", 0)) == 1
 		and int(ids.get("map", 0)) == 1 and int(ids.get("type", 0)) == 2
-		and int(ids.get("event", 0)) == 1 and int(ids.get("script", 0)) == 2,
-		str(ids)) and ok
+		and int(ids.get("event", 0)) == 1 and int(ids.get("script", 0)) == 2
+		and int(ids.get("relic", 0)) == 1, str(ids)) and ok
 	var tmx: Dictionary = ProjectValidator.validate_project("res://core/fixtures/valid_tmx")
 	ok = _schema_check("format 2: native TMX project validates and registers map/event ids",
 		bool(tmx.get("ok", false)) and int(tmx.get("files", 0)) == 5
@@ -5693,6 +5698,8 @@ func _schematest() -> void:
 		["broken_event_oob_cell", "cell (9,9) is outside map"],
 		["broken_formula_kernel", "unknown field 'frobnicate'"],
 		["broken_formula_ref", "dangling reference 'script:nope'"],
+		["broken_custom_field", "expected integer"],
+		["broken_content_type", "collides with the built-in layout"],
 	]
 	for c in cases:
 		var b: Dictionary = ProjectValidator.validate_project("res://core/fixtures/" + str(c[0]))

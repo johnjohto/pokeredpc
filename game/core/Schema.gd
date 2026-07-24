@@ -23,6 +23,31 @@ const _KNOWN := ["$schema", "$id", "$comment", "$defs", "title", "description", 
 	"x-ref", "x-ref-keys"]
 
 
+## Recursively refuse unknown keywords in a creator-declared schema FRAGMENT
+## (ADR-031, gh #68): a typo'd keyword must fail at declaration time, not at
+## first-record time — a kind with zero records would otherwise hide it forever.
+static func check_keywords(schema: Dictionary, path: String, errors: Array) -> void:
+	for k in schema:
+		if not _KNOWN.has(str(k)):
+			errors.append("%s — unsupported schema keyword '%s'" % [path, k])
+			continue
+		var v = schema[k]
+		match str(k):
+			"properties", "patternProperties", "$defs":
+				if v is Dictionary:
+					for name in v:
+						if v[name] is Dictionary:
+							check_keywords(v[name], "%s/%s/%s" % [path, k, name], errors)
+			"additionalProperties", "items":
+				if v is Dictionary:
+					check_keywords(v, path + "/" + str(k), errors)
+			"anyOf", "prefixItems":
+				if v is Array:
+					for i in (v as Array).size():
+						if v[i] is Dictionary:
+							check_keywords(v[i], "%s/%s/%d" % [path, k, i], errors)
+
+
 ## Validate `inst` against `schema` (with `root` for $defs lookups). Appends
 ## "path — message" strings to `errors` and {prefix, value, path} dicts to `refs`.
 static func validate(inst, schema: Dictionary, root: Dictionary, path: String,

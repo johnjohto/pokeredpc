@@ -2,6 +2,26 @@
 
 **Living document** — update the table when a milestone lands; add sub-tasks as discovered.
 
+**Landed 2026-07-24:** gh #68 — the ruleset config UI + creator extensibility (ADR-031).
+`SchemaForm` grew its one new control — the schema'd **map field** (key/value rows from
+`additionalProperties`/single-`patternProperties`) — and singleton `kind: table` files
+mount through the same form/canonical-save/preflight path as records: the shell lists
+**types** (the chart — a new elemental type is one map row), **ruleset** (every knob
+editable with the faithful emitted values visible), **custom_fields**, and
+**content_types**, creating missing declaration files with schema-valid starters.
+`data/custom_fields.json` narrows the reserved custom bag (declared fields validate and
+render as real controls incl. x-ref pickers; undeclared entries stay legal), and
+`data/content_types.json` declares new record families (dynamic layout claim, id
+registry, collision/keyword/id refusals at validation AND Studio save; engine
+consumption deliberately nil this phase — identity/link rules unchanged per ADR-029).
+Gates: `--studiotest` grew `StudioRulesetSmoke` (knob turned through the real map
+control, saved, and a child Engine answers `stage_apply(100, 2) == 300` live) and
+`StudioCreatorTypesSmoke` (declare fields → real controls + validation teeth → creator
+kind declared, created, saved, x-ref'd from a custom field, whole-project validation
+clean) — **141 checks ALL GREEN**; `--schematest` grew the valid-fixture declarations +
+2 broken fixtures; `--eventtest`/`--exprtest`/`--validate` (0 errors) green. Phase 6
+(gh #20) is functionally complete: hatch + config UI both shipped.
+
 **Landed 2026-07-24:** gh #67 — Studio's syntax-checked HatchScript editor. `scripts`
 joins the shell's browsable content kinds with a "New script…" dialog (creation
 validates through the shared seam before any byte lands; an id-pattern-breaking name

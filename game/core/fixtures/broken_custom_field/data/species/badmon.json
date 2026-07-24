@@ -1,5 +1,5 @@
 {
- "id": "species:testmon",
+ "id": "species:badmon",
  "name": "TESTMON",
  "stats": {
   "hp": 45,
@@ -26,13 +26,7 @@
  "tmhm": [
   "move:tackle"
  ],
- "evolutions": [
-  {
-   "method": "level",
-   "level": 16,
-   "into": "species:testmon2"
-  }
- ],
+ "evolutions": [],
  "dex": {
   "num": 1,
   "cat": "TEST",
@@ -52,7 +46,6 @@
   "back": "assets/back/testmon.png"
  },
  "custom": {
-  "grade": 3,
-  "note": "the ADR-017 reserved bag, exercised — grade is DECLARED, note is not"
+  "grade": "high"
  }
 }

@@ -1,0 +1,13 @@
+{
+ "species": {
+  "id_prefix": "widget",
+  "schema": {
+   "type": "object",
+   "properties": {
+    "id": {
+     "type": "string"
+    }
+   }
+  }
+ }
+}

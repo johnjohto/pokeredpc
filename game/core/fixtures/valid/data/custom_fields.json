@@ -1,0 +1,9 @@
+{
+ "species": {
+  "grade": {
+   "type": "integer",
+   "minimum": 0,
+   "maximum": 5
+  }
+ }
+}
