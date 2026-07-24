@@ -89,6 +89,32 @@ static func records(kind: String) -> Dictionary:
 	return _read_records("data/" + kind)
 
 
+## Deep-copy a project tree byte-for-byte (the scratch-project convention every suite
+## and Studio's dev/test flow use — ADR-020 d2). Returns "" or the first failure.
+static func copy_dir(from: String, to: String) -> String:
+	var da := DirAccess.open(from)
+	if da == null:
+		return "cannot open " + from
+	DirAccess.make_dir_recursive_absolute(to)
+	da.list_dir_begin()
+	var entry := da.get_next()
+	while entry != "":
+		var source := from.path_join(entry)
+		var target := to.path_join(entry)
+		if da.current_is_dir():
+			var child_error := copy_dir(source, target)
+			if child_error != "":
+				return child_error
+		else:
+			var out := FileAccess.open(target, FileAccess.WRITE)
+			if out == null:
+				return "cannot write " + target
+			out.store_buffer(FileAccess.get_file_as_bytes(source))
+		entry = da.get_next()
+	da.list_dir_end()
+	return ""
+
+
 static func map_exists(label: String) -> bool:
 	var extension := "tmx" if int(manifest.get("format", 1)) >= 2 else "json"
 	return FileAccess.file_exists(dir.path_join("maps/%s.%s" % [label, extension]))

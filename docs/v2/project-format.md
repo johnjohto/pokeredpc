@@ -64,7 +64,13 @@ project/
                          config carries ONLY knobs that were already data (badge
                          stat boosts, field-move badge gates, the two stat-stage
                          tables, the high-crit move list); absent keys fall back
-                         to the ruleset's built-in faithful defaults
+                         to the ruleset's built-in faithful defaults.
+                         formula_scripts (ADR-030, gh #66) binds RulesetFormulas
+                         kernel names to script: records — a bound kernel's math
+                         runs the HatchScript instead of the base ruleset's
+                         arithmetic (contracts in docs/v2/hatch-script.md); an
+                         unknown kernel name or dangling script ref refuses at
+                         validation and at Engine boot
     world.json           format 2+ — cardinal map connections keyed by stable map id
     lint_suppressions.json  table (ADR-027, gh #57) — reviewed ProjectLint warnings:
                          exact rule+source pairs, each with a required human reason;

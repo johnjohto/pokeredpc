@@ -403,6 +403,14 @@ func _ready() -> void:
 		print("[ruleset] FATAL: '%s' configured incompletely (a module script failed to load)" % rs_id)
 		get_tree().quit(1)
 		return
+	# gh #66 (ADR-028/ADR-030): script-backed formula kernels. A binding this build
+	# cannot resolve or parse refuses at boot naming the kernel and script.
+	var hatch_error := ruleset.attach_formula_scripts()
+	if hatch_error != "":
+		push_error("[ruleset] " + hatch_error)
+		print("[ruleset] FATAL: " + hatch_error)
+		get_tree().quit(1)
+		return
 	# gh #39 (ADR-019): load the project's authored events. A record this build cannot
 	# execute (unknown trigger kind / command / unparseable condition) refuses at boot —
 	# the refuse-newer pattern applied to event semantics.
@@ -677,6 +685,30 @@ func _ready() -> void:
 				if not event_probe_flag:
 					event_probe_ok = false
 					event_probe_error = "event ran without taking its authored branch"
+	# gh #66 acceptance: prove script-backed formula kernels are LIVE in a play-test
+	# boot. Fixed inputs and a fixed draw sequence keep the probe deterministic; the
+	# parent knows what the bound scripts must answer (and that gen1 would answer
+	# differently).
+	var formula_probe := "--playtest-formula" in args
+	var formula_kernels := ""
+	var formula_exp50 := -1
+	var formula_catch_caught := false
+	var formula_catch_shakes := -1
+	if formula_probe:
+		if ruleset.formulas is HatchFormulas:
+			formula_kernels = ",".join(PackedStringArray(
+				(ruleset.formulas as HatchFormulas).bound_kernels()))
+		formula_exp50 = ruleset.formulas.exp_for_level(50, "GROWTH_MEDIUM_FAST")
+		var probe_seq: Array = [100, 0]
+		var probe_i: Array = [0]
+		var probe_ri := func(n):
+			var v: int = int(probe_seq[probe_i[0] % probe_seq.size()]) % maxi(1, int(n))
+			probe_i[0] += 1
+			return v
+		var probe_catch := ruleset.formulas.catch_attempt("POKE BALL", "", 60, 20, 40,
+			probe_ri)
+		formula_catch_caught = bool(probe_catch.get("caught", false))
+		formula_catch_shakes = int(probe_catch.get("shakes", -1))
 	var playtest_handshake := _arg_value(args, "--playtest-handshake=")
 	if playtest_handshake != "":
 		var inspected_cells := {}
@@ -704,6 +736,10 @@ func _ready() -> void:
 			"event_probe_ok": event_probe_ok,
 			"event_probe_error": event_probe_error,
 			"event_probe_flag": event_probe_flag,
+			"formula_kernels": formula_kernels,
+			"formula_exp50": formula_exp50,
+			"formula_catch_caught": formula_catch_caught,
+			"formula_catch_shakes": formula_catch_shakes,
 			"save_path": ProjectSettings.globalize_path(SAVE_PATH),
 			"save_slot": _arg_value(args, "--saveslot="),
 			"token": _arg_value(args, "--playtest-token="),
@@ -5621,11 +5657,11 @@ func _schematest() -> void:
 	ok = _schema_check("valid: no errors", (r["errors"] as Array).is_empty() and bool(r["ok"]),
 		"; ".join(PackedStringArray(r["errors"]))) and ok
 	var ids: Dictionary = r["ids"]
-	ok = _schema_check("valid: ids registered (2 species, 1 move, 2 items, 1 trainer, 1 map, 2 types, 1 event, 1 script)",
+	ok = _schema_check("valid: ids registered (2 species, 1 move, 2 items, 1 trainer, 1 map, 2 types, 1 event, 2 scripts)",
 		int(ids.get("species", 0)) == 2 and int(ids.get("move", 0)) == 1
 		and int(ids.get("item", 0)) == 2 and int(ids.get("trainer", 0)) == 1
 		and int(ids.get("map", 0)) == 1 and int(ids.get("type", 0)) == 2
-		and int(ids.get("event", 0)) == 1 and int(ids.get("script", 0)) == 1,
+		and int(ids.get("event", 0)) == 1 and int(ids.get("script", 0)) == 2,
 		str(ids)) and ok
 	var tmx: Dictionary = ProjectValidator.validate_project("res://core/fixtures/valid_tmx")
 	ok = _schema_check("format 2: native TMX project validates and registers map/event ids",
@@ -5655,6 +5691,8 @@ func _schematest() -> void:
 		["broken_bad_command", "matches no anyOf branch"],
 		["broken_event_bad_object", "names object 'SPRITE_GHOST@0,0', which is not on map"],
 		["broken_event_oob_cell", "cell (9,9) is outside map"],
+		["broken_formula_kernel", "unknown field 'frobnicate'"],
+		["broken_formula_ref", "dangling reference 'script:nope'"],
 	]
 	for c in cases:
 		var b: Dictionary = ProjectValidator.validate_project("res://core/fixtures/" + str(c[0]))
@@ -5768,6 +5806,21 @@ func _rulesettest() -> void:
 	f2.apply_config({"stat_stage_multipliers": {"2": 300}})
 	ok = _rs_check("config override turns a knob (stage +2 -> 300%)",
 		f2.stage_apply(100, 2) == 300 and F.stage_apply(100, 2) == 200, "") and ok
+	# gh #66 (ADR-030): the formula hatch. Vanilla Kanto binds no formula scripts, so
+	# boot must NOT wrap the native provider, and the attach seam must be a no-op.
+	ok = _rs_check("no formula_scripts -> native formulas stay unwrapped",
+		not (ruleset.formulas is HatchFormulas)
+		and ruleset.attach_formula_scripts() == ""
+		and not (ruleset.formulas is HatchFormulas), "") and ok
+	# A bound kernel answers through its script; unbound kernels delegate to the base.
+	var hf := HatchFormulas.new(Gen1Formulas.new(), {"stage_apply": "script:triple"},
+		{"triple": {"id": "script:triple",
+			"source": "if stage == 2 { return base * 3 }\nreturn base"}})
+	ok = _rs_check("formula hatch turns a kernel; unbound kernels stay native",
+		hf.boot_error == "" and hf.stage_apply(100, 2) == 300
+		and F.stage_apply(100, 2) == 200
+		and hf.exp_for_level(100, "GROWTH_SLOW") == F.exp_for_level(100, "GROWTH_SLOW"),
+		hf.boot_error) and ok
 	print("[ruleset] %s" % ("ALL GREEN" if ok else "FAIL"))
 	get_tree().quit(0 if ok else 1)
 
@@ -5844,6 +5897,7 @@ func _exprtest() -> void:
 	ok = _ex_check("damage_core sweep (%d vectors, incl. the /4 overflow branch)" % checked,
 		mism == 0, "%d mismatches" % mism) and ok
 	ok = preload("res://core/ruleset/HatchScriptSmoke.gd").new().run() and ok
+	ok = await _exprtest_hatch(native) and ok
 	print("[expr] %s" % ("ALL GREEN" if ok else "FAIL"))
 	get_tree().quit(0 if ok else 1)
 
@@ -5852,6 +5906,417 @@ func _ex_check(name: String, good: bool, detail: String) -> bool:
 	print("[expr] %s: %s%s" % [name, "PASS" if good else "FAIL",
 		"" if good or detail == "" else " — " + detail])
 	return good
+
+
+## A replaying draw stub for the formula-hatch equivalence sweep: the native and the
+## scripted kernel each consume their OWN copy of the same pre-recorded sequence, and
+## equal consumed counts prove the script preserved the kernel's draw order.
+class _ExDraws:
+	var seq: Array
+	var i := 0
+	func _init(s: Array) -> void:
+		seq = s
+	func rf() -> float:
+		var v := float(seq[i % seq.size()])
+		i += 1
+		return v
+	func rr(a: int, b: int) -> int:
+		var v := int(seq[i % seq.size()])
+		i += 1
+		return clampi(v, a, b)
+	func ri(n: int) -> int:
+		var v := int(seq[i % seq.size()])
+		i += 1
+		return v % maxi(1, n)
+
+
+## The gh #66 sample creator tweak (also the play-test probe's binding): one draw
+## against twice the species rate. Deliberately NOT gen1's kernel — the probe proves a
+## creator's different math reaches play, so it must answer differently from native.
+const HATCH_DOUBLE_CATCH_SRC := """# Doubled catch rate: one draw against twice the species rate (cap 255).
+if ball == "MASTER BALL" { out("caught", true) out("shakes", 3) return 0 }
+let r = min(255, rate * 2)
+if rand_int(256) <= r { out("caught", true) out("shakes", 3) return 0 }
+out("caught", false)
+out("shakes", 1)"""
+
+const HATCH_HALF_CUBE_SRC := "return n * n * n / 2"
+
+
+## gh #66 (ADR-030): the formula hatch — every gen1 kernel re-expressed as a
+## HatchScript must answer exactly like the native kernel through HatchFormulas
+## (value for value, and draw for draw for the RNG kernels), the binding refusals
+## must name their cause, a runtime failure must fall back loudly to the base
+## kernel, and a scratch project binding a tweaked kernel must show the tweak
+## through a REAL child-engine boot with no engine code.
+func _exprtest_hatch(native: Gen1Formulas) -> bool:
+	var ok := true
+	var g1_sources := _hatch_gen1_sources()
+	var g1_records := {}
+	var g1_bindings := {}
+	for kernel in g1_sources:
+		g1_records["g1_" + str(kernel)] = {"id": "script:g1_" + str(kernel),
+			"source": g1_sources[kernel]}
+		g1_bindings[kernel] = "script:g1_" + str(kernel)
+	var hatch := HatchFormulas.new(Gen1Formulas.new(), g1_bindings, g1_records)
+	ok = _ex_check("hatch: all ten gen1 kernels bind and parse",
+		hatch.boot_error == "" and hatch.bound_kernels().size() == 10,
+		hatch.boot_error) and ok
+	if hatch.boot_error != "":
+		return false
+	# --- the pure kernels: value-for-value over the gh #35 vector matrices ---
+	var checked := 0
+	var mism := 0
+	for base in [1, 30, 100, 255]:
+		for level in [1, 5, 50, 100]:
+			for dv in [0, 8, 15]:
+				for sexp in [0, 1, 27, 100, 65535]:
+					for is_hp in [false, true]:
+						checked += 1
+						if native.stat_calc(base, level, dv, is_hp, sexp) \
+								!= hatch.stat_calc(base, level, dv, is_hp, sexp):
+							mism += 1
+	ok = _ex_check("hatch stat_calc sweep (%d vectors)" % checked, mism == 0,
+		"%d mismatches" % mism) and ok
+	checked = 0
+	mism = 0
+	for g in ["GROWTH_FAST", "GROWTH_SLOW", "GROWTH_MEDIUM_SLOW", "GROWTH_MEDIUM_FAST"]:
+		for n in range(1, 101):
+			checked += 1
+			if native.exp_for_level(n, g) != hatch.exp_for_level(n, g):
+				mism += 1
+		for xp in [0, 7, 511, 800000, 1059860, 1250000, 1999999]:
+			checked += 1
+			if native.level_for_exp(xp, g) != hatch.level_for_exp(xp, g):
+				mism += 1
+	ok = _ex_check("hatch exp-curve + inverse sweep (%d vectors)" % checked, mism == 0,
+		"%d mismatches" % mism) and ok
+	checked = 0
+	mism = 0
+	for level in [1, 50, 100]:
+		for crit in [false, true]:
+			for power in [0, 20, 100, 250]:
+				for a in [1, 150, 255, 999]:
+					for d in [1, 100, 255, 999]:
+						checked += 1
+						if native.damage_core(level, crit, power, a, d) \
+								!= hatch.damage_core(level, crit, power, a, d):
+							mism += 1
+	ok = _ex_check("hatch damage_core sweep (%d vectors)" % checked, mism == 0,
+		"%d mismatches" % mism) and ok
+	checked = 0
+	mism = 0
+	for base in [1, 100, 500, 999]:
+		for stage in range(-7, 8):
+			checked += 1
+			if native.stage_apply(base, stage) != hatch.stage_apply(base, stage):
+				mism += 1
+	ok = _ex_check("hatch stage_apply sweep (%d vectors)" % checked, mism == 0,
+		"%d mismatches" % mism) and ok
+	# --- the RNG kernels: same replayed draws in, same value AND draw count out ---
+	checked = 0
+	mism = 0
+	for spd in [10, 90, 200, 300]:
+		for focus in [false, true]:
+			for mv in ["SLASH", "TACKLE", "CRABHAMMER"]:
+				for roll in [0.0, 0.05, 0.17, 0.4, 0.9]:
+					checked += 1
+					var sa := _ExDraws.new([roll])
+					var sb := _ExDraws.new([roll])
+					if native.crit_roll(spd, focus, mv, Callable(sa, "rf")) \
+							!= hatch.crit_roll(spd, focus, mv, Callable(sb, "rf")) \
+							or sa.i != sb.i:
+						mism += 1
+	ok = _ex_check("hatch crit_roll sweep (%d vectors, draws preserved)" % checked,
+		mism == 0, "%d mismatches" % mism) and ok
+	checked = 0
+	mism = 0
+	for acc in [30, 70, 100]:
+		for a_stage in [-6, -2, -1, 0, 1, 2, 6]:
+			for e_stage in [-6, -2, -1, 0, 1, 2, 6]:
+				for roll in [0, 100, 254, 255]:
+					checked += 1
+					var sa := _ExDraws.new([roll])
+					var sb := _ExDraws.new([roll])
+					if native.accuracy_roll(acc, a_stage, e_stage, Callable(sa, "ri")) \
+							!= hatch.accuracy_roll(acc, a_stage, e_stage, Callable(sb, "ri")) \
+							or sa.i != sb.i:
+						mism += 1
+	ok = _ex_check("hatch accuracy_roll sweep (%d vectors, draws preserved)" % checked,
+		mism == 0, "%d mismatches" % mism) and ok
+	checked = 0
+	mism = 0
+	for dmg in [0, 1, 2, 50, 997]:
+		for roll in [217, 236, 255]:
+			checked += 1
+			var sa := _ExDraws.new([roll])
+			var sb := _ExDraws.new([roll])
+			if native.randomize_damage(dmg, Callable(sa, "rr")) \
+					!= hatch.randomize_damage(dmg, Callable(sb, "rr")) or sa.i != sb.i:
+				mism += 1
+	ok = _ex_check("hatch randomize_damage sweep (%d vectors, draws preserved)" % checked,
+		mism == 0, "%d mismatches" % mism) and ok
+	checked = 0
+	mism = 0
+	for mv in ["SEISMIC_TOSS", "NIGHT_SHADE", "DRAGON_RAGE", "SONICBOOM", "PSYWAVE", "TACKLE"]:
+		for level in [1, 40, 100]:
+			for roll in [1, 60, 149]:
+				checked += 1
+				var sa := _ExDraws.new([roll])
+				var sb := _ExDraws.new([roll])
+				if native.special_damage(mv, level, Callable(sa, "rr")) \
+						!= hatch.special_damage(mv, level, Callable(sb, "rr")) or sa.i != sb.i:
+					mism += 1
+	ok = _ex_check("hatch special_damage sweep (%d vectors, draws preserved)" % checked,
+		mism == 0, "%d mismatches" % mism) and ok
+	checked = 0
+	mism = 0
+	for ball in ["POKE BALL", "GREAT BALL", "ULTRA BALL", "MASTER BALL"]:
+		for status in ["", "psn", "slp", "frz"]:
+			for rate in [3, 45, 150, 255]:
+				for hpv in [[10, 10], [1, 50], [120, 250], [30, 40]]:
+					for seq in [[200, 30], [10, 250], [150, 100], [0, 0], [255, 255]]:
+						checked += 1
+						var sa := _ExDraws.new(seq)
+						var sb := _ExDraws.new(seq)
+						var nv := native.catch_attempt(ball, status, rate,
+							hpv[0], hpv[1], Callable(sa, "ri"))
+						var hv := hatch.catch_attempt(ball, status, rate,
+							hpv[0], hpv[1], Callable(sb, "ri"))
+						if nv["caught"] != hv["caught"] or nv["shakes"] != hv["shakes"] \
+								or sa.i != sb.i:
+							mism += 1
+	ok = _ex_check("hatch catch_attempt sweep (%d vectors, draws preserved)" % checked,
+		mism == 0, "%d mismatches" % mism) and ok
+	# --- repeated-run determinism: a compiled kernel answers identically forever ---
+	var det := true
+	var first := {}
+	for rep in range(3):
+		det = det and hatch.damage_core(50, false, 100, 150, 100) == 68
+		var sd := _ExDraws.new([150, 100])
+		var dv2 := hatch.catch_attempt("POKE BALL", "psn", 150, 30, 40, Callable(sd, "ri"))
+		if rep == 0:
+			first = dv2
+		det = det and dv2["caught"] == first["caught"] and dv2["shakes"] == first["shakes"] \
+			and bool(dv2["caught"]) and int(dv2["shakes"]) == 3
+	ok = _ex_check("hatch kernels are replay-deterministic", det, "") and ok
+	# --- a creator's tweak turns the knob: doubled catch + a custom exp curve ---
+	var dbl := HatchFormulas.new(Gen1Formulas.new(),
+		{"catch_attempt": "script:double_catch"},
+		{"double_catch": {"id": "script:double_catch", "source": HATCH_DOUBLE_CATCH_SRC}})
+	var sa2 := _ExDraws.new([100, 0])
+	var sb2 := _ExDraws.new([100, 0])
+	var nv2 := native.catch_attempt("POKE BALL", "", 60, 20, 40, Callable(sa2, "ri"))
+	var hv2 := dbl.catch_attempt("POKE BALL", "", 60, 20, 40, Callable(sb2, "ri"))
+	ok = _ex_check("doubled catch rate catches where native misses",
+		dbl.boot_error == "" and not bool(nv2["caught"]) and bool(hv2["caught"])
+		and int(hv2["shakes"]) == 3, str(hv2)) and ok
+	var custom := HatchFormulas.new(Gen1Formulas.new(),
+		{"exp_for_level": "script:half_cube"},
+		{"half_cube": {"id": "script:half_cube", "source": HATCH_HALF_CUBE_SRC}})
+	ok = _ex_check("custom exp curve applies and level_for_exp inverts the SCRIPTED curve",
+		custom.exp_for_level(10, "GROWTH_MEDIUM_FAST") == 500
+		and custom.level_for_exp(500, "GROWTH_MEDIUM_FAST") == 10
+		and native.level_for_exp(500, "GROWTH_MEDIUM_FAST") == 7, "") and ok
+	# --- boot refusals name their cause (the refuse-newer pattern) ---
+	var bad_kernel := HatchFormulas.new(native, {"frobnicate": "script:g1_stat_calc"},
+		g1_records)
+	ok = _ex_check("unknown kernel refuses at boot naming it",
+		bad_kernel.boot_error.contains("frobnicate"), bad_kernel.boot_error) and ok
+	var bad_ref := HatchFormulas.new(native, {"stat_calc": "script:nope"}, g1_records)
+	ok = _ex_check("missing script refuses at boot naming it",
+		bad_ref.boot_error.contains("script:nope"), bad_ref.boot_error) and ok
+	var bare_ref := HatchFormulas.new(native, {"stat_calc": "g1_stat_calc"}, g1_records)
+	ok = _ex_check("bare (unprefixed) script reference refuses at boot",
+		bare_ref.boot_error.contains("script: prefix"), bare_ref.boot_error) and ok
+	var bad_src := HatchFormulas.new(native, {"stat_calc": "script:broken"},
+		{"broken": {"id": "script:broken", "source": "let x ="}})
+	ok = _ex_check("unparseable script refuses at boot with its position",
+		bad_src.boot_error.contains("line 1"), bad_src.boot_error) and ok
+	# --- a runtime failure is loud and falls back to the base kernel ---
+	var rterr := HatchFormulas.new(Gen1Formulas.new(), {"stat_calc": "script:oops"},
+		{"oops": {"id": "script:oops", "source": "return no_such_var"}})
+	ok = _ex_check("runtime error falls back to the base kernel, loudly",
+		rterr.boot_error == ""
+		and rterr.stat_calc(100, 50, 15, false, 0) == native.stat_calc(100, 50, 15, false, 0)
+		and rterr.last_error.contains("no_such_var"), rterr.last_error) and ok
+	var noout := HatchFormulas.new(Gen1Formulas.new(), {"catch_attempt": "script:noout"},
+		{"noout": {"id": "script:noout", "source": "return 0"}})
+	var sa3 := _ExDraws.new([100, 0])
+	var sb3 := _ExDraws.new([100, 0])
+	var nv3 := native.catch_attempt("POKE BALL", "", 60, 20, 40, Callable(sa3, "ri"))
+	var hv3 := noout.catch_attempt("POKE BALL", "", 60, 20, 40, Callable(sb3, "ri"))
+	ok = _ex_check("catch script without out() falls back to the base kernel, loudly",
+		nv3["caught"] == hv3["caught"] and nv3["shakes"] == hv3["shakes"]
+		and noout.last_error.contains("out("), noout.last_error) and ok
+	ok = await _exprtest_hatch_playtest() and ok
+	return ok
+
+
+## The gh #66 acceptance: a scratch project binding a tweaked catch kernel and a custom
+## exp curve — pure data, no engine code — boots a REAL child Engine whose handshake
+## proves the scripted kernels are live on the ruleset seam.
+func _exprtest_hatch_playtest() -> bool:
+	var ok := true
+	var scratch := OS.get_user_data_dir().path_join("hatch_scratch")
+	if DirAccess.dir_exists_absolute(scratch):
+		OS.move_to_trash(scratch)
+	var cerr := ProjectData.copy_dir(ProjectSettings.globalize_path("res://project"), scratch)
+	ok = _ex_check("hatch scratch copy of the Kanto project", cerr == "", cerr) and ok
+	if cerr != "":
+		return false
+	DirAccess.make_dir_recursive_absolute(scratch.path_join("data/scripts"))
+	var werr := CanonJSON.write_file(scratch.path_join("data/scripts/double_catch.json"),
+		{"id": "script:double_catch", "source": HATCH_DOUBLE_CATCH_SRC})
+	werr += CanonJSON.write_file(scratch.path_join("data/scripts/half_cube.json"),
+		{"id": "script:half_cube", "source": HATCH_HALF_CUBE_SRC})
+	var rc_parsed = JSON.parse_string(FileAccess.get_file_as_string(
+		scratch.path_join("data/ruleset.json")))
+	var rc: Dictionary = rc_parsed if rc_parsed is Dictionary else {}
+	rc["formula_scripts"] = {"catch_attempt": "script:double_catch",
+		"exp_for_level": "script:half_cube"}
+	werr += CanonJSON.write_file(scratch.path_join("data/ruleset.json"), rc)
+	ok = _ex_check("hatch scratch binds two kernels through data alone", werr == "",
+		werr) and ok
+	var report := ProjectValidator.validate_project(scratch)
+	ok = _ex_check("hatch scratch validates with zero errors",
+		bool(report.get("ok", false)),
+		"; ".join(PackedStringArray(report.get("errors", [])))) and ok
+	var pt := StudioPlaytest.new()
+	var lerr := pt.launch(scratch, true, true, "", [], {}, "", true)
+	ok = _ex_check("hatch play-test child launches", lerr == "", lerr) and ok
+	if lerr != "":
+		return false
+	var ack: Dictionary = await pt.wait_for_handshake(get_tree(), 30000)
+	var exited: bool = await pt.wait_for_exit(get_tree(), 5000)
+	pt.cleanup_handshake()
+	# 50^3/2, not gen1's 125000 — and the doubled rate catches on the probe's fixed
+	# draw (100 <= 120) where gen1's kernel would have missed (100 > 60).
+	ok = _ex_check("child engine reports the scripted kernels live in play-test",
+		bool(ack.get("ok", false))
+		and str(ack.get("formula_kernels", "")) == "catch_attempt,exp_for_level"
+		and int(ack.get("formula_exp50", -1)) == 62500
+		and bool(ack.get("formula_catch_caught", false))
+		and int(ack.get("formula_catch_shakes", -1)) == 3
+		and exited, str(ack)) and ok
+	# Leave the scratch re-bound to the FULL gen1 re-expression (all ten kernels): the
+	# determinism gate replays `--battledettest --project=<this scratch>` and the four
+	# stream md5s must be byte-identical to the vanilla baseline — scripted kernels on
+	# the real battle path, byte-equal streams (the gh #66 determinism acceptance).
+	var g1_sources := _hatch_gen1_sources()
+	var g1_bind := {}
+	var gerr := ""
+	for kernel in g1_sources:
+		gerr += CanonJSON.write_file(
+			scratch.path_join("data/scripts/g1_%s.json" % str(kernel)),
+			{"id": "script:g1_%s" % str(kernel), "source": g1_sources[kernel]})
+		g1_bind[str(kernel)] = "script:g1_%s" % str(kernel)
+	rc["formula_scripts"] = g1_bind
+	gerr += CanonJSON.write_file(scratch.path_join("data/ruleset.json"), rc)
+	var report2 := ProjectValidator.validate_project(scratch)
+	ok = _ex_check("gen1-scripted scratch validates for the determinism gate",
+		gerr == "" and bool(report2.get("ok", false)),
+		gerr + "; ".join(PackedStringArray(report2.get("errors", [])))) and ok
+	print("[expr] hatch determinism scratch: " + scratch)
+	return ok
+
+
+## The scripted re-expressions of every gen1 kernel, wrapping the PROVEN gh #35
+## FormulaExpr sources in HatchScript statements wherever one exists — the sweep then
+## holds HatchFormulas to Gen1Formulas' outputs, value for value and draw for draw.
+## The asm spec is the SAME one Gen1Formulas cites kernel by kernel (CalcStat, the
+## growth-rate curves, the Focus-Energy-bug crit path, GetDamageVars/CalculateDamage,
+## RandomizeDamage, MoveHitTest, StatModifier, SPECIAL_DAMAGE_EFFECT, ItemUseBall);
+## these scripts restate Gen1Formulas' GDScript, and the sweep pins them to it.
+func _hatch_gen1_sources() -> Dictionary:
+	var native := Gen1Formulas.new()
+	var exp_src := "if growth == \"GROWTH_FAST\" { return %s }\n" % Gen1ExprFormulas.SRC_EXP["GROWTH_FAST"] \
+		+ "if growth == \"GROWTH_SLOW\" { return %s }\n" % Gen1ExprFormulas.SRC_EXP["GROWTH_SLOW"] \
+		+ "if growth == \"GROWTH_MEDIUM_SLOW\" { return %s }\n" % Gen1ExprFormulas.SRC_EXP["GROWTH_MEDIUM_SLOW"] \
+		+ "return " + Gen1ExprFormulas.SRC_EXP["GROWTH_MEDIUM_FAST"]
+	var lfe_src := """let lvl = 1
+while lvl < 100 {
+	let n = lvl + 1
+	let t = 0
+	if growth == "GROWTH_FAST" { t = %s }
+	if growth == "GROWTH_SLOW" { t = %s }
+	if growth == "GROWTH_MEDIUM_SLOW" { t = %s }
+	if growth == "GROWTH_MEDIUM_FAST" { t = %s }
+	if t > xp { return lvl }
+	lvl = lvl + 1
+}
+return lvl""" % [Gen1ExprFormulas.SRC_EXP["GROWTH_FAST"],
+		Gen1ExprFormulas.SRC_EXP["GROWTH_SLOW"],
+		Gen1ExprFormulas.SRC_EXP["GROWTH_MEDIUM_SLOW"],
+		Gen1ExprFormulas.SRC_EXP["GROWTH_MEDIUM_FAST"]]
+	var crit_src := """let b = base_spd / 2
+if focus { b = b / 2 } else { b = min(255, b * 2) }
+if move_name == "SLASH" or move_name == "KARATE_CHOP" or move_name == "RAZOR_LEAF" or move_name == "CRABHAMMER" {
+	b = min(255, min(255, b * 2) * 2)
+} else { b = b / 2 }
+return rand_float() < b / 256.0"""
+	var acc_src := "let a = acc_stage\nif a < -6 { a = -6 }\nif a > 6 { a = 6 }\n" \
+		+ "let e = 0 - eva_stage\nif e < -6 { e = -6 }\nif e > 6 { e = 6 }\n" \
+		+ "let acc = int(accuracy * 255 / 100.0)\nlet m = 100\n" \
+		+ _hatch_stage_chain("a", native.STAGE_NUM) \
+		+ "acc = int(acc * m / 100.0)\nm = 100\n" \
+		+ _hatch_stage_chain("e", native.STAGE_NUM) \
+		+ "acc = int(acc * m / 100.0)\nif acc > 255 { acc = 255 }\n" \
+		+ "return rand_int(256) < acc"
+	var stage_src := "let s = stage\nif s < -6 { s = -6 }\nif s > 6 { s = 6 }\nlet m = 100\n" \
+		+ _hatch_stage_chain("s", native.STAGE_NUM) \
+		+ "let v = base * m / 100\nif v < 1 { return 1 }\nif v > 999 { return 999 }\nreturn v"
+	var rdmg_src := """if dmg > 1 { return max(1, int(dmg * rand_range(217, 255) / 255.0)) }
+return dmg"""
+	var spec_src := """if move == "SEISMIC_TOSS" or move == "NIGHT_SHADE" { return level }
+if move == "DRAGON_RAGE" { return 40 }
+if move == "SONICBOOM" { return 20 }
+if move == "PSYWAVE" { return max(1, rand_range(1, int(1.5 * level))) }
+return level"""
+	var catch_src := """if ball == "MASTER BALL" { out("caught", true) out("shakes", 3) return 0 }
+let span = 256
+let bf = 12
+let bf2 = 255
+if ball == "GREAT BALL" { span = 201 bf = 8 bf2 = 200 }
+if ball == "ULTRA BALL" or ball == "SAFARI BALL" { span = 151 bf2 = 150 }
+let r1 = rand_int(span)
+if status == "slp" or status == "frz" { r1 = r1 - 25 } else { if status != "" { r1 = r1 - 12 } }
+if r1 < 0 { out("caught", true) out("shakes", 3) return 0 }
+let x = maxhp * 255 / bf / max(1, hp / 4)
+if r1 <= rate {
+	if x > 255 { out("caught", true) out("shakes", 3) return 0 }
+	if rand_int(256) <= x { out("caught", true) out("shakes", 3) return 0 }
+}
+let y = rate * 100 / bf2
+if y > 255 { out("caught", false) out("shakes", 3) return 0 }
+let z = min(x, 255) * y / 255
+if status == "slp" or status == "frz" { z = z + 10 } else { if status != "" { z = z + 5 } }
+if z < 10 { out("caught", false) out("shakes", 0) return 0 }
+if z < 30 { out("caught", false) out("shakes", 1) return 0 }
+if z < 70 { out("caught", false) out("shakes", 2) return 0 }
+out("caught", false)
+out("shakes", 3)"""
+	return {
+		"stat_calc": "return " + Gen1ExprFormulas.SRC_STAT_CALC,
+		"exp_for_level": exp_src,
+		"level_for_exp": lfe_src,
+		"crit_roll": crit_src,
+		"damage_core": "return " + Gen1ExprFormulas.SRC_DAMAGE_CORE,
+		"randomize_damage": rdmg_src,
+		"accuracy_roll": acc_src,
+		"stage_apply": stage_src,
+		"special_damage": spec_src,
+		"catch_attempt": catch_src,
+	}
+
+
+## stage table -> a HatchScript if-chain assigning m (the language has no tables; the
+## faithful percents inline, exactly as data/ruleset.json's knobs hold them).
+func _hatch_stage_chain(varname: String, table: Dictionary) -> String:
+	var out := ""
+	for s in range(-6, 7):
+		out += "if %s == %d { m = %d }\n" % [varname, s, int(table[s])]
+	return out
 
 
 ## gh #25: the reconstruction parity oracle — ProjectData.legacy(name) must equal the

@@ -10,7 +10,7 @@ func run() -> bool:
 	var scratch := OS.get_user_data_dir().path_join("worlddoc_edit")
 	if DirAccess.dir_exists_absolute(scratch):
 		OS.move_to_trash(scratch)
-	var copy_error := _copy_dir(fixture, scratch)
+	var copy_error := ProjectData.copy_dir(fixture, scratch)
 	var second := MapDocument.create(scratch, "LinkTown", 4, 3, "tracer.tsx")
 	var world_path := scratch.path_join("data/world.json")
 	var write_error := CanonJSON.write_file(world_path, {"maps": {
@@ -74,27 +74,3 @@ static func _check(name: String, good: bool, detail := "") -> bool:
 	print("[worlddoc] %s: %s%s" % [name, "PASS" if good else "FAIL",
 		"" if good or detail == "" else " — " + detail])
 	return good
-
-
-static func _copy_dir(from: String, to: String) -> String:
-	var directory := DirAccess.open(from)
-	if directory == null:
-		return "cannot open " + from
-	DirAccess.make_dir_recursive_absolute(to)
-	directory.list_dir_begin()
-	var entry := directory.get_next()
-	while entry != "":
-		var source := from.path_join(entry)
-		var target := to.path_join(entry)
-		if directory.current_is_dir():
-			var child_error := _copy_dir(source, target)
-			if child_error != "":
-				return child_error
-		else:
-			var out := FileAccess.open(target, FileAccess.WRITE)
-			if out == null:
-				return "cannot write " + target
-			out.store_buffer(FileAccess.get_file_as_bytes(source))
-		entry = directory.get_next()
-	directory.list_dir_end()
-	return ""

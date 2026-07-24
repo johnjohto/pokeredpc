@@ -26,7 +26,7 @@ func run() -> bool:
 	var scratch := OS.get_user_data_dir().path_join("projectlint_scratch_%d" % OS.get_process_id())
 	if DirAccess.dir_exists_absolute(scratch):
 		OS.move_to_trash(scratch)
-	var copy_error := _copy_dir(ProjectSettings.globalize_path("res://project"), scratch)
+	var copy_error := ProjectData.copy_dir(ProjectSettings.globalize_path("res://project"), scratch)
 	ok = _check("regression scratch copies the Kanto project", copy_error == "", copy_error) and ok
 	if copy_error != "":
 		return false
@@ -83,27 +83,3 @@ static func _delete(root: String, rel: String) -> String:
 	if not FileAccess.file_exists(path):
 		return "missing " + rel
 	return "" if DirAccess.remove_absolute(path) == OK else "cannot delete " + rel
-
-
-static func _copy_dir(from: String, to: String) -> String:
-	var directory := DirAccess.open(from)
-	if directory == null:
-		return "cannot open " + from
-	DirAccess.make_dir_recursive_absolute(to)
-	directory.list_dir_begin()
-	var entry := directory.get_next()
-	while entry != "":
-		var source := from.path_join(entry)
-		var target := to.path_join(entry)
-		if directory.current_is_dir():
-			var child_error := _copy_dir(source, target)
-			if child_error != "":
-				return child_error
-		else:
-			var out := FileAccess.open(target, FileAccess.WRITE)
-			if out == null:
-				return "cannot write " + target
-			out.store_buffer(FileAccess.get_file_as_bytes(source))
-		entry = directory.get_next()
-	directory.list_dir_end()
-	return ""

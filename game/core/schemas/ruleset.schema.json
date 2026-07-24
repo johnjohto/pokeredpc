@@ -1,7 +1,7 @@
 {
  "$schema": "https://json-schema.org/draft/2020-12/schema",
  "$id": "schema:ruleset",
- "$comment": "The ruleset config record (ADR-018 §4, gh #34): base names the built-in ruleset (must match the manifest's selector); config carries ONLY knobs that were already data — the badge stat-boost mapping, the field-move badge gates, the two stat-stage multiplier tables, and the high-crit move list. Absent keys fall back to the ruleset's built-in faithful defaults.",
+ "$comment": "The ruleset config record (ADR-018 §4, gh #34): base names the built-in ruleset (must match the manifest's selector); config carries ONLY knobs that were already data — the badge stat-boost mapping, the field-move badge gates, the two stat-stage multiplier tables, and the high-crit move list. Absent keys fall back to the ruleset's built-in faithful defaults. formula_scripts is the Phase-6 formula hatch (ADR-028/ADR-030, gh #66): kernel name -> the script: record replacing that kernel's arithmetic behind the same RulesetFormulas interface.",
  "type": "object",
  "required": [
   "base"
@@ -47,6 +47,53 @@
       "type": "string",
       "x-ref": "move"
      }
+    }
+   },
+   "additionalProperties": false
+  },
+  "formula_scripts": {
+   "$comment": "Phase-6 formula hatch (ADR-028/ADR-030, gh #66): kernel name -> the HatchScript record implementing it. Bound kernels replace the base ruleset's arithmetic; unbound kernels keep the base implementation. RNG-drawing kernels receive the battle's draw Callables as rand_float/rand_range/rand_int hosts — scripts control formula math, never draw order.",
+   "type": "object",
+   "properties": {
+    "stat_calc": {
+     "type": "string",
+     "x-ref": "script"
+    },
+    "exp_for_level": {
+     "type": "string",
+     "x-ref": "script"
+    },
+    "level_for_exp": {
+     "type": "string",
+     "x-ref": "script"
+    },
+    "crit_roll": {
+     "type": "string",
+     "x-ref": "script"
+    },
+    "damage_core": {
+     "type": "string",
+     "x-ref": "script"
+    },
+    "randomize_damage": {
+     "type": "string",
+     "x-ref": "script"
+    },
+    "accuracy_roll": {
+     "type": "string",
+     "x-ref": "script"
+    },
+    "stage_apply": {
+     "type": "string",
+     "x-ref": "script"
+    },
+    "special_damage": {
+     "type": "string",
+     "x-ref": "script"
+    },
+    "catch_attempt": {
+     "type": "string",
+     "x-ref": "script"
     }
    },
    "additionalProperties": false

@@ -859,7 +859,7 @@ func _studio_map_sweep_test() -> void:
 	var ok := true
 	var migration_scratch := OS.get_user_data_dir().path_join(
 		"studio_map_migration_%d" % OS.get_process_id())
-	var error := _copy_dir("res://project", migration_scratch)
+	var error := ProjectData.copy_dir("res://project", migration_scratch)
 	ok = _st_check("map migration test copies the Kanto project", error == "", error) and ok
 	var manifest_path := migration_scratch.path_join("manifest.json")
 	var native_manifest := FileAccess.get_file_as_string(manifest_path)
@@ -915,7 +915,7 @@ func _studiotest() -> void:
 	var scratch := OS.get_user_data_dir().path_join("studio_scratch")
 	if DirAccess.dir_exists_absolute(scratch):
 		OS.move_to_trash(scratch)
-	var cerr := _copy_dir("res://project", scratch)
+	var cerr := ProjectData.copy_dir("res://project", scratch)
 	ok = _st_check("scratch copy of the Kanto project", cerr == "", cerr) and ok
 	var err := open_project(scratch)
 	ok = _st_check("shell opens the scratch project", err == "", err) and ok
@@ -982,29 +982,3 @@ static func _dialog_label(text: String) -> Label:
 	var label := Label.new()
 	label.text = text
 	return label
-
-
-static func _copy_dir(from: String, to: String) -> String:
-	var da := DirAccess.open(from)
-	if da == null:
-		return "cannot open %s" % from
-	DirAccess.make_dir_recursive_absolute(to)
-	da.list_dir_begin()
-	var f := da.get_next()
-	while f != "":
-		var src := from.path_join(f)
-		var dst := to.path_join(f)
-		if da.current_is_dir():
-			var e := _copy_dir(src, dst)
-			if e != "":
-				return e
-		else:
-			var b := FileAccess.get_file_as_bytes(src)
-			var out := FileAccess.open(dst, FileAccess.WRITE)
-			if out == null:
-				return "cannot write %s" % dst
-			out.store_buffer(b)
-			out.close()
-		f = da.get_next()
-	da.list_dir_end()
-	return ""

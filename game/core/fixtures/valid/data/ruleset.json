@@ -1,0 +1,6 @@
+{
+ "base": "gen1",
+ "formula_scripts": {
+  "stat_calc": "script:stat_boost"
+ }
+}

@@ -10,6 +10,22 @@ milestones, `PATCH` bumps are fixes/polish. See `docs/roadmap.md` for the live p
 
 ### Added
 
+- **HatchScript formula hatch** (gh #66, ADR-030). `data/ruleset.json` gained
+  `formula_scripts`: kernel name → `script:` record, replacing that kernel's arithmetic
+  behind the same `RulesetFormulas` interface gen1 uses — bound kernels run their
+  HatchScript, unbound kernels keep the ruleset's native math, and any ruleset gains the
+  hatch through the generic `Ruleset.attach_formula_scripts()` boot step. RNG kernels
+  receive the battle's draw Callables as `rand_float`/`rand_range`/`rand_int` hosts, so
+  scripts control formula math, never draw order; `catch_attempt` reports through
+  `out("caught", …)`/`out("shakes", …)`; binding `exp_for_level` alone derives
+  `level_for_exp` from the scripted curve. Unknown kernels, dangling script refs, and
+  unparseable sources refuse at validation and boot; runtime failures fall back to the
+  base kernel loudly. `--exprtest` holds all ten gen1 kernels re-expressed as scripts to
+  the native outputs (value- and draw-identical) and boots a child Engine proving a
+  doubled catch rate + custom exp curve live in play-test from data alone;
+  `--battledettest` on the fully gen1-scripted project reproduces all four vanilla
+  stream md5s byte-identically.
+
 - **HatchScript event integration** (gh #65, ADR-028). Projects can store validated
   `data/scripts/*.json` sources and invoke them from the schema-derived event palette
   with `run_script`. Scripts receive transactional story flag/variable operations,

@@ -2,6 +2,22 @@
 
 **Living document** — update the table when a milestone lands; add sub-tasks as discovered.
 
+**Landed 2026-07-23:** gh #66 — the formula hatch (ADR-030): `data/ruleset.json`'s new
+`formula_scripts` binds `RulesetFormulas` kernel names to `script:` records, and the Core
+`HatchFormulas` wrapper (attached by the generic `Ruleset.attach_formula_scripts()` boot
+step) runs bound kernels as HatchScript while unbound kernels stay native. RNG kernels
+receive the battle's draw Callables as `rand_float`/`rand_range`/`rand_int` hosts (scripts
+control formula math, never draw order); `catch_attempt` reports through `out()`; binding
+only `exp_for_level` derives the inverse from the scripted curve; runtime failures fall
+back to the base kernel loudly; unknown kernels/dangling refs/bad sources refuse at
+validation and boot. Gates: `--exprtest` grew the ten-kernel gen1 re-expression sweep
+(3,400+ vectors, value- and draw-identical) plus refusal/fallback checks and a scratch
+project that boots a child Engine proving a doubled catch rate + custom exp curve live in
+play-test with no engine code; `--battledettest` on the fully gen1-scripted scratch
+reproduces all four vanilla stream md5s **byte-identically**; `--schematest` (2 new broken
+fixtures), `--rulesettest` (Kanto stays unwrapped; a bound kernel turns), `--eventtest`,
+`--studiotest` (109), `--validate` 0 errors. Contracts: `docs/v2/hatch-script.md`.
+
 **Landed 2026-07-23:** gh #65 attaches the HatchScript Core to authored events.
 `data/scripts/*.json` records are schema-validated and parsed at Project validation and
 Engine boot; `run_script` references one from the ordinary event command palette and can

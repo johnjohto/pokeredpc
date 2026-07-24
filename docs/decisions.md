@@ -2,6 +2,46 @@
 
 Newest first. Each entry: context → decision → consequences.
 
+## ADR-030 — Formula-hatch kernel contracts: fixed inputs, host draws, loud base fallback (2026-07-23)
+
+**Context:** gh #66 lands ADR-028's second hatch: script-backed `RulesetFormulas`
+kernels. The open design questions were where bindings live, how a script receives the
+battle's randomness without owning draw order, how the one dictionary-shaped kernel
+(`catch_attempt`) reports, and what happens when a script fails mid-battle — the
+downstream consumer (pokemon-one's non-gen1 progression layer) needs these contracts
+stable, not just gen1 re-expression.
+**Decision:** (1) Bindings live in `data/ruleset.json` as top-level `formula_scripts`
+(kernel name → `script:` ref) beside `config`, not inside it — ADR-018's "config is
+only what was already data" rule stays intact, and the schema enumerates the ten legal
+kernel names so an unknown key fails validation and boot. (2) The Core wrapper
+`HatchFormulas` composes over ANY base provider via the generic
+`Ruleset.attach_formula_scripts()` boot step: bound kernels run scripts, unbound
+kernels delegate — per-kernel granularity, no whole-module swap (ADR-028's deferral).
+(3) Each kernel has fixed input variables; RNG kernels register the battle's own draw
+Callables as hosts (`rand_float`/`rand_range`/`rand_int`) so scripts control formula
+math, never draw order — proven by re-expressing all ten gen1 kernels as scripts and
+reproducing the four `--battledettest` stream md5s byte-for-byte. (4) `catch_attempt`
+reports through an `out(name, value)` host (`caught` bool + `shakes` int) rather than
+an encoded scalar return. (5) Binding `exp_for_level` alone makes the wrapper derive
+`level_for_exp` by walking the scripted curve, so a curve and its inverse cannot
+disagree. (6) A runtime failure falls back to the base kernel LOUDLY (push_error naming
+script, kernel, position): parse errors refuse at boot like events, but a mid-battle
+input-dependent failure must neither crash the battle nor silently ship wrong math —
+the fallback is deterministic for identical inputs and draws.
+**Consequences:** creators replace exotic math with data alone (the doubled-catch and
+custom-exp acceptance runs live through a child-engine play-test with zero engine
+code); vanilla projects never wrap (rulesettest holds Kanto to the native provider);
+the ten-kernel contract table in docs/v2/hatch-script.md is the API pokemon-one designs
+against. Two known limits, accepted deliberately: scripts cannot express table-shaped
+config (stage multiplier tables stay `config` knobs — a scripted table would need
+language vocabulary ADR-028 excluded), and kernel inputs are exactly the ADR-018
+interface's (`stat_calc` sees base/level/dv, not species or form identity), so a
+per-species/per-form modifier needs the interface itself to grow — a follow-up the
+downstream consumer must drive with a concrete case, not a speculative widening here.
+`tools/hatchdet.ps1` automates the determinism gate: battledettest on vanilla vs the
+exprtest-built gen1-scripted scratch, the four md5s diffed by the script (md5s stay
+machine-relative per gh #44 — never pinned in-tree).
+
 ## ADR-029 — Red/Blue are build-time content variants; link identity stays battle-only (2026-07-23)
 
 **Context:** gh #26 adds Pokémon Blue as a build/extraction option. The pret/pokered tree

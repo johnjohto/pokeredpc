@@ -1,0 +1,4 @@
+{
+ "id": "script:tweak",
+ "source": "return dmg * 2"
+}

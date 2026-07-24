@@ -1,0 +1,6 @@
+{
+ "base": "gen1",
+ "formula_scripts": {
+  "catch_attempt": "script:nope"
+ }
+}

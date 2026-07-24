@@ -49,7 +49,7 @@ func run() -> bool:
 	var edit_scratch := OS.get_user_data_dir().path_join("mapdoc_edit")
 	if DirAccess.dir_exists_absolute(edit_scratch):
 		OS.move_to_trash(edit_scratch)
-	var edit_copy := _copy_dir(fixture, edit_scratch)
+	var edit_copy := ProjectData.copy_dir(fixture, edit_scratch)
 	var edit_opened := MapDocument.open(edit_scratch, "TestTown")
 	ok = _check("editable-map scratch opens", edit_copy == "" and bool(edit_opened.get("ok", false)),
 		edit_copy + str(edit_opened.get("error", ""))) and ok
@@ -138,7 +138,7 @@ func run() -> bool:
 	var scratch := OS.get_user_data_dir().path_join("mapdoc_malformed")
 	if DirAccess.dir_exists_absolute(scratch):
 		OS.move_to_trash(scratch)
-	var copy_error := _copy_dir(fixture, scratch)
+	var copy_error := ProjectData.copy_dir(fixture, scratch)
 	ok = _check("malformed-map scratch project copies", copy_error == "", copy_error) and ok
 	if copy_error == "":
 		var map_path := scratch.path_join("maps/TestTown.tmx")
@@ -208,28 +208,4 @@ static func _write_text(path: String, value: String) -> String:
 	if file == null:
 		return "cannot write " + path
 	file.store_string(value)
-	return ""
-
-
-static func _copy_dir(from: String, to: String) -> String:
-	var directory := DirAccess.open(from)
-	if directory == null:
-		return "cannot open " + from
-	DirAccess.make_dir_recursive_absolute(to)
-	directory.list_dir_begin()
-	var entry := directory.get_next()
-	while entry != "":
-		var source := from.path_join(entry)
-		var target := to.path_join(entry)
-		if directory.current_is_dir():
-			var child_error := _copy_dir(source, target)
-			if child_error != "":
-				return child_error
-		else:
-			var out := FileAccess.open(target, FileAccess.WRITE)
-			if out == null:
-				return "cannot write " + target
-			out.store_buffer(FileAccess.get_file_as_bytes(source))
-		entry = directory.get_next()
-	directory.list_dir_end()
 	return ""

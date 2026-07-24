@@ -1,0 +1,4 @@
+{
+ "id": "script:stat_boost",
+ "source": "let v = (base + dv) * 2 * level / 100\nif is_hp { return v + level + 10 }\nreturn v + 5"
+}
